@@ -1,0 +1,118 @@
+.public-layout__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) max(var(--space-4), calc((100vw - 1080px) / 2));
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.public-layout__brand {
+  font-weight: 800;
+}
+
+.public-layout__nav {
+  display: flex;
+  gap: var(--space-4);
+  color: var(--text-secondary);
+}
+
+.public-layout__main,
+.admin-layout__main {
+  min-height: calc(100vh - 72px);
+}
+
+.home-page,
+.article-detail {
+  width: min(1080px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: var(--space-8) 0;
+}
+
+.home-page__intro {
+  max-width: 720px;
+  margin-bottom: var(--space-8);
+}
+
+.home-page__eyebrow,
+.article-detail__meta {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.home-page__list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.article-card,
+.login-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+}
+
+.article-card__title {
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.article-card__summary {
+  color: var(--text-secondary);
+}
+
+.article-card__meta {
+  display: flex;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.article-detail__content {
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  background: var(--bg-card);
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.login-card {
+  display: grid;
+  width: min(420px, 100%);
+  gap: var(--space-4);
+}
+
+.login-card__error {
+  color: var(--danger);
+}
+
+.admin-layout {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 220px 1fr;
+  background: var(--bg-primary);
+}
+
+.admin-layout__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-right: 1px solid var(--border);
+  padding: var(--space-6);
+  background: var(--bg-card);
+}
+
