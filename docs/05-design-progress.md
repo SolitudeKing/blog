@@ -8,9 +8,9 @@
 | --- | --- |
 | 项目名称 | 新个人博客系统 |
 | 设计阶段 | 方案设计中 |
-| 当前版本 | `design-v0.4` |
+| 当前版本 | `design-v0.5.2` |
 | 开始日期 | 2026-07-03 |
-| 最近更新 | 2026-07-03 |
+| 最近更新 | 2026-07-04 |
 | 设计目标 | 基于旧博客功能结构，设计 Vue3 + Vite + TS + Sass + Go + Gin + GORM + JWT + Redis + Celery + MySQL 的新版博客系统 |
 
 ## 状态说明
@@ -35,7 +35,7 @@
 | 数据迁移方案 | 进行中 | 60% | [03-data-api-design.md](./03-data-api-design.md) | 已有迁移步骤；待补充迁移脚本输入输出、失败重试和校验报告格式 |
 | 部署与运维设计 | 待开始 | 25% | [01-new-blog-architecture.md](./01-new-blog-architecture.md)、[04-implementation-roadmap.md](./04-implementation-roadmap.md) | 已有 Docker Compose 与 Nginx 方向；待补充环境变量、备份、日志、健康检查细节 |
 | 编码设计 | 完成 | 100% | [06-coding-design.md](./06-coding-design.md) | 已定义工程目录、前端 API client、后端分层、Worker 任务、配置和测试策略 |
-| 编码实现骨架 | 进行中 | 45% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架，并通过 Go 测试、前端类型检查、前端构建和 Worker Python 编译；Docker CLI 当前不可用，Compose 尚未实机校验 |
+| 编码实现骨架 | 进行中 | 80% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权和文章数据库优先 CRUD；后台已接入文章管理、分类标签管理和文章分类标签选择；已通过 Go 测试、前端构建和本地 API 冒烟，Compose 尚未实机校验 |
 
 ## 已确认设计决策
 
@@ -54,7 +54,7 @@
 - 新系统采用 `web`、`server`、`worker`、`deploy` 四个新工程目录，旧项目仅作为参考和迁移来源。
 - Go 后端依赖方向固定为 `router -> handler -> service -> repository -> model`，service 负责事务、缓存失效和任务投递。
 - 前端 API client 统一注入 `X-API-Version` 和 JWT，并解析统一响应与游标分页响应。
-- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路，再逐步接入数据库、Redis 和真实 JWT。
+- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前已初步接入数据库、Redis、真实 JWT、后台文章管理和分类标签管理，下一步完善 Markdown 渲染、站点配置、媒体库和旧数据迁移。
 
 ## 近期设计任务
 
@@ -64,8 +64,11 @@
 | P0 | 细化首批自研组件 API：Button、Input、Textarea、Select、Modal、Toast、Table、CursorPagination、Upload | 待开始 | `02-product-and-interaction-design.md` |
 | P0 | 为核心 API 增加请求/响应 DTO 示例 | 待开始 | `03-data-api-design.md` |
 | P0 | 按编码设计创建 `web`、`server`、`worker`、`deploy` 工程脚手架 | 完成 | `06-coding-design.md` |
-| P0 | 接入 Go 数据库层、GORM 模型和 migration | 待开始 | `06-coding-design.md`、`03-data-api-design.md` |
-| P0 | 将 auth 示例 token 替换为真实 JWT 签发与刷新 | 待开始 | `06-coding-design.md`、`03-data-api-design.md` |
+| P0 | 接入 Go 数据库层、GORM 模型和 migration | 完成 | `06-coding-design.md`、`03-data-api-design.md` |
+| P0 | 将 auth 示例 token 替换为真实 JWT 签发与刷新 | 完成 | `06-coding-design.md`、`03-data-api-design.md` |
+| P0 | 完善后台文章列表、创建、编辑与删除页面 | 完成 | `06-coding-design.md`、`02-product-and-interaction-design.md` |
+| P0 | 完善分类标签 CRUD 与后台选择器 | 完成 | `06-coding-design.md`、`03-data-api-design.md` |
+| P1 | 完善 Markdown 渲染、目录导航与文章阅读体验 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 绘制公开站点页面线框：首页、文章详情、归档、搜索、关于 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 绘制后台页面线框：登录、仪表盘、文章列表、编辑器、媒体库、配置 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 补充旧数据迁移校验规则和报告格式 | 待开始 | `03-data-api-design.md` |
@@ -75,6 +78,9 @@
 
 | 日期 | 版本 | 内容 |
 | --- | --- | --- |
+| 2026-07-04 | `design-v0.5.2` | 新增分类与标签后端 CRUD、后台分类标签管理页、文章编辑器分类下拉与标签勾选；修复软删除文章后标签引用误判；完成 Go 测试、前端类型检查、前端构建和分类标签关联 API 冒烟 |
+| 2026-07-04 | `design-v0.5.1` | 后台文章管理接入真实 API，完成文章列表、搜索筛选、新建、编辑、删除和保存发布入口；新增文章编辑页和基础 Textarea 组件；完成 Go 测试、前端类型检查、前端构建和本地 API 冒烟 |
+| 2026-07-04 | `design-v0.5` | Go API 接入 `.env` 自动加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录与鉴权；文章 service 改为数据库优先的列表、详情、创建、更新和删除，并保留无数据库时的内存降级；完成 Go 测试 |
 | 2026-07-03 | `design-v0.4` | 根据文档创建新系统编码骨架：Go API、Vue Web、Celery Worker、Docker Compose、Nginx、环境变量和根 README；完成 Go 测试、前端类型检查、前端构建和 Worker Python 编译；Docker CLI 缺失，Compose 配置待后续校验 |
 | 2026-07-03 | `design-v0.3` | 新增编码设计文档，明确工程目录、前端编码规则、后端分层、Worker 任务、配置、测试和脚手架顺序 |
 | 2026-07-03 | `design-v0.2` | 新增设计进度追踪文档，记录当前设计模块状态、已确认决策和近期任务 |
