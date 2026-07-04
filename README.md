@@ -16,6 +16,7 @@
 - Go API 自动读取 `.env`，并接入 MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录与鉴权。
 - 文章接口已支持数据库优先的列表、详情、创建、更新、删除；数据库不可用时保留内存示例数据降级。
 - 分类与标签已支持后台 CRUD，并可在文章编辑器中选择。
+- 前台文章列表已支持游标分页、空状态和错误重试；文章详情已支持 Markdown 渲染和目录导航。
 - Vue 前端 API client、路由、Pinia、基础 CreamyUI token 和示例页面。
 - Celery worker 基础配置与任务命名。
 - Docker Compose 与 Nginx 初稿。
