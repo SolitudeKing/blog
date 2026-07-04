@@ -1,0 +1,59 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: solitude-blog-mysql
+    environment:
+      MYSQL_DATABASE: blog
+      MYSQL_USER: blog
+      MYSQL_PASSWORD: blog
+      MYSQL_ROOT_PASSWORD: root
+      TZ: UTC
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: solitude-blog-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: solitude-blog-api
+    env_file:
+      - ../.env
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "8080:8080"
+
+  worker:
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+    container_name: solitude-blog-worker
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    container_name: solitude-blog-nginx
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  mysql-data:
+  redis-data:
