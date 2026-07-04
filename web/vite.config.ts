@@ -19,6 +19,7 @@ export default defineConfig({
       '/article': 'http://localhost:8080',
       '/category': 'http://localhost:8080',
       '/tag': 'http://localhost:8080',
+      '/notice': 'http://localhost:8080',
     },
   },
 })
