@@ -7,18 +7,34 @@ import (
 
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/response"
+	"solitude-blog/server/internal/service"
 )
 
-func AuthRequired() gin.HandlerFunc {
+func AuthRequired(auth *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") || len(strings.TrimPrefix(header, "Bearer ")) == 0 {
+		if !strings.HasPrefix(header, "Bearer ") {
+			response.Error(c, apperrors.New(apperrors.CodeUnauthorized))
+			c.Abort()
+			return
+		}
+		token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+		if token == "" {
 			response.Error(c, apperrors.New(apperrors.CodeUnauthorized))
 			c.Abort()
 			return
 		}
 
-		c.Set("user_id", "1")
+		claims, err := auth.VerifyAccessToken(token)
+		if err != nil {
+			response.Error(c, err)
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", claims.UserID)
+		c.Set("username", claims.Username)
+		c.Set("role", claims.Role)
 		c.Next()
 	}
 }

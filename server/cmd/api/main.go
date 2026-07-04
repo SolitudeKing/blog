@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -10,7 +11,16 @@ import (
 
 func main() {
 	cfg := config.Load()
-	app := bootstrap.NewApp(cfg)
+	app, resources, err := bootstrap.NewApp(context.Background(), cfg)
+	if err != nil {
+		slog.Error("api server bootstrap failed", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := bootstrap.Close(resources); err != nil {
+			slog.Error("api resources close failed", "error", err)
+		}
+	}()
 
 	slog.Info("api server starting", "addr", cfg.HTTPAddr(), "env", cfg.AppEnv)
 	if err := app.Run(cfg.HTTPAddr()); err != nil {

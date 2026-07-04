@@ -32,7 +32,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	response.OK(c, h.auth.Refresh())
+	var req service.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+		return
+	}
+	if req.RefreshToken == "" {
+		response.Error(c, apperrors.New(apperrors.CodeMissingRequiredField))
+		return
+	}
+
+	result, err := h.auth.Refresh(req.RefreshToken)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, result)
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {

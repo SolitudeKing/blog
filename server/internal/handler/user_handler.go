@@ -14,9 +14,8 @@ func NewUserHandler() *UserHandler {
 
 func (h *UserHandler) Info(c *gin.Context) {
 	response.OK(c, gin.H{
-		"id":       1,
-		"username": "admin",
-		"nickname": "Solitude King",
-		"role":     "owner",
+		"id":       c.GetUint64("user_id"),
+		"username": c.GetString("username"),
+		"role":     c.GetString("role"),
 	})
 }

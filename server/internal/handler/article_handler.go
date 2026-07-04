@@ -21,7 +21,11 @@ func NewArticleHandler(article *service.ArticleService) *ArticleHandler {
 
 func (h *ArticleHandler) PublicList(c *gin.Context) {
 	query := articleListQuery(c)
-	items, page := h.article.PublicList(query)
+	items, page, err := h.article.PublicList(query)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	response.List(c, items, page)
 }
 
@@ -36,7 +40,11 @@ func (h *ArticleHandler) Detail(c *gin.Context) {
 
 func (h *ArticleHandler) ManageList(c *gin.Context) {
 	query := articleListQuery(c)
-	items, page := h.article.ManageList(query)
+	items, page, err := h.article.ManageList(query)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	response.List(c, items, page)
 }
 
@@ -64,10 +72,24 @@ func (h *ArticleHandler) Info(c *gin.Context) {
 }
 
 func (h *ArticleHandler) Update(c *gin.Context) {
-	response.OK(c, gin.H{"id": c.Param("id"), "updated": true})
+	var req service.ArticleUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+		return
+	}
+	item, err := h.article.Update(c.Param("id"), req)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, item)
 }
 
 func (h *ArticleHandler) Delete(c *gin.Context) {
+	if err := h.article.Delete(c.Param("id")); err != nil {
+		response.Error(c, err)
+		return
+	}
 	response.OK(c, gin.H{"id": c.Param("id"), "deleted": true})
 }
 

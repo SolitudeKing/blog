@@ -1,19 +1,26 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Article struct {
-	ID          uint64
-	Title       string
-	Slug        string
-	Summary     string
-	ContentMD   string
-	Status      string
-	CategoryID  uint64
-	AuthorID    uint64
-	ViewCount   uint64
-	PublishedAt *time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   *time.Time
+	ID          uint64         `gorm:"primaryKey" json:"id"`
+	Title       string         `gorm:"size:180;not null" json:"title"`
+	Slug        string         `gorm:"size:220;not null;uniqueIndex" json:"slug"`
+	Summary     string         `gorm:"size:500" json:"summary"`
+	ContentMD   string         `gorm:"type:longtext" json:"content_md"`
+	Status      string         `gorm:"size:32;not null;index" json:"status"`
+	CategoryID  uint64         `gorm:"index" json:"category_id"`
+	Category    Category       `json:"category_detail"`
+	AuthorID    uint64         `gorm:"index" json:"author_id"`
+	Author      User           `json:"author_detail"`
+	Tags        []Tag          `gorm:"many2many:article_tags;" json:"tag_details"`
+	ViewCount   uint64         `gorm:"not null;default:0" json:"view_count"`
+	PublishedAt *time.Time     `gorm:"index" json:"published_at"`
+	CreatedAt   time.Time      `gorm:"index" json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
