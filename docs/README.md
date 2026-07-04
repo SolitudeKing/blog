@@ -28,3 +28,4 @@
 - 后端从脚本式 Flask 视图升级为 Go 分层服务：Router、Handler、Service、Repository、Model、DTO、Middleware。
 - MySQL 作为长期数据源，Redis 同时承担缓存、限流、JWT 黑名单、异步任务 broker/result backend。
 - Celery 作为独立异步任务服务接入，负责内容索引、图片处理、站点地图、统计聚合、备份等非同步请求链路任务。
+- 开发过程按功能模块拆分提交；每完成一个可验证目标后，参照 `git-convention` 创建 commit，使实施进度可从 Git 历史直接追踪。
