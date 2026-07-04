@@ -1,0 +1,30 @@
+# 旧博客
+blog-mini-serve/
+blog-mini-v3/
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Local env
+.env
+.env.local
+
+# Go
+bin/
+*.exe
+
+# Storage
+storage/uploads/
+
+# IDE
+.idea/
+.vscode/
