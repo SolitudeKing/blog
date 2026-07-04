@@ -17,7 +17,8 @@ export default defineConfig({
       '/user': 'http://localhost:8080',
       '/setting': 'http://localhost:8080',
       '/article': 'http://localhost:8080',
+      '/category': 'http://localhost:8080',
+      '/tag': 'http://localhost:8080',
     },
   },
 })
-

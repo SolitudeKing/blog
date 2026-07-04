@@ -22,7 +22,21 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'admin-articles',
         component: () => import('@/pages/admin/ArticleListPage.vue'),
       },
+      {
+        path: 'articles/new',
+        name: 'admin-article-new',
+        component: () => import('@/pages/admin/ArticleEditorPage.vue'),
+      },
+      {
+        path: 'articles/:id',
+        name: 'admin-article-edit',
+        component: () => import('@/pages/admin/ArticleEditorPage.vue'),
+      },
+      {
+        path: 'taxonomy',
+        name: 'admin-taxonomy',
+        component: () => import('@/pages/admin/TaxonomyPage.vue'),
+      },
     ],
   },
 ]
-

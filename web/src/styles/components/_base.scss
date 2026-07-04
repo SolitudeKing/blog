@@ -44,6 +44,11 @@
   background: var(--bg-card);
 }
 
+.cui-button--ghost {
+  color: var(--text-primary);
+  background: transparent;
+}
+
 .cui-field {
   display: grid;
   gap: var(--space-2);
@@ -70,3 +75,9 @@
   }
 }
 
+.cui-textarea {
+  min-height: 120px;
+  resize: vertical;
+  padding-top: var(--space-3);
+  line-height: 1.7;
+}

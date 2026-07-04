@@ -14,5 +14,16 @@ export interface ArticleListItem {
 
 export interface ArticleDetail extends ArticleListItem {
   content_md: string
+  category_id: number
+  tag_ids: number[]
 }
 
+export interface ArticleSavePayload {
+  title: string
+  slug: string
+  summary: string
+  content_md: string
+  category_id: number
+  tag_ids: number[]
+  status: ArticleListItem['status']
+}
