@@ -8,7 +8,7 @@
 | --- | --- |
 | 项目名称 | 新个人博客系统 |
 | 设计阶段 | 方案设计中 |
-| 当前版本 | `design-v0.6.0` |
+| 当前版本 | `design-v0.6.1` |
 | 开始日期 | 2026-07-03 |
 | 最近更新 | 2026-07-04 |
 | 设计目标 | 基于旧博客功能结构，设计 Vue3 + Vite + TS + Sass + Go + Gin + GORM + JWT + Redis + Celery + MySQL 的新版博客系统 |
@@ -35,9 +35,9 @@
 | 数据迁移方案 | 进行中 | 60% | [03-data-api-design.md](./03-data-api-design.md) | 已有迁移步骤；待补充迁移脚本输入输出、失败重试和校验报告格式 |
 | 部署与运维设计 | 待开始 | 25% | [01-new-blog-architecture.md](./01-new-blog-architecture.md)、[04-implementation-roadmap.md](./04-implementation-roadmap.md) | 已有 Docker Compose 与 Nginx 方向；待补充环境变量、备份、日志、健康检查细节 |
 | 编码设计 | 完成 | 100% | [06-coding-design.md](./06-coding-design.md) | 已定义工程目录、前端 API client、后端分层、Worker 任务、配置和测试策略 |
-| 编码实现骨架 | 进行中 | 85% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权和文章数据库优先 CRUD；后台已接入文章管理、分类标签管理和文章分类标签选择；前台文章列表和详情阅读体验已完成 M2 收口；Compose 尚未实机校验 |
+| 编码实现骨架 | 进行中 | 88% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权、文章数据库优先 CRUD 和站点配置持久化；后台已接入文章管理、分类标签管理、文章分类标签选择和站点设置页；前台文章列表和详情阅读体验已完成 M2 收口；Compose 尚未实机校验 |
 | M2 可写可读文章 | 完成 | 100% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 登录、创建文章、发布文章、前台文章列表、文章详情、Markdown 渲染、目录导航、列表分页、空状态和错误状态已完成；已通过前端类型检查和构建 |
-| M3 可日常管理 | 待开始 | 20% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 分类标签 CRUD 和文章编辑器选择器属于 M3 前置工作，已提前完成；M3 不应在 M2 正式验收前标记为进行中 |
+| M3 可日常管理 | 进行中 | 40% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 分类标签 CRUD 和文章编辑器选择器作为 M3 前置工作已提前完成；站点配置已完成数据库持久化、后台设置页和前台读取链路；后续继续补公告管理、后台仪表盘和媒体资源管理 |
 
 ## 已确认设计决策
 
@@ -56,7 +56,7 @@
 - 新系统采用 `web`、`server`、`worker`、`deploy` 四个新工程目录，旧项目仅作为参考和迁移来源。
 - Go 后端依赖方向固定为 `router -> handler -> service -> repository -> model`，service 负责事务、缓存失效和任务投递。
 - 前端 API client 统一注入 `X-API-Version` 和 JWT，并解析统一响应与游标分页响应。
-- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2 已完成收口。分类标签管理已作为 M3 前置工作提前完成，下一步可正式进入 M3 的站点配置、公告和后台日常管理能力。
+- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2 已完成收口，M3 已正式启动。分类标签管理已作为 M3 前置工作提前完成，站点配置管理已完成数据库持久化和后台界面，下一步继续推进公告、仪表盘和媒体资源管理能力。
 
 ## 近期设计任务
 
@@ -70,6 +70,7 @@
 | P0 | 将 auth 示例 token 替换为真实 JWT 签发与刷新 | 完成 | `06-coding-design.md`、`03-data-api-design.md` |
 | P0 | 完善后台文章列表、创建、编辑与删除页面 | 完成 | `06-coding-design.md`、`02-product-and-interaction-design.md` |
 | P0 | 完善分类标签 CRUD 与后台选择器 | 完成 | `06-coding-design.md`、`03-data-api-design.md`；M3 前置工作 |
+| P0 | 完成站点配置持久化与后台设置页 | 完成 | `03-data-api-design.md`、`02-product-and-interaction-design.md`；M3 主要任务 |
 | P1 | 完善 Markdown 渲染、目录导航与文章阅读体验 | 完成 | `02-product-and-interaction-design.md` |
 | P1 | 绘制公开站点页面线框：首页、文章详情、归档、搜索、关于 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 绘制后台页面线框：登录、仪表盘、文章列表、编辑器、媒体库、配置 | 待开始 | `02-product-and-interaction-design.md` |
@@ -80,6 +81,7 @@
 
 | 日期 | 版本 | 内容 |
 | --- | --- | --- |
+| 2026-07-04 | `design-v0.6.1` | 启动 M3 日常管理阶段：站点配置从硬编码改为 `site_settings` 持久化；后台新增站点设置页，支持站点名、作者、签名、主题模式和社交链接维护；前台 `setting/lobby` 继续作为公开读取入口 |
 | 2026-07-04 | `design-v0.6.0` | 完成 M2 收口：前台文章列表支持游标分页、空状态和错误重试；文章详情支持 Markdown 渲染、目录导航和基础阅读样式；完成前端类型检查和前端构建 |
 | 2026-07-04 | `design-v0.5.3` | 明确区分里程碑主要任务和前置工作：M2 当前仍处于收口阶段，分类标签管理记录为 M3 前置工作提前完成，M3 不在 M2 正式验收前标记为进行中 |
 | 2026-07-04 | `design-v0.5.2` | 新增分类与标签后端 CRUD、后台分类标签管理页、文章编辑器分类下拉与标签勾选；修复软删除文章后标签引用误判；完成 Go 测试、前端类型检查、前端构建和分类标签关联 API 冒烟 |

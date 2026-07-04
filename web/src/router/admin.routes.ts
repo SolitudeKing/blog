@@ -37,6 +37,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'admin-taxonomy',
         component: () => import('@/pages/admin/TaxonomyPage.vue'),
       },
+      {
+        path: 'settings',
+        name: 'admin-settings',
+        component: () => import('@/pages/admin/SettingPage.vue'),
+      },
     ],
   },
 ]

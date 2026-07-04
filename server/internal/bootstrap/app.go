@@ -32,7 +32,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	engine.Use(middleware.APIVersion(cfg.APIVersion))
 
 	authService := service.NewAuthService(cfg, resources.DB)
-	settingService := service.NewSettingService()
+	settingService := service.NewSettingService(resources.DB)
 	articleService := service.NewArticleService(resources.DB)
 	categoryService := service.NewCategoryService(resources.DB)
 	tagService := service.NewTagService(resources.DB)

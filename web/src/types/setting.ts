@@ -7,3 +7,4 @@ export interface LobbySetting {
   social_links: Record<string, string>
 }
 
+export type SettingPayload = LobbySetting

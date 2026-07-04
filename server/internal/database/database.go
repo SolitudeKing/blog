@@ -126,6 +126,7 @@ func migrate(db *gorm.DB) error {
 		&model.Category{},
 		&model.Tag{},
 		&model.Article{},
+		&model.SiteSetting{},
 	)
 }
 
@@ -156,6 +157,9 @@ func seedAdmin(db *gorm.DB, cfg config.Config) error {
 		return err
 	}
 	if err := seedDefaultTags(db); err != nil {
+		return err
+	}
+	if err := seedDefaultSiteSetting(db); err != nil {
 		return err
 	}
 
@@ -191,6 +195,30 @@ func seedDefaultTags(db *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+func seedDefaultSiteSetting(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&model.SiteSetting{}).Where("id = ?", 1).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&model.SiteSetting{
+		ID:       1,
+		SiteName: "Solitude Blog",
+		Author:   "Solitude King",
+		Essay:    "Keep writing, keep shipping.",
+		Theme:    "forest",
+		Mode:     "light",
+		SocialLinksJSON: `{
+			"gitee": "",
+			"bilibili": "",
+			"douyin": "",
+			"github": ""
+		}`,
+	}).Error
 }
 
 func Close(resources Resources) error {
