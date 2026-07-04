@@ -36,6 +36,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	articleService := service.NewArticleService(resources.DB)
 	categoryService := service.NewCategoryService(resources.DB)
 	tagService := service.NewTagService(resources.DB)
+	noticeService := service.NewNoticeService(resources.DB)
 
 	handlers := router.Handlers{
 		Health:       handler.NewHealthHandler(resources),
@@ -46,6 +47,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 		Article:      handler.NewArticleHandler(articleService),
 		Category:     handler.NewCategoryHandler(categoryService),
 		Tag:          handler.NewTagHandler(tagService),
+		Notice:       handler.NewNoticeHandler(noticeService),
 	}
 
 	router.Register(engine, handlers, cfg)

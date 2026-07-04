@@ -6,6 +6,11 @@
       <p>{{ setting.lobby?.essay ?? 'Keep writing, keep shipping.' }}</p>
     </div>
 
+    <aside v-if="activeNotice" class="notice-banner">
+      <strong>{{ activeNotice.title }}</strong>
+      <p>{{ activeNotice.content }}</p>
+    </aside>
+
     <div v-if="articles.length" class="home-page__list">
       <ArticleCard v-for="article in articles" :key="article.id" :article="article" />
     </div>
@@ -29,12 +34,15 @@ import { onMounted, reactive, ref } from 'vue'
 import ArticleCard from '@/components/blog/ArticleCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { getArticleList } from '@/api/modules/article'
+import { getActiveNotice } from '@/api/modules/notice'
 import { useSettingStore } from '@/stores/setting'
 import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
+import type { NoticeItem } from '@/types/notice'
 
 const setting = useSettingStore()
 const articles = ref<ArticleListItem[]>([])
+const activeNotice = ref<NoticeItem | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
@@ -47,8 +55,17 @@ const page = reactive<CursorPage>({
 
 onMounted(async () => {
   await setting.loadLobby()
+  await loadNotice()
   await loadArticles()
 })
+
+async function loadNotice() {
+  try {
+    activeNotice.value = await getActiveNotice()
+  } catch {
+    activeNotice.value = null
+  }
+}
 
 async function reload() {
   articles.value = []

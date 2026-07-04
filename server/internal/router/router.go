@@ -16,6 +16,7 @@ type Handlers struct {
 	Article      *handler.ArticleHandler
 	Category     *handler.CategoryHandler
 	Tag          *handler.TagHandler
+	Notice       *handler.NoticeHandler
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
@@ -48,4 +49,10 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.POST("tag/create", h.AuthRequired, h.Tag.Create)
 	r.PUT("tag/update/:id", h.AuthRequired, h.Tag.Update)
 	r.DELETE("tag/delete/:id", h.AuthRequired, h.Tag.Delete)
+
+	r.GET("notice/active", h.Notice.Active)
+	r.GET("notice/manage-list", h.AuthRequired, h.Notice.ManageList)
+	r.POST("notice/create", h.AuthRequired, h.Notice.Create)
+	r.PUT("notice/update/:id", h.AuthRequired, h.Notice.Update)
+	r.DELETE("notice/delete/:id", h.AuthRequired, h.Notice.Delete)
 }
