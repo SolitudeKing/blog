@@ -126,6 +126,7 @@ func migrate(db *gorm.DB) error {
 		&model.Category{},
 		&model.Tag{},
 		&model.Article{},
+		&model.Asset{},
 		&model.SiteSetting{},
 		&model.Notice{},
 	)

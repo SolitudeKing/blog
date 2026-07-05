@@ -18,9 +18,12 @@ type Handlers struct {
 	Tag          *handler.TagHandler
 	Notice       *handler.NoticeHandler
 	Dashboard    *handler.DashboardHandler
+	Asset        *handler.AssetHandler
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
+	r.Static("/uploads", cfg.StorageLocalRoot)
+
 	r.GET("healthz", h.Health.Healthz)
 
 	r.POST("auth/login", h.Auth.Login)
@@ -30,6 +33,12 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.GET("user/info", h.AuthRequired, h.User.Info)
 
 	r.GET("dashboard/summary", h.AuthRequired, h.Dashboard.Summary)
+
+	r.GET("asset/list", h.AuthRequired, h.Asset.List)
+	r.POST("asset/upload", h.AuthRequired, h.Asset.Upload)
+	r.PUT("asset/update/:id", h.AuthRequired, h.Asset.Update)
+	r.DELETE("asset/delete/:id", h.AuthRequired, h.Asset.Delete)
+	r.GET("asset/reference-list/:id", h.AuthRequired, h.Asset.ReferenceList)
 
 	r.GET("setting/lobby", h.Setting.Lobby)
 	r.GET("setting/detail", h.AuthRequired, h.Setting.Detail)

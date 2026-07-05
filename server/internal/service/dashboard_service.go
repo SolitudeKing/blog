@@ -18,6 +18,7 @@ type DashboardSummary struct {
 	ArticleCounts  DashboardArticleCounts  `json:"article_counts"`
 	TaxonomyCounts DashboardTaxonomyCounts `json:"taxonomy_counts"`
 	NoticeCounts   DashboardNoticeCounts   `json:"notice_counts"`
+	AssetCount     int64                   `json:"asset_count"`
 	TotalViews     uint64                  `json:"total_views"`
 	RecentArticles []DashboardArticleItem  `json:"recent_articles"`
 	ActiveNotice   *DashboardNoticeItem    `json:"active_notice"`
@@ -73,6 +74,7 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 				Tags:       2,
 			},
 			NoticeCounts: DashboardNoticeCounts{Total: 1, Enabled: 1},
+			AssetCount:   0,
 			RecentArticles: []DashboardArticleItem{
 				{
 					ID:        1,
@@ -100,6 +102,9 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 		return DashboardSummary{}, err
 	}
 	if err := s.fillNoticeCounts(&summary); err != nil {
+		return DashboardSummary{}, err
+	}
+	if err := s.fillAssetCount(&summary); err != nil {
 		return DashboardSummary{}, err
 	}
 	if err := s.fillRecentArticles(&summary); err != nil {
@@ -150,6 +155,13 @@ func (s *DashboardService) fillNoticeCounts(summary *DashboardSummary) error {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 	if err := s.db.Model(&model.Notice{}).Where("enabled = ?", true).Count(&summary.NoticeCounts.Enabled).Error; err != nil {
+		return apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	return nil
+}
+
+func (s *DashboardService) fillAssetCount(summary *DashboardSummary) error {
+	if err := s.db.Model(&model.Asset{}).Count(&summary.AssetCount).Error; err != nil {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 	return nil

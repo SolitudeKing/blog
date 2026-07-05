@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	apperrors "solitude-blog/server/internal/errors"
@@ -9,7 +11,7 @@ import (
 
 func APIVersion(expected string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/healthz" || c.Request.URL.Path == "healthz" {
+		if c.Request.URL.Path == "/healthz" || c.Request.URL.Path == "healthz" || strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
 			c.Next()
 			return
 		}

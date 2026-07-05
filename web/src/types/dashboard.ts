@@ -37,6 +37,7 @@ export interface DashboardSummary {
   article_counts: DashboardArticleCounts
   taxonomy_counts: DashboardTaxonomyCounts
   notice_counts: DashboardNoticeCounts
+  asset_count: number
   total_views: number
   recent_articles: DashboardArticleItem[]
   active_notice: DashboardNoticeItem | null

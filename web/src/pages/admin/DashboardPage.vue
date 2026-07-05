@@ -61,6 +61,7 @@
         <div class="dashboard-actions">
           <RouterLink class="cui-button" to="/admin/articles/new">新建文章</RouterLink>
           <RouterLink class="cui-button cui-button--secondary" to="/admin/taxonomy">分类标签</RouterLink>
+          <RouterLink class="cui-button cui-button--secondary" to="/admin/media">媒体库</RouterLink>
           <RouterLink class="cui-button cui-button--secondary" to="/admin/notices">发布公告</RouterLink>
           <RouterLink class="cui-button cui-button--secondary" to="/admin/settings">站点设置</RouterLink>
         </div>
@@ -101,6 +102,11 @@ const metrics = computed(() => {
       label: '公告',
       value: data?.notice_counts.total ?? '-',
       detail: `启用 ${data?.notice_counts.enabled ?? 0}`,
+    },
+    {
+      label: '媒体资源',
+      value: data?.asset_count ?? '-',
+      detail: '已上传文件',
     },
   ]
 })

@@ -38,6 +38,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/pages/admin/TaxonomyPage.vue'),
       },
       {
+        path: 'media',
+        name: 'admin-media',
+        component: () => import('@/pages/admin/MediaPage.vue'),
+      },
+      {
         path: 'notices',
         name: 'admin-notices',
         component: () => import('@/pages/admin/NoticePage.vue'),

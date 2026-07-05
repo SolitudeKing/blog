@@ -8,7 +8,7 @@
 | --- | --- |
 | 项目名称 | 新个人博客系统 |
 | 设计阶段 | 方案设计中 |
-| 当前版本 | `design-v0.6.3` |
+| 当前版本 | `design-v0.6.4` |
 | 开始日期 | 2026-07-03 |
 | 最近更新 | 2026-07-05 |
 | 设计目标 | 基于旧博客功能结构，设计 Vue3 + Vite + TS + Sass + Go + Gin + GORM + JWT + Redis + Celery + MySQL 的新版博客系统 |
@@ -35,9 +35,9 @@
 | 数据迁移方案 | 进行中 | 60% | [03-data-api-design.md](./03-data-api-design.md) | 已有迁移步骤；待补充迁移脚本输入输出、失败重试和校验报告格式 |
 | 部署与运维设计 | 待开始 | 25% | [01-new-blog-architecture.md](./01-new-blog-architecture.md)、[04-implementation-roadmap.md](./04-implementation-roadmap.md) | 已有 Docker Compose 与 Nginx 方向；待补充环境变量、备份、日志、健康检查细节 |
 | 编码设计 | 完成 | 100% | [06-coding-design.md](./06-coding-design.md) | 已定义工程目录、前端 API client、后端分层、Worker 任务、配置和测试策略 |
-| 编码实现骨架 | 进行中 | 92% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权、文章数据库优先 CRUD、站点配置持久化、公告管理和后台摘要统计；后台已接入文章管理、分类标签管理、文章分类标签选择、站点设置页、公告管理页和仪表盘；前台文章列表和详情阅读体验已完成 M2 收口；Compose 尚未实机校验 |
+| 编码实现骨架 | 进行中 | 95% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权、文章数据库优先 CRUD、站点配置持久化、公告管理、后台摘要统计和媒体资源管理；后台已接入文章管理、分类标签管理、文章分类标签选择、站点设置页、公告管理页、仪表盘和媒体库；前台文章列表和详情阅读体验已完成 M2 收口；Compose 尚未实机校验 |
 | M2 可写可读文章 | 完成 | 100% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 登录、创建文章、发布文章、前台文章列表、文章详情、Markdown 渲染、目录导航、列表分页、空状态和错误状态已完成；已通过前端类型检查和构建 |
-| M3 可日常管理 | 进行中 | 80% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 分类标签 CRUD 和文章编辑器选择器作为 M3 前置工作已提前完成；站点配置、公告管理和后台仪表盘已完成数据库持久化、后台维护页、摘要聚合和前台读取链路；后续继续补媒体资源管理 |
+| M3 可日常管理 | 完成 | 100% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 分类标签 CRUD 和文章编辑器选择器作为 M3 前置工作已提前完成；站点配置、公告管理、后台仪表盘和媒体资源管理已完成数据库持久化、后台维护页、摘要聚合、上传管理和前台读取链路 |
 
 ## 已确认设计决策
 
@@ -56,7 +56,7 @@
 - 新系统采用 `web`、`server`、`worker`、`deploy` 四个新工程目录，旧项目仅作为参考和迁移来源。
 - Go 后端依赖方向固定为 `router -> handler -> service -> repository -> model`，service 负责事务、缓存失效和任务投递。
 - 前端 API client 统一注入 `X-API-Version` 和 JWT，并解析统一响应与游标分页响应。
-- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2 已完成收口，M3 已正式推进。分类标签管理已作为 M3 前置工作提前完成，站点配置、公告管理和后台仪表盘已完成数据库持久化、后台界面、摘要聚合和前台读取链路，下一步继续推进媒体资源管理能力。
+- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2 已完成收口，M3 已完成。分类标签管理已作为 M3 前置工作提前完成，站点配置、公告管理、后台仪表盘和媒体资源管理已完成数据库持久化、后台界面、摘要聚合、上传管理和前台读取链路，下一步进入 M4 的迁移上线与部署验证。
 
 ## 近期设计任务
 
@@ -73,6 +73,7 @@
 | P0 | 完成站点配置持久化与后台设置页 | 完成 | `03-data-api-design.md`、`02-product-and-interaction-design.md`；M3 主要任务 |
 | P0 | 完成公告管理与前台当前公告展示 | 完成 | `03-data-api-design.md`、`02-product-and-interaction-design.md`；M3 主要任务 |
 | P0 | 完成后台仪表盘摘要统计 | 完成 | `03-data-api-design.md`、`02-product-and-interaction-design.md`；M3 主要任务 |
+| P0 | 完成媒体资源上传与后台媒体库 | 完成 | `03-data-api-design.md`、`02-product-and-interaction-design.md`；M3 主要任务 |
 | P1 | 完善 Markdown 渲染、目录导航与文章阅读体验 | 完成 | `02-product-and-interaction-design.md` |
 | P1 | 绘制公开站点页面线框：首页、文章详情、归档、搜索、关于 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 绘制后台页面线框：登录、仪表盘、文章列表、编辑器、媒体库、配置 | 待开始 | `02-product-and-interaction-design.md` |
@@ -83,6 +84,7 @@
 
 | 日期 | 版本 | 内容 |
 | --- | --- | --- |
+| 2026-07-05 | `design-v0.6.4` | 完成 M3 媒体资源管理：新增 `assets` 数据模型、本地上传存储、媒体列表/筛选/编辑/删除接口和后台媒体库页面；`/uploads` 支持静态访问；M3 主要任务全部完成，下一步进入 M4 |
 | 2026-07-05 | `design-v0.6.3` | 完成 M3 后台仪表盘：新增 `dashboard/summary` 摘要接口，聚合文章状态、阅读量、分类标签、公告数量、最近文章和当前公告；后台首页替换骨架页并提供快捷维护入口；M3 下一步转向媒体资源管理 |
 | 2026-07-04 | `design-v0.6.2` | 完成 M3 公告管理：新增 `notices` 数据模型、公开当前公告接口、后台公告列表/创建/编辑/删除入口，并在首页展示当前启用公告；M3 下一步转向后台仪表盘和媒体资源管理 |
 | 2026-07-04 | `design-v0.6.1` | 启动 M3 日常管理阶段：站点配置从硬编码改为 `site_settings` 持久化；后台新增站点设置页，支持站点名、作者、签名、主题模式和社交链接维护；前台 `setting/lobby` 继续作为公开读取入口 |
