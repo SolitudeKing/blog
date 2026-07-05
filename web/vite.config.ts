@@ -13,6 +13,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/healthz': 'http://localhost:8080',
+      '/rss.xml': 'http://localhost:8080',
+      '/sitemap.xml': 'http://localhost:8080',
       '/auth': 'http://localhost:8080',
       '/user': 'http://localhost:8080',
       '/dashboard': 'http://localhost:8080',

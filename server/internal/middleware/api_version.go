@@ -11,7 +11,11 @@ import (
 
 func APIVersion(expected string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/healthz" || c.Request.URL.Path == "healthz" || strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
+		if c.Request.URL.Path == "/healthz" ||
+			c.Request.URL.Path == "healthz" ||
+			c.Request.URL.Path == "/rss.xml" ||
+			c.Request.URL.Path == "/sitemap.xml" ||
+			strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
 			c.Next()
 			return
 		}

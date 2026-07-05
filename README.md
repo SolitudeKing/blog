@@ -23,6 +23,7 @@
 - Vue 前端 API client、路由、Pinia、基础 CreamyUI token 和示例页面。
 - Celery worker 基础配置与任务命名。
 - Docker Compose、Nginx、健康检查、Redis AOF、上传文件卷、日志限制、MySQL 备份与恢复脚本。
+- M5 已启动，公开站点已支持 `/rss.xml` 和 `/sitemap.xml`。
 
 本机当前缺少 Docker CLI，Compose 实机展开和容器级健康检查需要在部署机继续执行。
 

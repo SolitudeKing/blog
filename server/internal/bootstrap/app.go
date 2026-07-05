@@ -39,6 +39,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	noticeService := service.NewNoticeService(resources.DB)
 	dashboardService := service.NewDashboardService(resources.DB)
 	assetService := service.NewAssetService(resources.DB, cfg.StorageLocalRoot)
+	feedService := service.NewFeedService(resources.DB)
 
 	handlers := router.Handlers{
 		Health:       handler.NewHealthHandler(resources),
@@ -52,6 +53,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 		Notice:       handler.NewNoticeHandler(noticeService),
 		Dashboard:    handler.NewDashboardHandler(dashboardService),
 		Asset:        handler.NewAssetHandler(assetService),
+		Feed:         handler.NewFeedHandler(feedService, cfg.SiteBaseURL),
 	}
 
 	router.Register(engine, handlers, cfg)

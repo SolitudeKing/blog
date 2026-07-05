@@ -19,12 +19,15 @@ type Handlers struct {
 	Notice       *handler.NoticeHandler
 	Dashboard    *handler.DashboardHandler
 	Asset        *handler.AssetHandler
+	Feed         *handler.FeedHandler
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.Static("/uploads", cfg.StorageLocalRoot)
 
 	r.GET("healthz", h.Health.Healthz)
+	r.GET("rss.xml", h.Feed.RSS)
+	r.GET("sitemap.xml", h.Feed.Sitemap)
 
 	r.POST("auth/login", h.Auth.Login)
 	r.POST("auth/refresh", h.Auth.Refresh)

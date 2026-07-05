@@ -10,9 +10,10 @@ import (
 )
 
 type Config struct {
-	AppEnv     string
-	AppPort    int
-	APIVersion string
+	AppEnv      string
+	AppPort     int
+	APIVersion  string
+	SiteBaseURL string
 
 	MySQLDSN      string
 	RedisAddr     string
@@ -39,6 +40,7 @@ func Load() Config {
 		AppEnv:           getEnv("APP_ENV", "development"),
 		AppPort:          getEnvInt("APP_PORT", 8080),
 		APIVersion:       getEnv("APP_API_VERSION", "v1"),
+		SiteBaseURL:      strings.TrimRight(getEnv("SITE_BASE_URL", ""), "/"),
 		MySQLDSN:         getEnv("MYSQL_DSN", ""),
 		RedisAddr:        getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
