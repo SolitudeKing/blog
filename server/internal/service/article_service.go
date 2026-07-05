@@ -57,6 +57,16 @@ type ArticleDetail struct {
 	TagIDs     []uint64 `json:"tag_ids"`
 }
 
+type ArticleVersionItem struct {
+	ID        uint64    `json:"id"`
+	ArticleID uint64    `json:"article_id"`
+	Title     string    `json:"title"`
+	Summary   string    `json:"summary"`
+	ContentMD string    `json:"content_md"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type cachedArticleList struct {
 	Items []ArticleItem         `json:"items"`
 	Page  pagination.CursorPage `json:"page"`
@@ -223,6 +233,9 @@ func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
 				return ArticleItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 			}
 		}
+		if err := s.createVersion(article); err != nil {
+			return ArticleItem{}, err
+		}
 		created, err := s.Info(strconv.FormatUint(article.ID, 10))
 		if err != nil {
 			return ArticleItem{}, err
@@ -294,6 +307,9 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 		if err := s.db.Model(&article).Association("Tags").Replace(tags); err != nil {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		if err := s.createVersion(article); err != nil {
+			return ArticleDetail{}, err
+		}
 		detail, err := s.Info(id)
 		if err != nil {
 			return ArticleDetail{}, err
@@ -362,6 +378,58 @@ func (s *ArticleService) Delete(id string) error {
 		}
 	}
 	return apperrors.New(apperrors.CodeResourceNotFound)
+}
+
+func (s *ArticleService) VersionList(id string) ([]ArticleVersionItem, error) {
+	parsed, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return nil, apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	if s.db == nil {
+		return []ArticleVersionItem{}, nil
+	}
+	var count int64
+	if err := s.db.Model(&model.Article{}).Where("id = ?", parsed).Count(&count).Error; err != nil {
+		return nil, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	if count == 0 {
+		return nil, apperrors.New(apperrors.CodeResourceNotFound)
+	}
+	var rows []model.ArticleVersion
+	if err := s.db.Where("article_id = ?", parsed).Order("created_at DESC, id DESC").Limit(20).Find(&rows).Error; err != nil {
+		return nil, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	items := make([]ArticleVersionItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, ArticleVersionItem{
+			ID:        row.ID,
+			ArticleID: row.ArticleID,
+			Title:     row.Title,
+			Summary:   row.Summary,
+			ContentMD: row.ContentMD,
+			Status:    row.Status,
+			CreatedAt: row.CreatedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *ArticleService) createVersion(article model.Article) error {
+	if s.db == nil || article.ID == 0 {
+		return nil
+	}
+	version := model.ArticleVersion{
+		ArticleID: article.ID,
+		Title:     article.Title,
+		Summary:   article.Summary,
+		ContentMD: article.ContentMD,
+		Status:    article.Status,
+		CreatedBy: article.AuthorID,
+	}
+	if err := s.db.Create(&version).Error; err != nil {
+		return apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	return nil
 }
 
 func (s *ArticleService) list(query ArticleListQuery, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {

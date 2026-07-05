@@ -54,6 +54,7 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.GET("article/manage-list", h.AuthRequired, h.Article.ManageList)
 	r.POST("article/create", h.AuthRequired, h.Article.Create)
 	r.GET("article/info/:id", h.AuthRequired, h.Article.Info)
+	r.GET("article/version-list/:id", h.AuthRequired, h.Article.VersionList)
 	r.PUT("article/update/:id", h.AuthRequired, h.Article.Update)
 	r.DELETE("article/delete/:id", h.AuthRequired, h.Article.Delete)
 

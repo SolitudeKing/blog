@@ -1,5 +1,11 @@
 import { request, requestList } from '@/api/http'
-import type { ArticleDetail, ArticleListItem, ArticleSavePayload, ArticleSearchItem } from '@/types/article'
+import type {
+  ArticleDetail,
+  ArticleListItem,
+  ArticleSavePayload,
+  ArticleSearchItem,
+  ArticleVersionItem,
+} from '@/types/article'
 
 export interface ArticleListParams {
   cursor?: string
@@ -54,6 +60,13 @@ export function getManagedArticleInfo(id: number | string) {
   return request<ArticleDetail>({
     method: 'GET',
     url: `article/info/${id}`,
+  })
+}
+
+export function getArticleVersions(id: number | string) {
+  return request<ArticleVersionItem[]>({
+    method: 'GET',
+    url: `article/version-list/${id}`,
   })
 }
 

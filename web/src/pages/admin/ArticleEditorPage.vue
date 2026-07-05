@@ -53,6 +53,23 @@
           <BaseButton type="button" variant="secondary" :disabled="saving" @click="publish">保存并发布</BaseButton>
         </div>
         <p v-if="error" class="admin-page__error">{{ error }}</p>
+
+        <div v-if="isEditing" class="editor-versions">
+          <div class="dashboard-panel__header">
+            <h2>版本记录</h2>
+            <button class="text-link" type="button" @click="loadVersions">刷新</button>
+          </div>
+          <div v-if="versions.length" class="editor-version-list">
+            <article v-for="version in versions" :key="version.id" class="editor-version">
+              <div>
+                <strong>{{ version.title }}</strong>
+                <p>{{ formatTime(version.created_at) }}</p>
+              </div>
+              <BaseButton type="button" variant="secondary" @click="applyVersion(version)">套用</BaseButton>
+            </article>
+          </div>
+          <p v-else class="editor-version-empty">暂无版本记录</p>
+        </div>
       </aside>
     </form>
   </section>
@@ -64,9 +81,9 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import { createArticle, getManagedArticleInfo, updateArticle } from '@/api/modules/article'
+import { createArticle, getArticleVersions, getManagedArticleInfo, updateArticle } from '@/api/modules/article'
 import { getCategoryList, getTagList } from '@/api/modules/taxonomy'
-import type { ArticleSavePayload } from '@/types/article'
+import type { ArticleSavePayload, ArticleVersionItem } from '@/types/article'
 import type { CategoryItem, TagItem } from '@/types/taxonomy'
 
 const route = useRoute()
@@ -76,6 +93,7 @@ const error = ref('')
 const isEditing = computed(() => route.name === 'admin-article-edit')
 const categories = ref<CategoryItem[]>([])
 const tags = ref<TagItem[]>([])
+const versions = ref<ArticleVersionItem[]>([])
 
 const form = reactive<ArticleSavePayload>({
   title: '',
@@ -101,6 +119,7 @@ onMounted(async () => {
     form.status = article.status
     form.category_id = article.category_id
     form.tag_ids = article.tag_ids
+    await loadVersions()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载文章失败'
   }
@@ -158,6 +177,28 @@ async function submit(status: ArticleSavePayload['status']) {
   } finally {
     saving.value = false
   }
+}
+
+async function loadVersions() {
+  if (!isEditing.value) {
+    return
+  }
+  try {
+    versions.value = await getArticleVersions(String(route.params.id))
+  } catch {
+    versions.value = []
+  }
+}
+
+function applyVersion(version: ArticleVersionItem) {
+  form.title = version.title
+  form.summary = version.summary
+  form.content_md = version.content_md
+  form.status = version.status
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleString()
 }
 
 function toSlug(value: string) {

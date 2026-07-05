@@ -71,6 +71,15 @@ func (h *ArticleHandler) Info(c *gin.Context) {
 	response.OK(c, item)
 }
 
+func (h *ArticleHandler) VersionList(c *gin.Context) {
+	items, err := h.article.VersionList(c.Param("id"))
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, items)
+}
+
 func (h *ArticleHandler) Update(c *gin.Context) {
 	var req service.ArticleUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
