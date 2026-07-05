@@ -1,21 +1,28 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/cache"
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
 	"solitude-blog/server/internal/pagination"
 )
 
+const articleCacheTTL = 5 * time.Minute
+
 type ArticleService struct {
 	db    *gorm.DB
+	redis *redis.Client
 	mu    sync.RWMutex
 	items []ArticleDetail
 }
@@ -50,6 +57,11 @@ type ArticleDetail struct {
 	TagIDs     []uint64 `json:"tag_ids"`
 }
 
+type cachedArticleList struct {
+	Items []ArticleItem         `json:"items"`
+	Page  pagination.CursorPage `json:"page"`
+}
+
 type ArticleCreateRequest struct {
 	Title      string   `json:"title"`
 	Slug       string   `json:"slug"`
@@ -62,10 +74,11 @@ type ArticleCreateRequest struct {
 
 type ArticleUpdateRequest = ArticleCreateRequest
 
-func NewArticleService(db *gorm.DB) *ArticleService {
+func NewArticleService(db *gorm.DB, redisClient *redis.Client) *ArticleService {
 	now := time.Now().UTC()
 	return &ArticleService{
-		db: db,
+		db:    db,
+		redis: redisClient,
 		items: []ArticleDetail{
 			{
 				ArticleItem: ArticleItem{
@@ -90,7 +103,15 @@ func NewArticleService(db *gorm.DB) *ArticleService {
 }
 
 func (s *ArticleService) PublicList(query ArticleListQuery) ([]ArticleItem, pagination.CursorPage, error) {
-	return s.list(query, true)
+	if cached, ok := s.getCachedPublicList(query); ok {
+		return cached.Items, cached.Page, nil
+	}
+	items, page, err := s.list(query, true)
+	if err != nil {
+		return nil, pagination.CursorPage{}, err
+	}
+	s.setCachedPublicList(query, cachedArticleList{Items: items, Page: page})
+	return items, page, nil
 }
 
 func (s *ArticleService) ManageList(query ArticleListQuery) ([]ArticleItem, pagination.CursorPage, error) {
@@ -99,6 +120,9 @@ func (s *ArticleService) ManageList(query ArticleListQuery) ([]ArticleItem, pagi
 
 func (s *ArticleService) Detail(slug string) (ArticleDetail, error) {
 	if s.db != nil {
+		if item, ok := s.getCachedDetail(slug); ok {
+			return item, nil
+		}
 		var article model.Article
 		err := s.db.Preload("Category").Preload("Tags").
 			Where("slug = ? AND status = ?", slug, "published").
@@ -109,7 +133,9 @@ func (s *ArticleService) Detail(slug string) (ArticleDetail, error) {
 		if err != nil {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
-		return detailFromModel(article), nil
+		item := detailFromModel(article)
+		s.setCachedDetail(slug, item)
+		return item, nil
 	}
 
 	s.mu.RLock()
@@ -201,6 +227,7 @@ func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
 		if err != nil {
 			return ArticleItem{}, err
 		}
+		s.invalidateArticleCaches(article.Slug)
 		return created.ArticleItem, nil
 	}
 
@@ -267,7 +294,12 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 		if err := s.db.Model(&article).Association("Tags").Replace(tags); err != nil {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
-		return s.Info(id)
+		detail, err := s.Info(id)
+		if err != nil {
+			return ArticleDetail{}, err
+		}
+		s.invalidateArticleCaches(article.Slug, req.Slug)
+		return detail, nil
 	}
 
 	return s.updateInMemory(parsed, req, status)
@@ -317,6 +349,7 @@ func (s *ArticleService) Delete(id string) error {
 		if result.RowsAffected == 0 {
 			return apperrors.New(apperrors.CodeResourceNotFound)
 		}
+		s.invalidateArticleCaches(article.Slug)
 		return nil
 	}
 
@@ -532,6 +565,84 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 		}
 	}
 	return ArticleDetail{}, apperrors.New(apperrors.CodeResourceNotFound)
+}
+
+func (s *ArticleService) getCachedPublicList(query ArticleListQuery) (cachedArticleList, bool) {
+	if s.redis == nil || s.db == nil {
+		return cachedArticleList{}, false
+	}
+	payload, err := s.redis.Get(context.Background(), publicListCacheKey(query)).Bytes()
+	if err != nil {
+		return cachedArticleList{}, false
+	}
+	var cached cachedArticleList
+	if err := json.Unmarshal(payload, &cached); err != nil {
+		return cachedArticleList{}, false
+	}
+	return cached, true
+}
+
+func (s *ArticleService) setCachedPublicList(query ArticleListQuery, cached cachedArticleList) {
+	if s.redis == nil || s.db == nil {
+		return
+	}
+	payload, err := json.Marshal(cached)
+	if err != nil {
+		return
+	}
+	_ = s.redis.Set(context.Background(), publicListCacheKey(query), payload, articleCacheTTL).Err()
+}
+
+func (s *ArticleService) getCachedDetail(slug string) (ArticleDetail, bool) {
+	if s.redis == nil || s.db == nil {
+		return ArticleDetail{}, false
+	}
+	payload, err := s.redis.Get(context.Background(), cache.ArticleDetailKey(slug)).Bytes()
+	if err != nil {
+		return ArticleDetail{}, false
+	}
+	var item ArticleDetail
+	if err := json.Unmarshal(payload, &item); err != nil {
+		return ArticleDetail{}, false
+	}
+	return item, true
+}
+
+func (s *ArticleService) setCachedDetail(slug string, item ArticleDetail) {
+	if s.redis == nil || s.db == nil {
+		return
+	}
+	payload, err := json.Marshal(item)
+	if err != nil {
+		return
+	}
+	_ = s.redis.Set(context.Background(), cache.ArticleDetailKey(slug), payload, articleCacheTTL).Err()
+}
+
+func (s *ArticleService) invalidateArticleCaches(slugs ...string) {
+	if s.redis == nil {
+		return
+	}
+	ctx := context.Background()
+	keys := make([]string, 0, len(slugs))
+	for _, slug := range slugs {
+		if slug == "" {
+			continue
+		}
+		keys = append(keys, cache.ArticleDetailKey(slug))
+	}
+	iter := s.redis.Scan(ctx, 0, cache.ArticleListPattern(), 100).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if len(keys) > 0 {
+		_ = s.redis.Del(ctx, keys...).Err()
+	}
+}
+
+func publicListCacheKey(query ArticleListQuery) string {
+	filterHash := cache.ArticleListFilterHash(query.Category, query.Tag, query.Keyword, query.Status)
+	return cache.ArticleListKey(query.Cursor, pagination.NormalizeLimit(query.Limit), filterHash)
 }
 
 func detailFromModel(article model.Article) ArticleDetail {

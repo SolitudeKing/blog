@@ -1,20 +1,26 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/cache"
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
 )
 
 const defaultSiteSettingID uint64 = 1
+const siteSettingCacheTTL = 10 * time.Minute
 
 type SettingService struct {
 	db      *gorm.DB
+	redis   *redis.Client
 	mu      sync.RWMutex
 	setting LobbySetting
 }
@@ -30,9 +36,10 @@ type LobbySetting struct {
 
 type SettingSaveRequest = LobbySetting
 
-func NewSettingService(db *gorm.DB) *SettingService {
+func NewSettingService(db *gorm.DB, redisClient *redis.Client) *SettingService {
 	return &SettingService{
 		db:      db,
+		redis:   redisClient,
 		setting: defaultLobbySetting(),
 	}
 }
@@ -43,11 +50,16 @@ func (s *SettingService) Lobby() (LobbySetting, error) {
 
 func (s *SettingService) Detail() (LobbySetting, error) {
 	if s.db != nil {
+		if item, ok := s.getCachedSetting(); ok {
+			return item, nil
+		}
 		row, err := s.loadOrCreate()
 		if err != nil {
 			return LobbySetting{}, err
 		}
-		return settingFromModel(row), nil
+		item := settingFromModel(row)
+		s.setCachedSetting(item)
+		return item, nil
 	}
 
 	s.mu.RLock()
@@ -75,6 +87,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		if err := s.db.Save(&row).Error; err != nil {
 			return LobbySetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		s.invalidateSettingCache()
 		return settingFromModel(row), nil
 	}
 
@@ -82,6 +95,39 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 	defer s.mu.Unlock()
 	s.setting = cloneSetting(normalized)
 	return cloneSetting(s.setting), nil
+}
+
+func (s *SettingService) getCachedSetting() (LobbySetting, bool) {
+	if s.redis == nil {
+		return LobbySetting{}, false
+	}
+	payload, err := s.redis.Get(context.Background(), cache.SiteSettingsKey()).Bytes()
+	if err != nil {
+		return LobbySetting{}, false
+	}
+	var item LobbySetting
+	if err := json.Unmarshal(payload, &item); err != nil {
+		return LobbySetting{}, false
+	}
+	return item, true
+}
+
+func (s *SettingService) setCachedSetting(item LobbySetting) {
+	if s.redis == nil {
+		return
+	}
+	payload, err := json.Marshal(item)
+	if err != nil {
+		return
+	}
+	_ = s.redis.Set(context.Background(), cache.SiteSettingsKey(), payload, siteSettingCacheTTL).Err()
+}
+
+func (s *SettingService) invalidateSettingCache() {
+	if s.redis == nil {
+		return
+	}
+	_ = s.redis.Del(context.Background(), cache.SiteSettingsKey()).Err()
 }
 
 func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
