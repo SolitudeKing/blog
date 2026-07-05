@@ -337,18 +337,20 @@
 
 主要里程任务：
 
-- 旧数据迁移。
-- 媒体库。
-- 缓存。
-- 部署配置。
+- [x] 旧数据迁移。
+- [x] 媒体库。
+- [x] 缓存。
+- [x] 部署配置。
 
 可提前开展的前置工作：
 
-- 迁移报告格式。
-- 备份脚本草案。
-- Docker Compose 健康检查。
+- [x] 迁移报告格式。
+- [x] 备份脚本草案。
+- [x] Docker Compose 健康检查。
 
 价值：具备上线基础。
+
+当前进度：M4 已完成代码与文档收口。旧数据迁移已形成 `scripts/export_legacy_blog.py` 导出器和 `server/cmd/import_legacy` 导入器，支持旧 SQLite、Markdown、PicBed Base64 与图片文件迁移，并输出迁移报告；前台文章列表、文章详情和站点配置已接入 Redis 缓存与写入失效；Docker Compose 已补充健康检查、Redis AOF、上传卷、日志限制，MySQL 备份/恢复脚本和部署运行手册已补齐。当前本机缺少 Docker CLI，Compose 实机展开与容器级健康检查需在部署机继续验证。
 
 ### M5：体验增强
 

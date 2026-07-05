@@ -8,7 +8,7 @@
 | --- | --- |
 | 项目名称 | 新个人博客系统 |
 | 设计阶段 | 方案设计中 |
-| 当前版本 | `design-v0.6.4` |
+| 当前版本 | `design-v0.7.0` |
 | 开始日期 | 2026-07-03 |
 | 最近更新 | 2026-07-05 |
 | 设计目标 | 基于旧博客功能结构，设计 Vue3 + Vite + TS + Sass + Go + Gin + GORM + JWT + Redis + Celery + MySQL 的新版博客系统 |
@@ -32,12 +32,13 @@
 | 数据模型与 API 设计 | 完成 | 85% | [03-data-api-design.md](./03-data-api-design.md) | 已确定表设计、无 `/api` 前缀、Header 版本、模块一级路径、统一响应、游标分页、错误码；待补充字段级请求/响应 DTO |
 | 实施路线图 | 完成 | 90% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 已拆分 Phase 0-8、里程碑、验收和风险；后续可根据真实开发进度滚动调整 |
 | UI 主题与组件规范 | 进行中 | 55% | [02-product-and-interaction-design.md](./02-product-and-interaction-design.md) | 已确定参考 CreamyUI；待输出本项目 token 文件结构、组件状态矩阵和首批组件 API |
-| 数据迁移方案 | 进行中 | 60% | [03-data-api-design.md](./03-data-api-design.md) | 已有迁移步骤；待补充迁移脚本输入输出、失败重试和校验报告格式 |
-| 部署与运维设计 | 待开始 | 25% | [01-new-blog-architecture.md](./01-new-blog-architecture.md)、[04-implementation-roadmap.md](./04-implementation-roadmap.md) | 已有 Docker Compose 与 Nginx 方向；待补充环境变量、备份、日志、健康检查细节 |
+| 数据迁移方案 | 完成 | 100% | [03-data-api-design.md](./03-data-api-design.md)、[07-migration-runbook.md](./07-migration-runbook.md) | 已完成旧 SQLite、Markdown、PicBed Base64、图片文件导出与 Go 导入链路，并输出导出/导入报告 |
+| 部署与运维设计 | 完成 | 90% | [01-new-blog-architecture.md](./01-new-blog-architecture.md)、[04-implementation-roadmap.md](./04-implementation-roadmap.md)、[08-deployment-runbook.md](./08-deployment-runbook.md) | 已补充 Compose 健康检查、Redis AOF、上传卷、日志限制、MySQL 备份/恢复脚本和部署运行手册；本机缺少 Docker CLI，Compose 实机校验待部署机执行 |
 | 编码设计 | 完成 | 100% | [06-coding-design.md](./06-coding-design.md) | 已定义工程目录、前端 API client、后端分层、Worker 任务、配置和测试策略 |
-| 编码实现骨架 | 进行中 | 95% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权、文章数据库优先 CRUD、站点配置持久化、公告管理、后台摘要统计和媒体资源管理；后台已接入文章管理、分类标签管理、文章分类标签选择、站点设置页、公告管理页、仪表盘和媒体库；前台文章列表和详情阅读体验已完成 M2 收口；Compose 尚未实机校验 |
+| 编码实现骨架 | 进行中 | 98% | [../README.md](../README.md) | 已创建 `web`、`server`、`worker`、`deploy` 骨架；Go API 已接入 `.env` 加载、MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录鉴权、文章数据库优先 CRUD、站点配置持久化、公告管理、后台摘要统计、媒体资源管理和前台内容缓存；后台已接入文章管理、分类标签管理、文章分类标签选择、站点设置页、公告管理页、仪表盘和媒体库；M4 迁移导入、部署健康检查、备份恢复已完成代码收口；Compose 尚未实机校验 |
 | M2 可写可读文章 | 完成 | 100% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 登录、创建文章、发布文章、前台文章列表、文章详情、Markdown 渲染、目录导航、列表分页、空状态和错误状态已完成；已通过前端类型检查和构建 |
 | M3 可日常管理 | 完成 | 100% | [04-implementation-roadmap.md](./04-implementation-roadmap.md) | 分类标签 CRUD 和文章编辑器选择器作为 M3 前置工作已提前完成；站点配置、公告管理、后台仪表盘和媒体资源管理已完成数据库持久化、后台维护页、摘要聚合、上传管理和前台读取链路 |
+| M4 可迁移上线 | 完成 | 95% | [04-implementation-roadmap.md](./04-implementation-roadmap.md)、[07-migration-runbook.md](./07-migration-runbook.md)、[08-deployment-runbook.md](./08-deployment-runbook.md) | 旧数据迁移、媒体库、Redis 缓存、部署配置、备份恢复脚本和健康检查已完成；剩余 5% 为部署机 Docker Compose 实机验证 |
 
 ## 已确认设计决策
 
@@ -56,7 +57,7 @@
 - 新系统采用 `web`、`server`、`worker`、`deploy` 四个新工程目录，旧项目仅作为参考和迁移来源。
 - Go 后端依赖方向固定为 `router -> handler -> service -> repository -> model`，service 负责事务、缓存失效和任务投递。
 - 前端 API client 统一注入 `X-API-Version` 和 JWT，并解析统一响应与游标分页响应。
-- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2 已完成收口，M3 已完成。分类标签管理已作为 M3 前置工作提前完成，站点配置、公告管理、后台仪表盘和媒体资源管理已完成数据库持久化、后台界面、摘要聚合、上传管理和前台读取链路，下一步进入 M4 的迁移上线与部署验证。
+- 第一轮编码实现从可运行骨架开始，先完成 health、auth、user、setting、article 示例链路；当前 M2、M3、M4 已完成代码收口。分类标签管理已作为 M3 前置工作提前完成，站点配置、公告管理、后台仪表盘和媒体资源管理已完成数据库持久化、后台界面、摘要聚合、上传管理和前台读取链路；旧数据迁移、Redis 缓存、部署健康检查和备份恢复已完成，下一步进入 M5 的体验增强与部署机实机验证。
 
 ## 近期设计任务
 
@@ -77,13 +78,14 @@
 | P1 | 完善 Markdown 渲染、目录导航与文章阅读体验 | 完成 | `02-product-and-interaction-design.md` |
 | P1 | 绘制公开站点页面线框：首页、文章详情、归档、搜索、关于 | 待开始 | `02-product-and-interaction-design.md` |
 | P1 | 绘制后台页面线框：登录、仪表盘、文章列表、编辑器、媒体库、配置 | 待开始 | `02-product-and-interaction-design.md` |
-| P1 | 补充旧数据迁移校验规则和报告格式 | 待开始 | `03-data-api-design.md` |
-| P2 | 补充 Docker Compose、Nginx、环境变量、备份与日志设计 | 待开始 | `01-new-blog-architecture.md`、`04-implementation-roadmap.md` |
+| P1 | 补充旧数据迁移校验规则和报告格式 | 完成 | `07-migration-runbook.md` |
+| P2 | 补充 Docker Compose、Nginx、环境变量、备份与日志设计 | 完成 | `08-deployment-runbook.md` |
 
 ## 设计日志
 
 | 日期 | 版本 | 内容 |
 | --- | --- | --- |
+| 2026-07-05 | `design-v0.7.0` | 完成 M4 可迁移上线：新增旧博客导出器和 Go 导入器，支持旧 SQLite、Markdown、PicBed Base64 与图片文件迁移并生成报告；前台文章列表、文章详情和站点配置接入 Redis 缓存；Compose 补充健康检查、Redis AOF、上传卷、日志限制，新增 MySQL 备份/恢复与部署运行手册；本机缺少 Docker CLI，Compose 实机校验待部署机执行 |
 | 2026-07-05 | `design-v0.6.4` | 完成 M3 媒体资源管理：新增 `assets` 数据模型、本地上传存储、媒体列表/筛选/编辑/删除接口和后台媒体库页面；`/uploads` 支持静态访问；M3 主要任务全部完成，下一步进入 M4 |
 | 2026-07-05 | `design-v0.6.3` | 完成 M3 后台仪表盘：新增 `dashboard/summary` 摘要接口，聚合文章状态、阅读量、分类标签、公告数量、最近文章和当前公告；后台首页替换骨架页并提供快捷维护入口；M3 下一步转向媒体资源管理 |
 | 2026-07-04 | `design-v0.6.2` | 完成 M3 公告管理：新增 `notices` 数据模型、公开当前公告接口、后台公告列表/创建/编辑/删除入口，并在首页展示当前启用公告；M3 下一步转向后台仪表盘和媒体资源管理 |

@@ -18,6 +18,10 @@
    - 记录当前设计状态、已确认决策、近期任务和设计日志。
 7. [编码设计](./06-coding-design.md)
    - 定义新系统工程目录、编码规范、前后端分层、Worker 任务、配置和测试策略。
+8. [旧博客迁移运行手册](./07-migration-runbook.md)
+   - 说明旧 SQLite、Markdown、PicBed 和图片文件迁移到新系统的导出、导入与验收步骤。
+9. [M4 部署与备份运行手册](./08-deployment-runbook.md)
+   - 说明 Docker Compose 启动、健康检查、MySQL 备份恢复、日志和持久化策略。
 
 ## 设计原则
 
