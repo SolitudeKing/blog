@@ -25,6 +25,7 @@ bin/
 # Storage
 storage/uploads/
 migration-output/
+backups/
 
 # IDE
 .idea/
