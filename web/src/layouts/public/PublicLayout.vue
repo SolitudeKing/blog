@@ -5,6 +5,7 @@
       <nav class="public-layout__nav" aria-label="Primary">
         <RouterLink to="/">首页</RouterLink>
         <RouterLink to="/archives">归档</RouterLink>
+        <RouterLink to="/search">搜索</RouterLink>
       </nav>
     </header>
     <main class="public-layout__main">
@@ -14,4 +15,3 @@
 </template>
 
 <script setup lang="ts"></script>
-

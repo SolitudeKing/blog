@@ -21,7 +21,11 @@ export const publicRoutes: RouteRecordRaw[] = [
         name: 'archives',
         component: () => import('@/pages/public/ArchivesPage.vue'),
       },
+      {
+        path: 'search',
+        name: 'search',
+        component: () => import('@/pages/public/SearchPage.vue'),
+      },
     ],
   },
 ]
-

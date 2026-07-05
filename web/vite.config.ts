@@ -18,6 +18,7 @@ export default defineConfig({
       '/auth': 'http://localhost:8080',
       '/user': 'http://localhost:8080',
       '/dashboard': 'http://localhost:8080',
+      '/search': 'http://localhost:8080',
       '/asset': 'http://localhost:8080',
       '/uploads': 'http://localhost:8080',
       '/setting': 'http://localhost:8080',

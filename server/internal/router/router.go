@@ -20,6 +20,7 @@ type Handlers struct {
 	Dashboard    *handler.DashboardHandler
 	Asset        *handler.AssetHandler
 	Feed         *handler.FeedHandler
+	Search       *handler.SearchHandler
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
@@ -28,6 +29,7 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.GET("healthz", h.Health.Healthz)
 	r.GET("rss.xml", h.Feed.RSS)
 	r.GET("sitemap.xml", h.Feed.Sitemap)
+	r.GET("search/article", h.Search.Article)
 
 	r.POST("auth/login", h.Auth.Login)
 	r.POST("auth/refresh", h.Auth.Refresh)

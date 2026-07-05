@@ -1,5 +1,5 @@
 import { request, requestList } from '@/api/http'
-import type { ArticleDetail, ArticleListItem, ArticleSavePayload } from '@/types/article'
+import type { ArticleDetail, ArticleListItem, ArticleSavePayload, ArticleSearchItem } from '@/types/article'
 
 export interface ArticleListParams {
   cursor?: string
@@ -25,6 +25,17 @@ export function getArticleDetail(slug: string) {
   return request<ArticleDetail>({
     method: 'GET',
     url: `article/detail/${slug}`,
+  })
+}
+
+export function searchArticles(params: Pick<ArticleListParams, 'cursor' | 'limit' | 'keyword'> = {}) {
+  return requestList<ArticleSearchItem>({
+    method: 'GET',
+    url: 'search/article',
+    params: {
+      limit: 20,
+      ...params,
+    },
   })
 }
 
