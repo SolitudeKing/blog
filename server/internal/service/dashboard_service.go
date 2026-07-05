@@ -21,6 +21,8 @@ type DashboardSummary struct {
 	AssetCount     int64                   `json:"asset_count"`
 	TotalViews     uint64                  `json:"total_views"`
 	RecentArticles []DashboardArticleItem  `json:"recent_articles"`
+	TopArticles    []DashboardTopArticle   `json:"top_articles"`
+	CategoryStats  []DashboardCategoryStat `json:"category_stats"`
 	ActiveNotice   *DashboardNoticeItem    `json:"active_notice"`
 	GeneratedAt    time.Time               `json:"generated_at"`
 }
@@ -49,6 +51,21 @@ type DashboardArticleItem struct {
 	Slug      string    `json:"slug"`
 	Status    string    `json:"status"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type DashboardTopArticle struct {
+	ID        uint64    `json:"id"`
+	Title     string    `json:"title"`
+	Slug      string    `json:"slug"`
+	ViewCount uint64    `json:"view_count"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type DashboardCategoryStat struct {
+	ID           uint64 `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ArticleCount int64  `json:"article_count"`
 }
 
 type DashboardNoticeItem struct {
@@ -84,6 +101,18 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 					UpdatedAt: now,
 				},
 			},
+			TopArticles: []DashboardTopArticle{
+				{
+					ID:        1,
+					Title:     "Welcome to Solitude Blog",
+					Slug:      "welcome",
+					ViewCount: 8,
+					UpdatedAt: now,
+				},
+			},
+			CategoryStats: []DashboardCategoryStat{
+				{ID: 1, Name: "Notes", Slug: "notes", ArticleCount: 1},
+			},
 			ActiveNotice: &DashboardNoticeItem{
 				ID:        1,
 				Title:     "Welcome",
@@ -108,6 +137,12 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 		return DashboardSummary{}, err
 	}
 	if err := s.fillRecentArticles(&summary); err != nil {
+		return DashboardSummary{}, err
+	}
+	if err := s.fillTopArticles(&summary); err != nil {
+		return DashboardSummary{}, err
+	}
+	if err := s.fillCategoryStats(&summary); err != nil {
 		return DashboardSummary{}, err
 	}
 	if err := s.fillActiveNotice(&summary); err != nil {
@@ -180,6 +215,58 @@ func (s *DashboardService) fillRecentArticles(summary *DashboardSummary) error {
 			Slug:      row.Slug,
 			Status:    row.Status,
 			UpdatedAt: row.UpdatedAt,
+		})
+	}
+	return nil
+}
+
+func (s *DashboardService) fillTopArticles(summary *DashboardSummary) error {
+	var rows []model.Article
+	if err := s.db.Select("id", "title", "slug", "view_count", "updated_at").
+		Where("status = ?", "published").
+		Order("view_count DESC, updated_at DESC, id DESC").
+		Limit(5).
+		Find(&rows).Error; err != nil {
+		return apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	summary.TopArticles = make([]DashboardTopArticle, 0, len(rows))
+	for _, row := range rows {
+		summary.TopArticles = append(summary.TopArticles, DashboardTopArticle{
+			ID:        row.ID,
+			Title:     row.Title,
+			Slug:      row.Slug,
+			ViewCount: row.ViewCount,
+			UpdatedAt: row.UpdatedAt,
+		})
+	}
+	return nil
+}
+
+func (s *DashboardService) fillCategoryStats(summary *DashboardSummary) error {
+	type categoryStatRow struct {
+		ID           uint64
+		Name         string
+		Slug         string
+		ArticleCount int64
+	}
+	var rows []categoryStatRow
+	if err := s.db.Table("categories").
+		Select("categories.id, categories.name, categories.slug, COUNT(articles.id) AS article_count").
+		Joins("LEFT JOIN articles ON articles.category_id = categories.id AND articles.deleted_at IS NULL").
+		Where("categories.deleted_at IS NULL").
+		Group("categories.id, categories.name, categories.slug").
+		Order("article_count DESC, categories.sort_order ASC, categories.id ASC").
+		Limit(8).
+		Scan(&rows).Error; err != nil {
+		return apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	summary.CategoryStats = make([]DashboardCategoryStat, 0, len(rows))
+	for _, row := range rows {
+		summary.CategoryStats = append(summary.CategoryStats, DashboardCategoryStat{
+			ID:           row.ID,
+			Name:         row.Name,
+			Slug:         row.Slug,
+			ArticleCount: row.ArticleCount,
 		})
 	}
 	return nil

@@ -24,6 +24,21 @@ export interface DashboardArticleItem {
   updated_at: string
 }
 
+export interface DashboardTopArticle {
+  id: number
+  title: string
+  slug: string
+  view_count: number
+  updated_at: string
+}
+
+export interface DashboardCategoryStat {
+  id: number
+  name: string
+  slug: string
+  article_count: number
+}
+
 export interface DashboardNoticeItem {
   id: number
   title: string
@@ -40,6 +55,8 @@ export interface DashboardSummary {
   asset_count: number
   total_views: number
   recent_articles: DashboardArticleItem[]
+  top_articles: DashboardTopArticle[]
+  category_stats: DashboardCategoryStat[]
   active_notice: DashboardNoticeItem | null
   generated_at: string
 }

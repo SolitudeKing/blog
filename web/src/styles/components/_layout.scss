@@ -763,6 +763,30 @@
   gap: var(--space-3);
 }
 
+.dashboard-bars {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.dashboard-bar {
+  display: grid;
+  gap: var(--space-2);
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    color: var(--text-secondary);
+  }
+
+  i {
+    display: block;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+}
+
 .media-layout {
   display: grid;
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);

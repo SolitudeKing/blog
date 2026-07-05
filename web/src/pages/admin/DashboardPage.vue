@@ -54,6 +54,44 @@
         <div v-else class="empty-state">暂无启用公告</div>
       </section>
 
+      <section class="dashboard-panel">
+        <div class="dashboard-panel__header">
+          <h2>热门文章</h2>
+          <RouterLink class="text-link" to="/admin/articles">查看全部</RouterLink>
+        </div>
+        <div v-if="summary?.top_articles.length" class="dashboard-list">
+          <RouterLink
+            v-for="article in summary.top_articles"
+            :key="article.id"
+            class="dashboard-list__item"
+            :to="`/admin/articles/${article.id}`"
+          >
+            <div>
+              <strong>{{ article.title }}</strong>
+              <p>{{ formatTime(article.updated_at) }}</p>
+            </div>
+            <span>{{ article.view_count }} views</span>
+          </RouterLink>
+        </div>
+        <div v-else class="empty-state">暂无阅读数据</div>
+      </section>
+
+      <section class="dashboard-panel">
+        <div class="dashboard-panel__header">
+          <h2>分类分布</h2>
+        </div>
+        <div v-if="summary?.category_stats.length" class="dashboard-bars">
+          <div v-for="item in summary.category_stats" :key="item.id" class="dashboard-bar">
+            <div>
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.article_count }}</span>
+            </div>
+            <i :style="{ width: `${categoryPercent(item.article_count)}%` }"></i>
+          </div>
+        </div>
+        <div v-else class="empty-state">暂无分类统计</div>
+      </section>
+
       <section class="dashboard-panel dashboard-panel--wide">
         <div class="dashboard-panel__header">
           <h2>快捷入口</h2>
@@ -146,5 +184,13 @@ function formatNoticeRange(notice: DashboardNoticeItem) {
     return '长期有效'
   }
   return `${notice.starts_at ? formatTime(notice.starts_at) : '立即'} - ${notice.ends_at ? formatTime(notice.ends_at) : '不限'}`
+}
+
+function categoryPercent(value: number) {
+  const max = Math.max(...(summary.value?.category_stats.map((item) => item.article_count) ?? [0]))
+  if (!max) {
+    return 0
+  }
+  return Math.max(8, Math.round((value / max) * 100))
 }
 </script>
