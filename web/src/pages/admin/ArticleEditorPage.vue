@@ -17,6 +17,15 @@
       </div>
 
       <aside class="editor-panel">
+        <div class="editor-autosave">
+          <strong>{{ autosaveStatus }}</strong>
+          <p v-if="draftAvailable">发现本地草稿，可恢复到编辑器。</p>
+          <div v-if="draftAvailable" class="editor-autosave__actions">
+            <BaseButton type="button" variant="secondary" @click="restoreDraft">恢复草稿</BaseButton>
+            <button class="text-link text-link--danger" type="button" @click="discardDraft">丢弃</button>
+          </div>
+        </div>
+
         <label class="cui-field">
           <span class="cui-field__label">状态</span>
           <select v-model="form.status" class="cui-input">
@@ -76,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
@@ -94,6 +103,15 @@ const isEditing = computed(() => route.name === 'admin-article-edit')
 const categories = ref<CategoryItem[]>([])
 const tags = ref<TagItem[]>([])
 const versions = ref<ArticleVersionItem[]>([])
+const autosaveStatus = ref('自动保存待命')
+const draftAvailable = ref(false)
+const hydrated = ref(false)
+let autosaveTimer: number | undefined
+
+interface AutoSavedDraft {
+  payload: ArticleSavePayload
+  saved_at: string
+}
 
 const form = reactive<ArticleSavePayload>({
   title: '',
@@ -108,6 +126,8 @@ const form = reactive<ArticleSavePayload>({
 onMounted(async () => {
   await loadTaxonomy()
   if (!isEditing.value) {
+    loadLocalDraft()
+    hydrated.value = true
     return
   }
   try {
@@ -120,8 +140,17 @@ onMounted(async () => {
     form.category_id = article.category_id
     form.tag_ids = article.tag_ids
     await loadVersions()
+    loadLocalDraft()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载文章失败'
+  } finally {
+    hydrated.value = true
+  }
+})
+
+onBeforeUnmount(() => {
+  if (autosaveTimer) {
+    window.clearTimeout(autosaveTimer)
   }
 })
 
@@ -133,6 +162,17 @@ watch(
     }
     form.slug = toSlug(title)
   },
+)
+
+watch(
+  form,
+  () => {
+    if (!hydrated.value) {
+      return
+    }
+    scheduleAutosave()
+  },
+  { deep: true },
 )
 
 async function loadTaxonomy() {
@@ -171,12 +211,81 @@ async function submit(status: ArticleSavePayload['status']) {
     } else {
       await createArticle(payload)
     }
+    clearLocalDraft()
     await router.push('/admin/articles')
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存文章失败'
   } finally {
     saving.value = false
   }
+}
+
+function scheduleAutosave() {
+  if (autosaveTimer) {
+    window.clearTimeout(autosaveTimer)
+  }
+  autosaveStatus.value = '有未保存修改'
+  autosaveTimer = window.setTimeout(() => {
+    saveLocalDraft()
+  }, 800)
+}
+
+function saveLocalDraft() {
+  const draft: AutoSavedDraft = {
+    payload: {
+      ...form,
+      category_id: Number(form.category_id) || 0,
+      tag_ids: form.tag_ids.map(Number),
+    },
+    saved_at: new Date().toISOString(),
+  }
+  localStorage.setItem(autosaveKey(), JSON.stringify(draft))
+  draftAvailable.value = true
+  autosaveStatus.value = `已自动保存 ${new Date(draft.saved_at).toLocaleTimeString()}`
+}
+
+function loadLocalDraft() {
+  const raw = localStorage.getItem(autosaveKey())
+  if (!raw) {
+    draftAvailable.value = false
+    autosaveStatus.value = '自动保存待命'
+    return
+  }
+  draftAvailable.value = true
+  try {
+    const draft = JSON.parse(raw) as AutoSavedDraft
+    autosaveStatus.value = `本地草稿 ${new Date(draft.saved_at).toLocaleString()}`
+  } catch {
+    clearLocalDraft()
+  }
+}
+
+function restoreDraft() {
+  const raw = localStorage.getItem(autosaveKey())
+  if (!raw) {
+    return
+  }
+  const draft = JSON.parse(raw) as AutoSavedDraft
+  Object.assign(form, {
+    ...draft.payload,
+    tag_ids: draft.payload.tag_ids.map(Number),
+  })
+  autosaveStatus.value = '已恢复本地草稿'
+}
+
+function discardDraft() {
+  clearLocalDraft()
+  autosaveStatus.value = '本地草稿已丢弃'
+}
+
+function clearLocalDraft() {
+  localStorage.removeItem(autosaveKey())
+  draftAvailable.value = false
+}
+
+function autosaveKey() {
+  const id = isEditing.value ? String(route.params.id) : 'new'
+  return `solitude:article-draft:${id}`
 }
 
 async function loadVersions() {
