@@ -17,6 +17,7 @@ type Handlers struct {
 	Category     *handler.CategoryHandler
 	Tag          *handler.TagHandler
 	Notice       *handler.NoticeHandler
+	Dashboard    *handler.DashboardHandler
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
@@ -27,6 +28,8 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.POST("auth/logout", h.AuthRequired, h.Auth.Logout)
 
 	r.GET("user/info", h.AuthRequired, h.User.Info)
+
+	r.GET("dashboard/summary", h.AuthRequired, h.Dashboard.Summary)
 
 	r.GET("setting/lobby", h.Setting.Lobby)
 	r.GET("setting/detail", h.AuthRequired, h.Setting.Detail)

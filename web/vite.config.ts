@@ -15,6 +15,7 @@ export default defineConfig({
       '/healthz': 'http://localhost:8080',
       '/auth': 'http://localhost:8080',
       '/user': 'http://localhost:8080',
+      '/dashboard': 'http://localhost:8080',
       '/setting': 'http://localhost:8080',
       '/article': 'http://localhost:8080',
       '/category': 'http://localhost:8080',
