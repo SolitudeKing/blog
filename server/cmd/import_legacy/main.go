@@ -240,15 +240,19 @@ func upsertSetting(tx *gorm.DB, setting exportedSetting, report *importReport) e
 	if setting.Mode == "" {
 		setting.Mode = "light"
 	}
-	row := model.SiteSetting{
-		ID:              1,
-		SiteName:        setting.SiteName,
-		Author:          setting.Author,
-		Essay:           setting.Essay,
-		Theme:           setting.Theme,
-		Mode:            setting.Mode,
-		SocialLinksJSON: string(links),
+	row := model.SiteSetting{}
+	err = tx.First(&row, 1).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		row.ID = 1
+	} else if err != nil {
+		return fmt.Errorf("load setting: %w", err)
 	}
+	row.SiteName = setting.SiteName
+	row.Author = setting.Author
+	row.Essay = setting.Essay
+	row.Theme = setting.Theme
+	row.Mode = setting.Mode
+	row.SocialLinksJSON = string(links)
 	if err := tx.Save(&row).Error; err != nil {
 		return fmt.Errorf("upsert setting: %w", err)
 	}
