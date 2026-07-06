@@ -17,16 +17,8 @@
       <p>{{ activeNotice.content }}</p>
     </aside>
 
-    <div v-if="articles.length" class="home-page__content">
-      <div class="home-page__list" aria-label="文章列表">
-        <ArticleCard
-          v-for="article in articles"
-          :key="article.id"
-          :article="article"
-          :dom-id="articleAnchorId(article)"
-        />
-      </div>
-      <BlogToc class="home-page__toc" title="本页目录" :items="tocItems" />
+    <div v-if="articles.length" class="home-page__list" aria-label="文章列表">
+      <ArticleCard v-for="article in articles" :key="article.id" :article="article" />
     </div>
 
     <div v-else-if="loading" class="page-state">文章加载中</div>
@@ -44,9 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import ArticleCard from '@/components/blog/ArticleCard.vue'
-import BlogToc from '@/components/blog/BlogToc.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { getArticleList } from '@/api/modules/article'
 import { getActiveNotice } from '@/api/modules/notice'
@@ -54,7 +45,6 @@ import { useSettingStore } from '@/stores/setting'
 import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 import type { NoticeItem } from '@/types/notice'
-import type { BlogTocItem } from '@/types/toc'
 
 const setting = useSettingStore()
 const articles = ref<ArticleListItem[]>([])
@@ -68,15 +58,6 @@ const page = reactive<CursorPage>({
   limit: 20,
   has_more: false,
 })
-
-const tocItems = computed<BlogTocItem[]>(() =>
-  articles.value.map((article) => ({
-    id: article.slug,
-    label: article.title,
-    href: `#${articleAnchorId(article)}`,
-    meta: article.category,
-  })),
-)
 
 onMounted(async () => {
   await setting.loadLobby()
@@ -126,7 +107,4 @@ async function loadMore() {
   }
 }
 
-function articleAnchorId(article: ArticleListItem) {
-  return `post-${article.slug}`
-}
 </script>

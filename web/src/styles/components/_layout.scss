@@ -153,13 +153,6 @@
   }
 }
 
-.home-page__content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: var(--space-6);
-  align-items: start;
-}
-
 .home-page__list {
   display: grid;
   gap: var(--space-5);
@@ -1178,7 +1171,6 @@
   .dashboard-grid,
   .dashboard-metrics,
   .editor-form,
-  .home-page__content,
   .home-page__hero,
   .media-layout,
   .media-toolbar,
