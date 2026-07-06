@@ -9,17 +9,7 @@
 
       <div class="article-detail__layout">
         <div class="markdown-body" v-html="rendered.html" />
-        <aside v-if="rendered.toc.length" class="article-toc">
-          <strong>目录</strong>
-          <a
-            v-for="item in rendered.toc"
-            :key="item.id"
-            :href="`#${item.id}`"
-            :style="{ paddingLeft: `${(item.level - 2) * 12}px` }"
-          >
-            {{ item.text }}
-          </a>
-        </aside>
+        <BlogToc title="文章目录" :items="tocItems" />
       </div>
     </article>
 
@@ -34,8 +24,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import BlogToc from '@/components/blog/BlogToc.vue'
 import { getArticleDetail } from '@/api/modules/article'
 import type { ArticleDetail } from '@/types/article'
+import type { BlogTocItem } from '@/types/toc'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -44,6 +36,14 @@ const loading = ref(false)
 const error = ref('')
 
 const rendered = computed(() => renderMarkdown(article.value?.content_md ?? ''))
+const tocItems = computed<BlogTocItem[]>(() =>
+  rendered.value.toc.map((item) => ({
+    id: item.id,
+    label: item.text,
+    href: `#${item.id}`,
+    level: item.level - 2,
+  })),
+)
 
 onMounted(async () => {
   loading.value = true
