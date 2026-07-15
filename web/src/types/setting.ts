@@ -1,9 +1,12 @@
+export type ThemeName = 'mist-sea-salt' | 'mist-forest'
+export type ModeName = 'light' | 'dark'
+
 export interface LobbySetting {
   site_name: string
   author: string
   essay: string
-  theme: 'forest' | 'strawberry'
-  mode: 'light' | 'dark'
+  theme: ThemeName
+  mode: ModeName
   social_links: Record<string, string>
 }
 

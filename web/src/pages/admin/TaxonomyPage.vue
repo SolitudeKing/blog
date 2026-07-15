@@ -1,5 +1,5 @@
 <template>
-  <section class="admin-page">
+  <section class="admin-page" :aria-busy="loading || savingCategory || savingTag">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Taxonomy</p>
@@ -8,12 +8,15 @@
       <BaseButton variant="secondary" :loading="loading" @click="loadAll">刷新</BaseButton>
     </header>
 
-    <p v-if="error" class="admin-page__error">{{ error }}</p>
+    <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
+    <p v-else-if="loading && !categories.length && !tags.length" class="admin-page__status" role="status" aria-live="polite">
+      正在加载分类与标签…
+    </p>
 
     <div class="taxonomy-grid">
       <section class="taxonomy-panel">
         <h2>分类</h2>
-        <form class="taxonomy-form" @submit.prevent="saveCategory">
+        <form class="taxonomy-form" :aria-busy="savingCategory" @submit.prevent="saveCategory">
           <BaseInput v-model="categoryForm.name" label="名称" />
           <BaseInput v-model="categoryForm.slug" label="Slug" />
           <BaseInput v-model="categorySortOrder" label="排序" type="number" />
@@ -44,10 +47,15 @@
 
       <section class="taxonomy-panel">
         <h2>标签</h2>
-        <form class="taxonomy-form" @submit.prevent="saveTag">
+        <form class="taxonomy-form" :aria-busy="savingTag" @submit.prevent="saveTag">
           <BaseInput v-model="tagForm.name" label="名称" />
           <BaseInput v-model="tagForm.slug" label="Slug" />
-          <BaseInput v-model="tagForm.color" label="颜色" />
+          <BaseInput
+            v-model="tagForm.color"
+            label="颜色"
+            hint="使用 #RGB 或 #RRGGBB 格式，例如 #5f8d62"
+            :error="tagColorError"
+          />
           <BaseTextarea v-model="tagForm.description" label="描述" :rows="3" />
           <div class="taxonomy-form__actions">
             <BaseButton type="submit" :loading="savingTag">{{ editingTagId ? '保存标签' : '新增标签' }}</BaseButton>
@@ -59,7 +67,7 @@
           <div v-for="tag in tags" :key="tag.id" class="taxonomy-item">
             <div>
               <strong>
-                <span class="tag-dot" :style="{ background: tag.color || 'var(--accent)' }" />
+                <span class="tag-dot" :style="{ background: safeTagColor(tag.color) }" />
                 {{ tag.name }}
               </strong>
               <p>{{ tag.slug }}</p>
@@ -120,6 +128,17 @@ const categorySortOrder = computed({
   set: (value: string) => {
     categoryForm.sort_order = Number(value) || 0
   },
+})
+
+const tagColorError = computed(() => {
+  const color = tagForm.color.trim()
+  if (!color) {
+    return '请输入标签颜色'
+  }
+  if (!isHexColor(color)) {
+    return '颜色格式应为 #RGB 或 #RRGGBB'
+  }
+  return ''
 })
 
 onMounted(() => {
@@ -207,13 +226,22 @@ function resetCategoryForm() {
 }
 
 async function saveTag() {
-  savingTag.value = true
   error.value = ''
+  if (tagColorError.value) {
+    error.value = tagColorError.value
+    return
+  }
+
+  savingTag.value = true
   try {
+    const payload: TagPayload = {
+      ...tagForm,
+      color: tagForm.color.trim(),
+    }
     if (editingTagId.value) {
-      await updateTag(editingTagId.value, tagForm)
+      await updateTag(editingTagId.value, payload)
     } else {
-      await createTag(tagForm)
+      await createTag(payload)
     }
     resetTagForm()
     await loadAll()
@@ -258,5 +286,14 @@ function toSlug(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
     .replace(/^-|-$/g, '')
+}
+
+function isHexColor(value: string) {
+  return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value)
+}
+
+function safeTagColor(value: string | null | undefined) {
+  const color = value?.trim() ?? ''
+  return isHexColor(color) ? color : 'var(--accent)'
 }
 </script>

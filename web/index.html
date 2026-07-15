@@ -1,8 +1,84 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="forest" data-mode="light">
+<html lang="zh-CN" data-theme="mist-sea-salt" data-mode="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5faff" />
+    <script>
+      ;(() => {
+        const root = document.documentElement
+        const defaultTheme = 'mist-sea-salt'
+        const defaultMode = 'light'
+        const validTheme = (value) => value === 'mist-sea-salt' || value === 'mist-forest'
+        const validMode = (value) => value === 'light' || value === 'dark'
+        const parseJson = (raw) => {
+          if (!raw) return null
+          try {
+            return JSON.parse(raw)
+          } catch {
+            return null
+          }
+        }
+        const parseStoredMode = (raw) => {
+          if (validMode(raw)) return raw
+          const parsed = parseJson(raw)
+          if (validMode(parsed)) return parsed
+          return validMode(parsed?.mode) ? parsed.mode : null
+        }
+
+        let localMode = null
+        let cachedAppearance = null
+
+        try {
+          localMode = parseStoredMode(localStorage.getItem('blog:mode'))
+          if (!localMode) {
+            localMode = parseStoredMode(localStorage.getItem('blog:theme'))
+            if (localMode) {
+              localStorage.setItem('blog:mode', localMode)
+            } else {
+              localStorage.removeItem('blog:mode')
+            }
+          }
+          localStorage.removeItem('blog:theme')
+
+          const cached = parseJson(localStorage.getItem('blog:site-appearance'))
+          if (validTheme(cached?.theme) && validMode(cached?.mode)) {
+            cachedAppearance = cached
+          } else {
+            localStorage.removeItem('blog:site-appearance')
+          }
+        } catch {
+          // Storage may be unavailable; static defaults remain usable.
+        }
+
+        const theme = cachedAppearance?.theme ??
+          (validTheme(root.dataset.theme) ? root.dataset.theme : defaultTheme)
+        const mode = localMode ?? cachedAppearance?.mode ??
+          (validMode(root.dataset.mode)
+            ? root.dataset.mode
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : defaultMode)
+
+        root.dataset.theme = theme
+        root.dataset.mode = mode
+        root.style.colorScheme = mode
+
+        const themeColors = {
+          'mist-sea-salt': {
+            light: '#f5faff',
+            dark: '#101b22',
+          },
+          'mist-forest': {
+            light: '#f7fcf8',
+            dark: '#101b16',
+          },
+        }
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute('content', themeColors[theme][mode])
+      })()
+    </script>
     <link rel="alternate" type="application/rss+xml" title="Solitude Blog RSS" href="/rss.xml" />
     <title>Solitude Blog</title>
   </head>

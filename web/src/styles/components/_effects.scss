@@ -1,0 +1,213 @@
+// =================== Effects ===================
+// Shared effects used across pages: hover lift mixin, reading progress bar,
+// scroll behavior, focus rings.
+
+@mixin hover-lift($shadow: var(--shadow-md), $accent: var(--accent)) {
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: translateY(-2px) scale(1.005);
+      box-shadow: $shadow;
+      border-color: var(--border-focus);
+      border-color: color-mix(in srgb, $accent 50%, var(--border));
+    }
+  }
+
+  &:active {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mist-hover-lift {
+  @include hover-lift;
+}
+
+// Reading progress bar (used on article detail)
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  z-index: calc(var(--z-sticky) + 1);
+  background: transparent;
+  pointer-events: none;
+
+  &__bar {
+    height: 100%;
+    width: var(--progress, 0%);
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    box-shadow: var(--shadow-glow);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
+    transition: width 80ms linear;
+  }
+}
+
+// Smooth scroll for anchor navigation
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--layout-public-header) + var(--space-4));
+}
+
+[id] {
+  scroll-margin-top: calc(var(--layout-public-header) + var(--space-4));
+}
+
+// Section divider
+.section-divider {
+  display: block;
+  height: 1px;
+  border: 0;
+  background: var(--border);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--border) 100%, transparent),
+    transparent
+  );
+  margin: var(--space-6) 0;
+}
+
+// Dot pattern background used by hero
+.bg-dot-pattern {
+  background-image: radial-gradient(var(--accent-soft) 1px, transparent 1px);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--accent) 20%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+  background-position: 0 0;
+}
+
+// Glass surface (consumed by sticky elements)
+.surface-glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+// Soft fade-in animation for route transitions
+.fade-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.fade-enter-active {
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
+}
+
+.fade-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+// CTA pill (for home/profile quick links)
+.cta-pill {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border-focus);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-4);
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--bg-card));
+  font-weight: 700;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Stat tile (used in hero / profile)
+.stat-tile {
+  display: grid;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 66%, transparent);
+  text-align: center;
+
+  strong {
+    color: var(--accent-active);
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+}
+
+// Highlighted link within body text
+.text-link {
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  &--danger {
+    color: var(--danger);
+
+    &:hover {
+      color: var(--danger);
+      color: color-mix(in srgb, var(--danger) 80%, var(--text-primary));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mist-hover-lift,
+  .cta-pill,
+  .fade-enter,
+  .fade-enter-to {
+    transform: none !important;
+  }
+
+  .reading-progress__bar {
+    transition: none;
+  }
+}

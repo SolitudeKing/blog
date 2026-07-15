@@ -1,14 +1,14 @@
 <template>
-  <section class="admin-page article-editor">
+  <section class="admin-page article-editor" :aria-busy="saving">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Editor</p>
         <h1>{{ isEditing ? '编辑文章' : '新建文章' }}</h1>
       </div>
-      <RouterLink class="cui-button cui-button--secondary" to="/admin/articles">返回列表</RouterLink>
+      <RouterLink class="mist-button mist-button--secondary" to="/admin/articles">返回列表</RouterLink>
     </header>
 
-    <form class="editor-form" @submit.prevent="save">
+    <form class="editor-form" :aria-busy="saving" @submit.prevent="save">
       <div class="editor-form__main">
         <BaseInput v-model="form.title" label="标题" />
         <BaseInput v-model="form.slug" label="Slug" />
@@ -18,7 +18,7 @@
 
       <aside class="editor-panel">
         <div class="editor-autosave">
-          <strong>{{ autosaveStatus }}</strong>
+          <strong role="status" aria-live="polite">{{ autosaveStatus }}</strong>
           <p v-if="draftAvailable">发现本地草稿，可恢复到编辑器。</p>
           <div v-if="draftAvailable" class="editor-autosave__actions">
             <BaseButton type="button" variant="secondary" @click="restoreDraft">恢复草稿</BaseButton>
@@ -26,32 +26,24 @@
           </div>
         </div>
 
-        <label class="cui-field">
-          <span class="cui-field__label">状态</span>
-          <select v-model="form.status" class="cui-input">
-            <option value="draft">草稿</option>
-            <option value="published">发布</option>
-            <option value="private">私有</option>
-            <option value="archived">归档</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="form.status"
+          :options="statusOptions"
+          label="状态"
+        />
 
-        <label class="cui-field">
-          <span class="cui-field__label">分类</span>
-          <select v-model.number="form.category_id" class="cui-input">
-            <option :value="0">默认分类</option>
-            <option v-for="category in categories" :key="category.id" :value="category.id">
-              {{ category.name }}
-            </option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="categorySelection"
+          :options="categoryOptions"
+          label="分类"
+        />
 
-        <div class="cui-field">
-          <span class="cui-field__label">标签</span>
-          <div class="tag-checks">
+        <div class="mist-field">
+          <span id="article-tags-label" class="mist-field__label">标签</span>
+          <div class="tag-checks" role="group" aria-labelledby="article-tags-label">
             <label v-for="tag in tags" :key="tag.id" class="tag-check">
               <input v-model="form.tag_ids" type="checkbox" :value="tag.id" />
-              <span class="tag-dot" :style="{ background: tag.color || 'var(--accent)' }" />
+              <span class="tag-dot" :style="{ background: safeTagColor(tag.color) }" />
               {{ tag.name }}
             </label>
           </div>
@@ -61,7 +53,7 @@
           <BaseButton type="submit" :loading="saving">{{ isEditing ? '保存修改' : '创建文章' }}</BaseButton>
           <BaseButton type="button" variant="secondary" :disabled="saving" @click="publish">保存并发布</BaseButton>
         </div>
-        <p v-if="error" class="admin-page__error">{{ error }}</p>
+        <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
 
         <div v-if="isEditing" class="editor-versions">
           <div class="dashboard-panel__header">
@@ -89,9 +81,11 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { createArticle, getArticleVersions, getManagedArticleInfo, updateArticle } from '@/api/modules/article'
 import { getCategoryList, getTagList } from '@/api/modules/taxonomy'
+import { useToast } from '@/composables/useToast'
 import type { ArticleSavePayload, ArticleVersionItem } from '@/types/article'
 import type { CategoryItem, TagItem } from '@/types/taxonomy'
 
@@ -122,6 +116,30 @@ const form = reactive<ArticleSavePayload>({
   tag_ids: [],
   status: 'draft',
 })
+
+const toast = useToast()
+
+const statusOptions: Array<{ label: string; value: ArticleSavePayload['status'] }> = [
+  { label: '草稿', value: 'draft' },
+  { label: '发布', value: 'published' },
+  { label: '私有', value: 'private' },
+  { label: '归档', value: 'archived' },
+]
+
+const categorySelection = computed<number>({
+  get: () => form.category_id || 0,
+  set: (value) => {
+    form.category_id = Number(value) || 0
+  },
+})
+
+const categoryOptions = computed(() => [
+  { label: '默认分类', value: 0 },
+  ...categories.value.map((category) => ({
+    label: category.name,
+    value: category.id,
+  })),
+])
 
 onMounted(async () => {
   await loadTaxonomy()
@@ -212,9 +230,11 @@ async function submit(status: ArticleSavePayload['status']) {
       await createArticle(payload)
     }
     clearLocalDraft()
+    toast.success(isEditing.value ? '文章已更新' : '文章已创建')
     await router.push('/admin/articles')
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存文章失败'
+    toast.error(error.value)
   } finally {
     saving.value = false
   }
@@ -316,5 +336,10 @@ function toSlug(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
     .replace(/^-|-$/g, '')
+}
+
+function safeTagColor(value: string | null | undefined) {
+  const color = value?.trim() ?? ''
+  return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(color) ? color : 'var(--accent)'
 }
 </script>

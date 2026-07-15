@@ -1,48 +1,177 @@
 <template>
-  <section class="search-page">
-    <header class="search-page__header">
-      <p class="home-page__eyebrow">Search</p>
-      <h1>搜索文章</h1>
+  <section class="search-page" aria-labelledby="search-title">
+    <header class="search-hero">
+      <div class="search-hero__copy">
+        <p class="search-kicker">Search the current</p>
+        <h1 id="search-title">打捞一段想法</h1>
+        <p>输入一个词，沿着标题、摘要、正文与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p>
+      </div>
+
+      <aside class="search-hero__aside" :aria-label="searchOverview">
+        <div class="search-stat">
+          <strong>{{ searched ? results.length : '—' }}</strong>
+          <span>{{ searched ? (page.has_more ? '条已加载' : '篇结果') : '等待搜索' }}</span>
+        </div>
+        <div class="search-stat">
+          <strong>{{ searched ? matchedFieldCount : '—' }}</strong>
+          <span>个命中字段</span>
+        </div>
+      </aside>
     </header>
 
-    <form class="search-box" @submit.prevent="submitSearch">
-      <input v-model.trim="keyword" class="cui-input" placeholder="输入标题、标签或正文关键词" />
-      <BaseButton :loading="loading">搜索</BaseButton>
-    </form>
-
-    <div v-if="searched && results.length" class="search-results">
-      <RouterLink v-for="item in results" :key="item.id" class="search-result" :to="`/articles/${item.slug}`">
-        <div>
-          <h2>{{ item.title }}</h2>
-          <p>
-            <template v-for="(part, index) in highlight(item.snippet)" :key="`${item.id}-${index}`">
-              <mark v-if="part.hit">{{ part.text }}</mark>
-              <span v-else>{{ part.text }}</span>
-            </template>
-          </p>
+    <section class="search-workbench mist-glass--strong" aria-labelledby="search-workbench-title">
+      <h2 id="search-workbench-title" class="sr-only">文章搜索工作台</h2>
+      <form class="search-form" role="search" @submit.prevent="submitSearch">
+        <label class="sr-only" for="article-search">搜索文章标题、摘要、正文或标签</label>
+        <div class="search-input-wrap">
+          <svg class="search-input-wrap__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
+          <input
+            id="article-search"
+            ref="inputRef"
+            v-model.trim="keyword"
+            class="mist-input search-form__input"
+            type="search"
+            name="q"
+            autocomplete="off"
+            placeholder="例如：设计系统、写作、Vue……"
+            aria-describedby="search-hint search-status"
+            aria-controls="search-results"
+          />
+          <button
+            v-if="keyword"
+            class="search-clear"
+            type="button"
+            aria-label="清空搜索"
+            @click="clearSearch"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path d="m7 7 10 10M17 7 7 17" />
+            </svg>
+          </button>
         </div>
-        <div class="search-result__meta">
-          <span>{{ item.category }}</span>
-          <span v-for="field in item.matched_fields" :key="field">{{ field }}</span>
+        <BaseButton class="search-submit" type="submit" :loading="loading">搜索</BaseButton>
+        <p id="search-hint" class="sr-only">提交搜索后，查询会写入地址栏，搜索结果可以分享。</p>
+        <p id="search-status" class="sr-only" aria-live="polite">{{ searchStatus }}</p>
+      </form>
+
+      <div class="search-suggestions" role="group" aria-label="常用搜索词">
+        <span class="search-suggestions__label">试试这些航标</span>
+        <button
+          v-for="suggestion in suggestions"
+          :key="suggestion"
+          class="search-chip"
+          type="button"
+          :aria-pressed="normalizedKeyword === suggestion.toLocaleLowerCase('zh-CN')"
+          @click="applySuggestion(suggestion)"
+        >
+          {{ suggestion }}
+        </button>
+      </div>
+    </section>
+
+    <div class="search-content" :class="{ 'search-content--single': !fieldMap.length }">
+      <section
+        id="search-results"
+        class="search-results"
+        aria-labelledby="results-title"
+        :aria-busy="loading || loadingMore"
+      >
+        <header v-if="searched" class="search-results__header">
+          <h2 id="results-title" class="search-results__count">
+            {{ page.has_more ? '已加载' : '找到' }} <strong>{{ results.length }}</strong> 篇文章
+          </h2>
+          <span>按相关度排序</span>
+        </header>
+        <h2 v-else id="results-title" class="sr-only">搜索结果</h2>
+
+        <div v-if="loading && !results.length" class="page-state" aria-busy="true" aria-label="正在搜索">
+          <BaseSkeleton variant="card" :count="2" />
         </div>
-      </RouterLink>
-    </div>
 
-    <div v-else-if="loading" class="page-state">正在搜索</div>
-    <div v-else-if="error" class="page-state page-state--error">{{ error }}</div>
-    <div v-else-if="searched" class="page-state">没有找到匹配文章</div>
-    <div v-else class="page-state">输入关键词开始搜索</div>
+        <div v-else-if="error && !results.length" class="page-state page-state--error" role="alert">
+          <p>{{ error }}</p>
+          <BaseButton variant="secondary" @click="retrySearch">重试</BaseButton>
+        </div>
 
-    <div v-if="results.length && page.has_more" class="home-page__footer">
-      <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+        <ol v-else-if="searched && results.length" class="search-result-list">
+          <li v-for="(item, index) in results" :key="item.id" class="search-result">
+            <span class="search-result__index" aria-hidden="true">{{ formatResultIndex(index) }}</span>
+            <article>
+              <h3>
+                <RouterLink :to="`/articles/${item.slug}`">{{ item.title }}</RouterLink>
+              </h3>
+              <p>
+                <template v-for="(part, partIndex) in highlight(item.snippet)" :key="`${item.id}-${partIndex}`">
+                  <mark v-if="part.hit">{{ part.text }}</mark>
+                  <span v-else>{{ part.text }}</span>
+                </template>
+              </p>
+              <div class="search-result__meta">
+                <time :datetime="item.published_at || item.created_at">{{ formatDate(item) }}</time>
+                <span v-if="item.category" class="search-result__tag">{{ item.category }}</span>
+                <span v-for="field in item.matched_fields" :key="field">命中 {{ displayField(field) }}</span>
+              </div>
+            </article>
+          </li>
+        </ol>
+
+        <BaseEmpty
+          v-else-if="searched"
+          title="这片水域还没有记录"
+          description="可以尝试缩短关键词，或从“设计”“代码”“写作”这些航标重新出发。"
+        >
+          <template #icon>
+            <svg viewBox="0 0 24 24">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="m15.5 15.5 5 5M8 10.5h5" />
+            </svg>
+          </template>
+        </BaseEmpty>
+
+        <div v-else class="page-state search-page__prompt">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="10.5" cy="10.5" r="6.5" />
+            <path d="m15.5 15.5 5 5" />
+          </svg>
+          <p>输入关键词开始搜索</p>
+        </div>
+
+        <div v-if="error && results.length" class="search-load-error" role="alert">
+          <span>{{ error }}</span>
+          <BaseButton variant="secondary" size="sm" @click="loadMore">重试加载</BaseButton>
+        </div>
+
+        <div v-if="results.length && page.has_more && !error" class="search-footer">
+          <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+        </div>
+      </section>
+
+      <aside v-if="fieldMap.length" class="search-aside mist-glass" aria-labelledby="search-map-title">
+        <h2 id="search-map-title">命中海图</h2>
+        <div class="search-map">
+          <div v-for="field in fieldMap" :key="field.label" class="search-map__row">
+            <span>{{ field.label }}</span>
+            <span class="search-map__track" aria-hidden="true">
+              <span class="search-map__fill" :style="{ '--map-width': `${field.width}%` }" />
+            </span>
+            <span>{{ field.count }}</span>
+          </div>
+        </div>
+        <p>同一篇文章可能同时命中多个字段。</p>
+      </aside>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseEmpty from '@/components/base/BaseEmpty.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import { searchArticles } from '@/api/modules/article'
 import type { CursorPage } from '@/api/types'
 import type { ArticleSearchItem } from '@/types/article'
@@ -52,14 +181,35 @@ interface HighlightPart {
   hit: boolean
 }
 
+interface SearchMapItem {
+  label: string
+  count: number
+  width: number
+}
+
+const suggestions = ['设计', '代码', '写作', 'Vue', '前端']
+const fieldLabels: Record<string, string> = {
+  title: '标题',
+  summary: '摘要',
+  content: '正文',
+  category: '分类',
+  tag: '标签',
+}
+const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
 const route = useRoute()
 const router = useRouter()
+const inputRef = ref<HTMLInputElement | null>(null)
 const keyword = ref('')
 const results = ref<ArticleSearchItem[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)
 const searched = ref(false)
 const error = ref('')
+let searchRequestId = 0
 const page = reactive<CursorPage>({
   cursor: '',
   next_cursor: '',
@@ -67,35 +217,119 @@ const page = reactive<CursorPage>({
   has_more: false,
 })
 
-onMounted(async () => {
-  const query = typeof route.query.q === 'string' ? route.query.q : ''
-  keyword.value = query
-  if (query) {
-    await runSearch()
+const normalizedKeyword = computed(() => keyword.value.trim().toLocaleLowerCase('zh-CN'))
+
+const matchedFieldCount = computed(() => {
+  const fields = new Set(results.value.flatMap((item) => item.matched_fields))
+  return fields.size
+})
+
+const fieldMap = computed<SearchMapItem[]>(() => {
+  const counts = new Map<string, number>()
+  for (const result of results.value) {
+    for (const field of result.matched_fields) {
+      counts.set(field, (counts.get(field) ?? 0) + 1)
+    }
   }
+  const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+  const max = entries[0]?.[1] ?? 1
+  return entries.map(([field, count]) => ({
+    label: displayField(field),
+    count,
+    width: Math.max(12, Math.round((count / max) * 100)),
+  }))
+})
+
+const searchOverview = computed(() => {
+  if (!searched.value) {
+    return '尚未开始搜索'
+  }
+  const resultLabel = page.has_more ? `已加载 ${results.value.length} 条结果` : `找到 ${results.value.length} 篇文章`
+  return `${resultLabel}，命中 ${matchedFieldCount.value} 个内容字段`
+})
+
+const searchStatus = computed(() => {
+  if (loading.value || loadingMore.value) {
+    return `正在搜索“${keyword.value}”`
+  }
+  if (!searched.value) {
+    return ''
+  }
+  if (error.value && !results.value.length) {
+    return '搜索失败，请重试'
+  }
+  return page.has_more
+    ? `关键词“${keyword.value}”已加载 ${results.value.length} 条结果，还有更多结果`
+    : `关键词“${keyword.value}”找到 ${results.value.length} 篇文章`
 })
 
 async function submitSearch() {
-  await router.replace({ path: '/search', query: keyword.value ? { q: keyword.value } : {} })
-  await runSearch()
+  const normalized = keyword.value.trim()
+  const currentQuery = typeof route.query.q === 'string' ? route.query.q : ''
+  keyword.value = normalized
+  if (normalized === currentQuery) {
+    await runSearch('', true)
+    return
+  }
+  await router.replace({ path: '/search', query: normalized ? { q: normalized } : {} })
 }
 
-async function runSearch(cursor = '') {
-  searched.value = true
+async function applySuggestion(suggestion: string) {
+  keyword.value = suggestion
+  await submitSearch()
+  await nextTick()
+  inputRef.value?.focus({ preventScroll: true })
+}
+
+async function clearSearch() {
+  keyword.value = ''
+  if (route.query.q) {
+    await router.replace({ path: '/search' })
+  } else {
+    await runSearch('', true)
+  }
+  await nextTick()
+  inputRef.value?.focus({ preventScroll: true })
+}
+
+async function runSearch(cursor = '', replace = false) {
+  const requestId = ++searchRequestId
   if (!keyword.value) {
     results.value = []
+    searched.value = false
+    error.value = ''
+    loading.value = false
+    loadingMore.value = false
+    page.cursor = ''
+    page.next_cursor = ''
+    page.has_more = false
     return
+  }
+  searched.value = true
+  if (replace || !cursor) {
+    results.value = []
+    loadingMore.value = false
+    page.cursor = ''
+    page.next_cursor = ''
+    page.has_more = false
   }
   loading.value = !cursor
   error.value = ''
   try {
     const result = await searchArticles({ keyword: keyword.value, cursor: cursor || undefined, limit: page.limit })
+    if (requestId !== searchRequestId) {
+      return
+    }
     results.value = cursor ? [...results.value, ...result.data] : result.data
     Object.assign(page, result.page)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '搜索失败'
+    if (requestId === searchRequestId) {
+      error.value = err instanceof Error ? err.message : '搜索失败'
+    }
   } finally {
-    loading.value = false
+    if (requestId === searchRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -111,12 +345,36 @@ async function loadMore() {
   }
 }
 
+async function retrySearch() {
+  await runSearch('', true)
+}
+
+function formatResultIndex(index: number) {
+  return String(index + 1).padStart(2, '0')
+}
+
+function displayField(field: string) {
+  return fieldLabels[field] ?? field
+}
+
+function formatDate(item: ArticleSearchItem) {
+  const raw = item.published_at || item.created_at
+  if (!raw) {
+    return '未发布'
+  }
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return '日期未知'
+  }
+  return dateFormatter.format(date)
+}
+
 function highlight(value: string): HighlightPart[] {
   if (!keyword.value) {
     return [{ text: value, hit: false }]
   }
-  const lowerValue = value.toLowerCase()
-  const lowerKeyword = keyword.value.toLowerCase()
+  const lowerValue = value.toLocaleLowerCase('zh-CN')
+  const lowerKeyword = keyword.value.toLocaleLowerCase('zh-CN')
   const parts: HighlightPart[] = []
   let cursor = 0
   let index = lowerValue.indexOf(lowerKeyword)
@@ -133,4 +391,14 @@ function highlight(value: string): HighlightPart[] {
   }
   return parts.length ? parts : [{ text: value, hit: false }]
 }
+
+watch(
+  () => route.query.q,
+  async (rawQuery) => {
+    const query = typeof rawQuery === 'string' ? rawQuery.trim() : ''
+    keyword.value = query
+    await runSearch('', true)
+  },
+  { immediate: true },
+)
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <section class="admin-page">
+  <section class="admin-page" :aria-busy="loading || uploading || saving">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Media</p>
@@ -9,11 +9,11 @@
     </header>
 
     <div class="media-layout">
-      <aside class="media-panel">
+      <aside class="media-panel" :aria-busy="uploading || saving">
         <h2>上传资源</h2>
-        <label class="cui-field">
-          <span class="cui-field__label">文件</span>
-          <input class="cui-input" type="file" accept="image/*" @change="selectFile" />
+        <label class="mist-field">
+          <span class="mist-field__label">文件</span>
+          <input class="mist-input" type="file" accept="image/*" @change="selectFile" />
         </label>
         <BaseInput v-model="uploadName" label="显示名称" />
         <BaseButton :loading="uploading" :disabled="!selectedFile" @click="upload">上传</BaseButton>
@@ -28,20 +28,31 @@
           </div>
         </div>
 
-        <p v-if="message" class="settings-message">{{ message }}</p>
-        <p v-if="error" class="admin-page__error">{{ error }}</p>
+        <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
       </aside>
 
-      <section class="media-main">
-        <div class="admin-toolbar media-toolbar">
-          <input v-model="keyword" class="cui-input" placeholder="搜索文件名或 Alt" @keyup.enter="loadAssets()" />
-          <select v-model="mime" class="cui-input" @change="loadAssets()">
-            <option value="">全部类型</option>
-            <option value="image/">图片</option>
-            <option value="image/svg+xml">SVG</option>
-          </select>
+      <section class="media-main" :aria-busy="loading">
+        <div class="admin-toolbar media-toolbar" role="search" aria-label="筛选媒体资源">
+          <input
+            v-model="keyword"
+            class="mist-input"
+            type="search"
+            aria-label="搜索文件名或替代文本"
+            placeholder="搜索文件名或 Alt"
+            @keyup.enter="loadAssets()"
+          />
+          <BaseSelect
+            v-model="mime"
+            :options="mimeOptions"
+            label="资源类型"
+            @change="loadAssets()"
+          />
           <BaseButton variant="secondary" :loading="loading" @click="loadAssets()">筛选</BaseButton>
         </div>
+
+        <p v-if="loading && !assets.length" class="admin-page__status" role="status" aria-live="polite">
+          正在加载媒体资源…
+        </p>
 
         <div v-if="assets.length" class="media-grid">
           <article v-for="asset in assets" :key="asset.id" class="media-card">
@@ -61,7 +72,17 @@
             </div>
           </article>
         </div>
-        <div v-else-if="!loading" class="empty-state">暂无媒体资源</div>
+        <BaseEmpty
+          v-else-if="!loading"
+          title="暂无媒体资源"
+          description="从左侧上传第一张图片，文章配图不用愁。"
+        >
+          <template #icon>
+            <svg class="admin-empty__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M9 9h.01" />
+            </svg>
+          </template>
+        </BaseEmpty>
 
         <div v-if="assets.length && page.has_more" class="media-footer">
           <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
@@ -74,8 +95,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { deleteAsset, getAssetList, updateAsset, uploadAsset } from '@/api/modules/asset'
+import { useToast } from '@/composables/useToast'
 import type { CursorPage } from '@/api/types'
 import type { AssetItem, AssetUpdatePayload } from '@/types/asset'
 
@@ -83,14 +107,14 @@ const assets = ref<AssetItem[]>([])
 const selectedFile = ref<File | null>(null)
 const uploadName = ref('')
 const keyword = ref('')
-const mime = ref('')
+const mime = ref<string>('')
 const loading = ref(false)
 const loadingMore = ref(false)
 const uploading = ref(false)
 const saving = ref(false)
 const error = ref('')
-const message = ref('')
 const editingAsset = ref<AssetItem | null>(null)
+const toast = useToast()
 
 const page = reactive<CursorPage>({
   cursor: '',
@@ -103,6 +127,12 @@ const editForm = reactive<AssetUpdatePayload>({
   display_name: '',
   alt_text: '',
 })
+
+const mimeOptions = [
+  { label: '全部类型', value: '' },
+  { label: '图片', value: 'image/' },
+  { label: 'SVG', value: 'image/svg+xml' },
+]
 
 onMounted(() => {
   loadAssets()
@@ -153,15 +183,16 @@ async function upload() {
   }
   uploading.value = true
   error.value = ''
-  message.value = ''
   try {
     await uploadAsset(selectedFile.value, uploadName.value)
     selectedFile.value = null
     uploadName.value = ''
-    message.value = '上传完成'
+    toast.success('上传完成')
     await loadAssets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '上传媒体资源失败'
+    const message = err instanceof Error ? err.message : '上传媒体资源失败'
+    error.value = message
+    toast.error(message)
   } finally {
     uploading.value = false
   }
@@ -179,7 +210,6 @@ async function saveAsset() {
   }
   saving.value = true
   error.value = ''
-  message.value = ''
   try {
     const saved = await updateAsset(editingAsset.value.id, editForm)
     const index = assets.value.findIndex((asset) => asset.id === saved.id)
@@ -187,9 +217,11 @@ async function saveAsset() {
       assets.value[index] = saved
     }
     editingAsset.value = null
-    message.value = '资源信息已保存'
+    toast.success('资源信息已保存')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存资源信息失败'
+    const message = err instanceof Error ? err.message : '保存资源信息失败'
+    error.value = message
+    toast.error(message)
   } finally {
     saving.value = false
   }
@@ -206,14 +238,21 @@ async function removeAsset(asset: AssetItem) {
   try {
     await deleteAsset(asset.id)
     assets.value = assets.value.filter((item) => item.id !== asset.id)
+    toast.success('资源已删除')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '删除媒体资源失败'
+    const message = err instanceof Error ? err.message : '删除媒体资源失败'
+    error.value = message
+    toast.error(message)
   }
 }
 
 async function copyURL(url: string) {
-  await navigator.clipboard.writeText(new URL(url, window.location.origin).toString())
-  message.value = 'URL 已复制'
+  try {
+    await navigator.clipboard.writeText(new URL(url, window.location.origin).toString())
+    toast.success('URL 已复制')
+  } catch {
+    toast.error('复制失败，请手动复制')
+  }
 }
 
 function formatSize(size: number) {

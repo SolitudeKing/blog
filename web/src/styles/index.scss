@@ -1,7 +1,15 @@
 @use './reset';
 @use './tokens/base' as token-base;
-@use './tokens/forest' as token-forest;
-@use './tokens/strawberry' as token-strawberry;
-@use './themes/creamy';
+@use './tokens/mist-sea-salt' as token-mist-sea-salt;
+@use './tokens/mist-forest' as token-mist-forest;
+@use './themes/mist';
 @use './components/base' as component-base;
+@use './components/effects';
 @use './components/layout';
+@use './components/navbar';
+@use './components/home';
+@use './components/article';
+@use './components/archives';
+@use './components/search';
+@use './components/about';
+@use './components/admin';

@@ -1,0 +1,203 @@
+.mist-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: clip;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  background-image:
+    var(--light-gradient-primary),
+    radial-gradient(ellipse 44% 34% at 7% 7%, var(--body-bg-spot-1) 0%, transparent 72%),
+    radial-gradient(ellipse 38% 30% at 92% 8%, var(--body-bg-spot-2) 0%, transparent 74%),
+    radial-gradient(ellipse 42% 34% at 72% 38%, var(--body-bg-spot-3) 0%, transparent 76%),
+    radial-gradient(ellipse 50% 40% at 24% 44%, var(--body-bg-spot-4) 0%, transparent 75%),
+    radial-gradient(ellipse 36% 32% at 93% 68%, var(--body-bg-spot-5) 0%, transparent 74%),
+    radial-gradient(ellipse 44% 36% at 16% 82%, var(--body-bg-spot-6) 0%, transparent 76%),
+    radial-gradient(ellipse 38% 30% at 56% 94%, var(--body-bg-spot-7) 0%, transparent 74%),
+    radial-gradient(ellipse 34% 28% at 52% 12%, var(--body-bg-spot-8) 0%, transparent 72%);
+  font-family: var(--font-sans);
+}
+
+.mist-page::before,
+.mist-page::after {
+  position: fixed;
+  z-index: var(--z-base);
+  width: clamp(360px, 58vw, 880px);
+  aspect-ratio: 1.55;
+  border-radius: 50%;
+  content: '';
+  filter: blur(var(--fog-blur-lg));
+  mix-blend-mode: var(--fog-blend-mode);
+  opacity: var(--fog-opacity);
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+.mist-page::before {
+  top: -18%;
+  left: -22%;
+  background:
+    radial-gradient(ellipse at 30% 42%, var(--fog-color-1) 0%, transparent 62%),
+    radial-gradient(ellipse at 72% 54%, var(--fog-color-2) 0%, transparent 68%);
+  animation: mist-fog-drift-one var(--fog-drift-slow) ease-in-out infinite alternate;
+}
+
+.mist-page::after {
+  right: -24%;
+  bottom: -20%;
+  background:
+    radial-gradient(ellipse at 64% 46%, var(--fog-color-2) 0%, transparent 60%),
+    radial-gradient(ellipse at 28% 64%, var(--fog-color-3) 0%, transparent 70%);
+  animation: mist-fog-drift-two var(--fog-drift-slower) ease-in-out infinite alternate;
+}
+
+.mist-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mist-page--quiet {
+  background-image: none;
+}
+
+.mist-page--quiet::before,
+.mist-page--quiet::after {
+  display: none;
+}
+
+.mist-glass,
+.mist-glass--subtle,
+.mist-glass--strong {
+  border: var(--border-thin) solid var(--surface-glass-border);
+  box-shadow: var(--surface-glass-shadow);
+}
+
+.mist-glass {
+  background-color: var(--bg-card);
+  background: var(--surface-glass-highlight), var(--surface-glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur-md)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur-md)) saturate(var(--glass-saturation));
+}
+
+.mist-glass--subtle {
+  background-color: var(--bg-card);
+  background: var(--light-gradient-secondary), var(--surface-glass-subtle);
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturation));
+}
+
+.mist-glass--strong {
+  background-color: var(--bg-elevated);
+  background: var(--surface-glass-highlight), var(--surface-glass-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturation));
+}
+
+.mist-luminous {
+  position: relative;
+  overflow: hidden;
+}
+
+.mist-luminous::before {
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  background: var(--light-gradient-secondary);
+  content: '';
+  opacity: 0.72;
+  pointer-events: none;
+  transform: translate3d(-2%, -1%, 0);
+  animation: mist-aurora-drift var(--aurora-drift) ease-in-out infinite alternate;
+}
+
+.page-shell {
+  width: min(
+    var(--layout-page-max),
+    calc(100% - var(--layout-gutter) - var(--layout-gutter))
+  );
+  min-width: 0;
+  margin-inline: auto;
+  padding: var(--space-8) 0;
+}
+
+@keyframes mist-fog-drift-one {
+  from {
+    opacity: calc(var(--fog-opacity) * 0.82);
+    transform: translate3d(-2vw, -1vh, 0) scale(0.98);
+  }
+
+  to {
+    opacity: var(--fog-opacity);
+    transform: translate3d(3vw, 3vh, 0) scale(1.03);
+  }
+}
+
+@keyframes mist-fog-drift-two {
+  from {
+    opacity: var(--fog-opacity);
+    transform: translate3d(2vw, 2vh, 0) scale(1.02);
+  }
+
+  to {
+    opacity: calc(var(--fog-opacity) * 0.78);
+    transform: translate3d(-3vw, -2vh, 0) scale(0.97);
+  }
+}
+
+@keyframes mist-aurora-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(2%, 2%, 0) scale(1.04);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mist-glass,
+  .mist-glass--subtle {
+    background: var(--bg-card);
+  }
+
+  .mist-glass--strong {
+    background: var(--bg-elevated);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 641px) {
+  .mist-page {
+    background-attachment: fixed;
+  }
+}
+
+@media (max-width: 640px) {
+  .mist-page {
+    background-attachment: scroll;
+  }
+
+  .mist-page::before,
+  .mist-page::after {
+    width: min(104vw, 560px);
+    filter: blur(var(--fog-blur-md));
+    opacity: calc(var(--fog-opacity) * 0.72);
+    animation: none;
+    will-change: auto;
+  }
+
+  .mist-page::after {
+    bottom: 6%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mist-page::before,
+  .mist-page::after,
+  .mist-luminous::before {
+    animation: none;
+    transform: none;
+    will-change: auto;
+  }
+}

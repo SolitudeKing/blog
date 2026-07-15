@@ -17,6 +17,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/appearance"
 	"solitude-blog/server/internal/config"
 	"solitude-blog/server/internal/model"
 )
@@ -234,12 +235,8 @@ func upsertSetting(tx *gorm.DB, setting exportedSetting, report *importReport) e
 	if setting.Author == "" {
 		setting.Author = "Solitude King"
 	}
-	if setting.Theme == "" {
-		setting.Theme = "forest"
-	}
-	if setting.Mode == "" {
-		setting.Mode = "light"
-	}
+	setting.Theme = appearance.NormalizeTheme(setting.Theme)
+	setting.Mode = appearance.NormalizeMode(setting.Mode)
 	row := model.SiteSetting{}
 	err = tx.First(&row, 1).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

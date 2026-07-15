@@ -10,13 +10,16 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/appearance"
 	"solitude-blog/server/internal/cache"
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
 )
 
-const defaultSiteSettingID uint64 = 1
-const siteSettingCacheTTL = 10 * time.Minute
+const (
+	defaultSiteSettingID uint64 = 1
+	siteSettingCacheTTL         = 10 * time.Minute
+)
 
 type SettingService struct {
 	db      *gorm.DB
@@ -109,6 +112,8 @@ func (s *SettingService) getCachedSetting() (LobbySetting, bool) {
 	if err := json.Unmarshal(payload, &item); err != nil {
 		return LobbySetting{}, false
 	}
+	item.Theme = appearance.NormalizeTheme(item.Theme)
+	item.Mode = appearance.NormalizeMode(item.Mode)
 	return item, true
 }
 
@@ -160,16 +165,7 @@ func normalizeSetting(req SettingSaveRequest) (LobbySetting, error) {
 	if req.SiteName == "" || req.Author == "" {
 		return LobbySetting{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
-	if req.Theme == "" {
-		req.Theme = "forest"
-	}
-	if req.Mode == "" {
-		req.Mode = "light"
-	}
-	if req.Theme != "forest" && req.Theme != "strawberry" {
-		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
-	}
-	if req.Mode != "light" && req.Mode != "dark" {
+	if !appearance.IsValidTheme(req.Theme) || !appearance.IsValidMode(req.Mode) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
 	if req.SocialLinks == nil {
@@ -187,8 +183,8 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 		SiteName:    row.SiteName,
 		Author:      row.Author,
 		Essay:       row.Essay,
-		Theme:       row.Theme,
-		Mode:        row.Mode,
+		Theme:       appearance.NormalizeTheme(row.Theme),
+		Mode:        appearance.NormalizeMode(row.Mode),
 		SocialLinks: links,
 	}
 }
@@ -198,8 +194,8 @@ func defaultLobbySetting() LobbySetting {
 		SiteName: "Solitude Blog",
 		Author:   "Solitude King",
 		Essay:    "Keep writing, keep shipping.",
-		Theme:    "forest",
-		Mode:     "light",
+		Theme:    appearance.DefaultTheme,
+		Mode:     appearance.DefaultMode,
 		SocialLinks: map[string]string{
 			"gitee":    "",
 			"bilibili": "",

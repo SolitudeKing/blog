@@ -14,6 +14,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/appearance"
 	"solitude-blog/server/internal/config"
 	"solitude-blog/server/internal/model"
 )
@@ -201,20 +202,29 @@ func seedDefaultTags(db *gorm.DB) error {
 }
 
 func seedDefaultSiteSetting(db *gorm.DB) error {
-	var count int64
-	if err := db.Model(&model.SiteSetting{}).Where("id = ?", 1).Count(&count).Error; err != nil {
-		return err
+	var row model.SiteSetting
+	err := db.First(&row, 1).Error
+	if err == nil {
+		theme := appearance.NormalizeTheme(row.Theme)
+		mode := appearance.NormalizeMode(row.Mode)
+		if theme == row.Theme && mode == row.Mode {
+			return nil
+		}
+		return db.Model(&row).Updates(map[string]any{
+			"theme": theme,
+			"mode":  mode,
+		}).Error
 	}
-	if count > 0 {
-		return nil
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	return db.Create(&model.SiteSetting{
 		ID:       1,
 		SiteName: "Solitude Blog",
 		Author:   "Solitude King",
 		Essay:    "Keep writing, keep shipping.",
-		Theme:    "forest",
-		Mode:     "light",
+		Theme:    appearance.DefaultTheme,
+		Mode:     appearance.DefaultMode,
 		SocialLinksJSON: `{
 			"gitee": "",
 			"bilibili": "",

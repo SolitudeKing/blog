@@ -1,5 +1,5 @@
 <template>
-  <section class="admin-page">
+  <section class="admin-page" :aria-busy="loading || saving">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Notices</p>
@@ -9,7 +9,7 @@
     </header>
 
     <div class="notice-grid">
-      <form class="notice-panel" @submit.prevent="saveNotice">
+      <form class="notice-panel" :aria-busy="saving" @submit.prevent="saveNotice">
         <h2>{{ editingId ? '编辑公告' : '新增公告' }}</h2>
         <BaseInput v-model="form.title" label="标题" />
         <BaseTextarea v-model="form.content" label="内容" :rows="5" />
@@ -23,13 +23,13 @@
         </div>
 
         <div class="notice-form__row">
-          <label class="cui-field">
-            <span class="cui-field__label">生效时间</span>
-            <input v-model="startsAtInput" class="cui-input" type="datetime-local" />
+          <label class="mist-field">
+            <span class="mist-field__label">生效时间</span>
+            <input v-model="startsAtInput" class="mist-input" type="datetime-local" />
           </label>
-          <label class="cui-field">
-            <span class="cui-field__label">失效时间</span>
-            <input v-model="endsAtInput" class="cui-input" type="datetime-local" />
+          <label class="mist-field">
+            <span class="mist-field__label">失效时间</span>
+            <input v-model="endsAtInput" class="mist-input" type="datetime-local" />
           </label>
         </div>
 
@@ -37,44 +37,81 @@
           <BaseButton type="submit" :loading="saving">{{ editingId ? '保存修改' : '创建公告' }}</BaseButton>
           <BaseButton v-if="editingId" type="button" variant="secondary" @click="resetForm">取消</BaseButton>
         </div>
-        <p v-if="error" class="admin-page__error">{{ error }}</p>
+        <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
       </form>
 
       <section class="notice-list">
-        <div class="admin-toolbar notice-toolbar">
-          <input v-model="keyword" class="cui-input" placeholder="搜索公告" @keyup.enter="loadNotices()" />
-          <select v-model="enabledFilter" class="cui-input" @change="loadNotices()">
-            <option value="">全部状态</option>
-            <option value="true">启用</option>
-            <option value="false">停用</option>
-          </select>
+        <div class="admin-toolbar notice-toolbar" role="search" aria-label="筛选公告">
+          <input
+            v-model="keyword"
+            class="mist-input"
+            type="search"
+            aria-label="搜索公告"
+            placeholder="搜索公告"
+            @keyup.enter="loadNotices()"
+          />
+          <BaseSelect
+            v-model="enabledFilter"
+            :options="enabledOptions"
+            label="公告状态"
+            @change="loadNotices()"
+          />
           <BaseButton variant="secondary" :loading="loading" @click="loadNotices()">筛选</BaseButton>
         </div>
 
-        <div class="admin-table">
-          <div class="admin-table__row admin-table__row--head notice-table__row">
-            <span>标题</span>
-            <span>状态</span>
-            <span>有效期</span>
-            <span>操作</span>
+        <p v-if="loading && !notices.length" class="admin-page__status" role="status" aria-live="polite">
+          正在加载公告…
+        </p>
+
+        <div
+          v-if="notices.length"
+          class="admin-table"
+          role="table"
+          aria-label="公告列表"
+          :aria-rowcount="notices.length + 1"
+        >
+          <div class="admin-table__row admin-table__row--head notice-table__row" role="row">
+            <span class="admin-table__cell" role="columnheader">标题</span>
+            <span class="admin-table__cell" role="columnheader">状态</span>
+            <span class="admin-table__cell" role="columnheader">有效期</span>
+            <span class="admin-table__cell" role="columnheader">操作</span>
           </div>
-          <div v-for="notice in notices" :key="notice.id" class="admin-table__row notice-table__row">
-            <div>
+          <div v-for="notice in notices" :key="notice.id" class="admin-table__row notice-table__row" role="row">
+            <div class="admin-table__cell" role="cell" data-label="标题">
               <strong>{{ notice.title }}</strong>
               <p>{{ notice.content }}</p>
             </div>
-            <span class="status-pill" :class="notice.enabled ? 'status-pill--published' : 'status-pill--archived'">
-              {{ notice.enabled ? '启用' : '停用' }}
-            </span>
-            <span>{{ formatRange(notice) }}</span>
-            <div class="admin-table__actions">
-              <button class="text-link" type="button" @click="editNotice(notice)">编辑</button>
-              <button class="text-link text-link--danger" type="button" @click="removeNotice(notice.id)">删除</button>
+            <div class="admin-table__cell" role="cell" data-label="状态">
+              <span
+                class="status-pill"
+                :class="notice.enabled ? 'status-pill--published' : 'status-pill--archived'"
+              >
+                {{ notice.enabled ? '启用' : '停用' }}
+              </span>
+            </div>
+            <span class="admin-table__cell" role="cell" data-label="有效期">{{ formatRange(notice) }}</span>
+            <div class="admin-table__cell admin-table__actions" role="cell" data-label="操作">
+              <div class="admin-table__action-list">
+                <button class="text-link" type="button" @click="editNotice(notice)">编辑</button>
+                <button class="text-link text-link--danger" type="button" @click="removeNotice(notice.id)">
+                  删除
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div v-if="!loading && notices.length === 0" class="empty-state">暂无公告</div>
+        <BaseEmpty
+          v-else-if="!loading"
+          title="暂无公告"
+          description="创建一条公告，让访客在首页第一眼看到。"
+        >
+          <template #icon>
+            <svg class="admin-empty__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M4 10v4l10 3V7L4 10zM14 10h2a3 3 0 0 1 0 6h-2M7 15l1 4h3" />
+            </svg>
+          </template>
+        </BaseEmpty>
 
         <div v-if="notices.length && page.has_more" class="notice-list__footer">
           <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
@@ -87,9 +124,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { createNotice, deleteNotice, getManagedNoticeList, updateNotice } from '@/api/modules/notice'
+import { useToast } from '@/composables/useToast'
 import type { CursorPage } from '@/api/types'
 import type { NoticeItem, NoticePayload } from '@/types/notice'
 
@@ -99,8 +139,15 @@ const loadingMore = ref(false)
 const saving = ref(false)
 const error = ref('')
 const keyword = ref('')
-const enabledFilter = ref('')
+const enabledFilter = ref<string>('')
 const editingId = ref<number | null>(null)
+const toast = useToast()
+
+const enabledOptions = [
+  { label: '全部状态', value: '' },
+  { label: '启用', value: 'true' },
+  { label: '停用', value: 'false' },
+]
 
 const page = reactive<CursorPage>({
   cursor: '',
@@ -181,13 +228,17 @@ async function saveNotice() {
     const payload = { ...form }
     if (editingId.value) {
       await updateNotice(editingId.value, payload)
+      toast.success('公告已更新')
     } else {
       await createNotice(payload)
+      toast.success('公告已创建')
     }
     resetForm()
     await loadNotices()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存公告失败'
+    const message = err instanceof Error ? err.message : '保存公告失败'
+    error.value = message
+    toast.error(message)
   } finally {
     saving.value = false
   }
@@ -210,8 +261,11 @@ async function removeNotice(id: number) {
   try {
     await deleteNotice(id)
     notices.value = notices.value.filter((notice) => notice.id !== id)
+    toast.success('公告已删除')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '删除公告失败'
+    const message = err instanceof Error ? err.message : '删除公告失败'
+    error.value = message
+    toast.error(message)
   }
 }
 
