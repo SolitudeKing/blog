@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" data-mode="light">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="搜索潮汐之间的设计、代码、工作方法与城市漫游文章。">
+    <meta name="theme-color" content="#f5faff">
+    <title>搜索｜潮汐之间</title>
+    <script src="assets/mist-mode.js"></script>
+    <link rel="stylesheet" href="assets/styles/themes/mist-sea-salt.css">
+    <link rel="stylesheet" href="assets/styles/pages.css">
+    <script src="assets/app.js" defer></script>
+  </head>
+  <body class="mist-page search-page">
+    <a class="mist-skip-link" href="#main-content">跳到搜索内容</a>
+    <header class="mist-nav">
+      <div class="mist-container mist-nav__inner">
+        <a class="mist-brand" href="index.html" aria-label="潮汐之间，返回首页"><span class="mist-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5c3-3 6 3 9 0s6 3 9 0M3 15.5c3-3 6 3 9 0s6 3 9 0"/></svg></span><span><span class="mist-brand__cn">潮汐之间</span><span class="mist-brand__en">Between Tides</span></span></a>
+        <nav class="mist-nav__links" aria-label="主导航"><a class="mist-nav__link" href="index.html">首页</a><a class="mist-nav__link" href="article.html">文章</a><a class="mist-nav__link" href="archives.html">归档</a><a class="mist-nav__link" href="search.html" aria-current="page">搜索</a><a class="mist-nav__link" href="about.html">关于</a></nav>
+        <div class="mist-nav__actions">
+          <button class="mist-button mist-button--ghost mist-button--mode" type="button" data-mode-toggle><svg class="mist-icon mist-mode-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.3 14.1A8.4 8.4 0 0 1 9.9 3.7a8.4 8.4 0 1 0 10.4 10.4Z"/></svg><svg class="mist-icon mist-mode-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg><span class="mist-mode-label">暗色</span></button>
+          <button class="mist-button mist-button--ghost mist-button--icon mist-menu-toggle" type="button" aria-label="打开导航菜单" aria-controls="mobile-menu" aria-expanded="false" data-menu-toggle><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></button>
+        </div>
+        <nav class="mist-mobile-menu mist-glass--strong" id="mobile-menu" aria-label="移动端导航" data-mobile-menu hidden><a class="mist-nav__link" href="index.html">首页</a><a class="mist-nav__link" href="article.html">文章</a><a class="mist-nav__link" href="archives.html">归档</a><a class="mist-nav__link" href="search.html" aria-current="page">搜索</a><a class="mist-nav__link" href="about.html">关于</a></nav>
+      </div>
+    </header>
+
+    <main class="mist-main" id="main-content" tabindex="-1">
+      <section class="mist-container search-hero" aria-labelledby="search-title">
+        <div class="search-hero__grid">
+          <div class="search-hero__copy"><span class="mist-kicker">Search the current</span><h1 id="search-title">打捞一段想法</h1><p>输入一个词，沿着标题、摘要与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p></div>
+          <div class="search-hero__aside" aria-label="内容索引统计"><div class="search-stat"><strong>128</strong><span>篇文章</span></div><div class="search-stat"><strong>18</strong><span>个主题</span></div></div>
+        </div>
+      </section>
+
+      <section class="mist-container search-workbench mist-glass--strong" aria-label="文章搜索工作台">
+        <form class="search-form" role="search" action="search.html" method="get">
+          <label class="mist-visually-hidden" for="site-search">搜索文章标题、摘要或标签</label>
+          <div class="mist-input-wrap">
+            <svg class="mist-icon mist-input-wrap__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <input class="mist-input search-form__input" id="site-search" name="q" type="search" placeholder="例如：设计系统、写作、海边……" autocomplete="off" aria-describedby="search-hint search-status" data-search-input>
+            <button class="mist-button mist-button--ghost mist-button--icon search-clear" type="button" aria-label="清空搜索" data-search-clear hidden><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+          </div>
+          <p class="mist-visually-hidden" id="search-hint">搜索会随着输入实时更新结果。</p>
+          <p class="mist-visually-hidden" id="search-status" aria-live="polite" data-search-status></p>
+        </form>
+        <div class="search-suggestions" aria-label="常用搜索词">
+          <span class="search-suggestions__label">试试这些航标</span>
+          <button class="search-chip" type="button" data-search-query="设计" aria-pressed="false">设计</button>
+          <button class="search-chip" type="button" data-search-query="代码" aria-pressed="false">代码</button>
+          <button class="search-chip" type="button" data-search-query="漫游" aria-pressed="false">漫游</button>
+          <button class="search-chip" type="button" data-search-query="注意力" aria-pressed="false">注意力</button>
+          <button class="search-chip" type="button" data-search-query="写作" aria-pressed="false">写作</button>
+        </div>
+      </section>
+
+      <div class="mist-container search-content">
+        <section class="search-results" aria-labelledby="results-title">
+          <header class="search-results__header"><span class="search-results__count" id="results-title">找到 <strong data-search-count>8</strong> 篇文章</span><span>按相关度排序</span></header>
+          <div data-search-results>
+            <article class="search-result" data-search-item data-search="前端 代码 CSS TypeScript Design Token 设计系统 主题 Light Dark"><span class="search-result__index">01</span><div><h2><a href="article.html">从零搭建一个可维护的前端 Design Token 系统</a></h2><p>从三层 Token 模型、TypeScript 类型契约到 Light/Dark 运行时切换。</p><div class="meta-row"><span>2026.07.12</span><span class="mist-tag">前端</span><span>12 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="代码 博客 重构 前端 工具 独立写作"><span class="search-result__index">02</span><div><h2><a href="article.html#gentle-interface">把博客重新写一遍，我保留了什么</a></h2><p>一次不以框架升级为目标的重构：更少依赖、更清楚的内容边界。</p><div class="meta-row"><span>2026.06.14</span><span class="mist-tag">代码</span><span>11 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="漫游 海边 城市 铁路 步行 摄影 旅行"><span class="search-result__index">03</span><div><h2><a href="article.html#slow-systems">沿着旧铁路走到海边</a></h2><p>没有攻略，也没有必须抵达的终点。只是让身体替大脑做一次缓慢的导航。</p><div class="meta-row"><span>2026.06.28</span><span class="mist-tag">漫游</span><span>6 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="注意力 深度工作 时间 专注 方法 工作"><span class="search-result__index">04</span><div><h2><a href="article.html#attention">注意力不是时间：关于深度工作的三个误会</a></h2><p>日程排满并不会自动带来专注，真正稀缺的是不被打断的心理空间。</p><div class="meta-row"><span>2026.05.30</span><span class="mist-tag">工作</span><span>5 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="写作 个人网站 博客 数字花园 自我介绍"><span class="search-result__index">05</span><div><h2><a href="article.html#after-rain">个人网站是一种缓慢的自我介绍</a></h2><p>当社交平台不断改变格式，我们仍需要一处能按自己的速度生长的地方。</p><div class="meta-row"><span>2024.10.21</span><span class="mist-tag">写作</span><span>7 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="设计 组件 协作 边界 代码 前端 系统"><span class="search-result__index">06</span><div><h2><a href="article.html#gentle-interface">组件的边界，也是协作的边界</a></h2><p>好的组件 API 不只是减少重复，还让团队对状态、语义与责任有共同理解。</p><div class="meta-row"><span>2023.06.05</span><span class="mist-tag">代码</span><span>9 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="工具 消失 体验 设计 产品 注意力"><span class="search-result__index">07</span><div><h2><a href="article.html#attention">好工具应该在什么时候消失</a></h2><p>不是把所有控件藏起来，而是在用户形成节奏之后不再争抢注意力。</p><div class="meta-row"><span>2024.10.04</span><span class="mist-tag">工具</span><span>6 分钟</span></div></div></article>
+            <article class="search-result" data-search-item data-search="漫游 旅行 泉州 城市 海边 步行"><span class="search-result__index">08</span><div><h2><a href="article.html#slow-systems">从泉州西街步行到海边</a></h2><p>一条从砖红屋檐到咸湿海风的路线，以及途中遇到的五种声音。</p><div class="meta-row"><span>2025.09.02</span><span class="mist-tag">漫游</span><span>7 分钟</span></div></div></article>
+          </div>
+          <div class="search-empty" data-search-empty hidden><span class="search-empty__icon" aria-hidden="true"><svg class="mist-icon mist-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4M8.5 11h5"/></svg></span><h2>这片水域还没有记录</h2><p>换一个更短的关键词，或回到“设计”“代码”“漫游”这些航标试试。</p></div>
+        </section>
+
+        <aside class="search-aside mist-glass" aria-labelledby="search-map-title">
+          <h2 id="search-map-title">内容海图</h2>
+          <div class="search-map">
+            <div class="search-map__row"><span>设计</span><span class="search-map__track"><span class="search-map__fill" style="--map-width: 92%"></span></span><span>42</span></div>
+            <div class="search-map__row"><span>代码</span><span class="search-map__track"><span class="search-map__fill" style="--map-width: 78%"></span></span><span>36</span></div>
+            <div class="search-map__row"><span>漫游</span><span class="search-map__track"><span class="search-map__fill" style="--map-width: 62%"></span></span><span>28</span></div>
+            <div class="search-map__row"><span>写作</span><span class="search-map__track"><span class="search-map__fill" style="--map-width: 48%"></span></span><span>22</span></div>
+            <div class="search-map__row"><span>生活</span><span class="search-map__track"><span class="search-map__fill" style="--map-width: 36%"></span></span><span>17</span></div>
+          </div>
+          <p class="mist-field__hint">一篇文章可能同时属于多条水路。</p>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="mist-footer"><div class="mist-container"><div class="mist-footer__line" aria-hidden="true"></div><div class="mist-footer__grid">
+      <div><a class="mist-brand" href="index.html"><span class="mist-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8.5c3-3 6 3 9 0s6 3 9 0M3 15.5c3-3 6 3 9 0s6 3 9 0"/></svg></span><span>潮汐之间</span></a><p class="mist-footer__note">关于设计、代码与缓慢生活的长期笔记。保持好奇，也保持边界。</p></div>
+      <div><h2 class="mist-footer__title">漫游</h2><nav class="mist-footer__links" aria-label="页脚导航"><a href="archives.html">全部文章</a><a href="search.html">搜索</a><a href="about.html">关于我</a><a href="about.html#contact">联系</a></nav></div>
+      <div><h2 class="mist-footer__title">在别处</h2><nav class="mist-footer__links" aria-label="社交链接"><a href="about.html#contact">即刻</a><a href="about.html#contact">GitHub</a><a href="about.html#contact">RSS</a></nav></div>
+    </div><div class="mist-footer__copyright">© 2020–<span data-current-year>2026</span> 林屿 · 文字与照片保留署名权</div></div></footer>
+    <div class="mist-toast-region" data-toast-region aria-label="消息通知"></div>
+    <button class="mist-button mist-button--icon mist-backtop" type="button" aria-label="返回页面顶部" data-backtop><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>
+  </body>
+</html>

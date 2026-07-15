@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN" data-mode="light">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="从三层 Token 模型、TypeScript 类型契约到 Light/Dark 运行时切换，搭建可维护的前端 Design Token 系统。">
+    <meta name="theme-color" content="#f5faff">
+    <title>从零搭建一个可维护的前端 Design Token 系统｜潮汐之间</title>
+    <script src="assets/mist-mode.js"></script>
+    <link rel="stylesheet" href="assets/styles/themes/mist-sea-salt.css">
+    <link rel="stylesheet" href="assets/styles/pages.css">
+    <script src="assets/app.js" defer></script>
+  </head>
+  <body class="mist-page article-page technical-article">
+    <a class="mist-skip-link" href="#main-content">跳到文章正文</a>
+
+    <div class="article-progress" data-reading-progress aria-hidden="true"><div class="article-progress__bar"></div></div>
+
+    <main class="mist-main" id="main-content" tabindex="-1">
+      <nav class="article-back-channel" aria-label="返回上一级">
+        <a class="article-back-channel__link" href="archives.html">
+          <svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span><small>返回上一级</small><strong>文章列表</strong></span>
+        </a>
+      </nav>
+
+      <article>
+        <header class="mist-container article-hero">
+          <div class="article-hero__grid">
+            <div>
+              <span class="mist-kicker">前端工程 · Architecture 032</span>
+              <h1>从零搭建一个可维护的前端 Design Token 系统</h1>
+              <p class="article-hero__lead">从三层 Token 模型、TypeScript 类型契约到 Light/Dark 运行时切换，整理一条不依赖具体框架、可以长期维护的工程路径。</p>
+            </div>
+            <aside class="article-hero__aside" aria-label="文章信息">
+              <dl>
+                <div><dt>发布</dt><dd><time datetime="2026-07-12">2026.07.12</time></dd></div>
+                <div><dt>阅读</dt><dd>12 分钟 · 3,680 字</dd></div>
+                <div><dt>技术栈</dt><dd>CSS / TypeScript</dd></div>
+              </dl>
+            </aside>
+          </div>
+        </header>
+
+        <figure class="mist-container article-cover article-cover--technical">
+          <svg viewBox="0 0 1120 480" fill="none" stroke="currentColor" aria-hidden="true">
+            <rect x="72" y="130" width="222" height="220" rx="24" stroke-width="1.6"/>
+            <rect x="432" y="72" width="222" height="140" rx="20" stroke-width="1.4" opacity=".78"/>
+            <rect x="432" y="268" width="222" height="140" rx="20" stroke-width="1.4" opacity=".78"/>
+            <rect x="792" y="170" width="222" height="140" rx="20" stroke-width="1.2" opacity=".5"/>
+            <path d="M294 240h138M654 142h58c44 0 80 36 80 80v18M654 338h58c44 0 80-36 80-80v-18" stroke-width="1.5"/>
+            <circle cx="363" cy="240" r="6" fill="currentColor" stroke="none"/>
+            <path d="M112 178h142M112 214h104M112 250h126M112 286h78" stroke-width="1.3" opacity=".62"/>
+            <path d="M474 116h138M474 150h82M474 312h138M474 346h102M834 214h138M834 248h92" stroke-width="1.2" opacity=".48"/>
+          </svg>
+          <figcaption class="article-cover__caption">Primitive → Semantic → Component：把具体值与业务语义隔开。</figcaption>
+        </figure>
+
+        <div class="mist-container article-layout">
+          <div class="article-body" data-article-body>
+            <p>Design Token 最容易出现的误区，是把它理解成“把十六进制颜色换成 CSS 变量”。变量只是语法，真正有价值的是建立一份稳定契约：设计可以调整视觉语言，组件可以保持接口不变，业务页面也不需要知道某个蓝色究竟是哪一个色值。</p>
+            <p>本文使用原生 CSS 与 TypeScript 展示完整路径。即使项目采用 Vue、React 或其他框架，核心分层仍然成立。</p>
+
+            <aside class="article-callout" aria-label="本文目标">
+              <svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 10v6M12 7h.01"/></svg>
+              <div><strong>完成后，你会得到什么</strong><p>一套只有主题层包含具体色值、组件只消费语义变量，并且能安全切换 Light/Dark 的最小实现。</p></div>
+            </aside>
+
+            <h2 id="gentle-interface"><span class="article-section-number">01</span>从三层 Token 模型开始</h2>
+            <p>一个可维护的系统至少要区分基础、主题语义与组件别名三层。它们分别回答“尺度是什么”“这个值表达什么”和“组件需要怎样的接口”。</p>
+
+            <figure class="article-figure article-figure--wide">
+              <div class="article-figure__visual" role="img" aria-label="Design Token 三层结构示意图">
+                <svg viewBox="0 0 760 280" fill="none" stroke="currentColor" aria-hidden="true">
+                  <rect x="28" y="54" width="202" height="172" rx="20" stroke-width="1.5"/>
+                  <rect x="279" y="54" width="202" height="172" rx="20" stroke-width="1.5" opacity=".72"/>
+                  <rect x="530" y="54" width="202" height="172" rx="20" stroke-width="1.5" opacity=".5"/>
+                  <path d="M230 140h49M481 140h49" stroke-width="1.5"/>
+                  <circle cx="254" cy="140" r="4" fill="currentColor" stroke="none"/><circle cx="505" cy="140" r="4" fill="currentColor" stroke="none"/>
+                  <path d="M66 98h126M66 130h88M66 162h108M66 194h72M317 98h126M317 130h96M317 162h112M317 194h80M568 98h126M568 130h98M568 162h118M568 194h84" stroke-width="1.1" opacity=".48"/>
+                </svg>
+              </div>
+              <figcaption>组件永远不跨层读取 Primitive；否则主题切换会变成全局搜索替换。</figcaption>
+            </figure>
+
+            <h3>基础层只定义与颜色无关的尺度</h3>
+            <p>字号、间距、圆角、控件高度与动效时间属于基础层。它们可以被多个主题共用，不应该出现任何品牌颜色。</p>
+            <div class="article-code" aria-label="基础与主题 Token 的 CSS 示例">
+              <div class="article-code__bar"><span>tokens.css</span><span>foundation + semantic</span></div>
+              <pre><code>:root {
+  --space-4: 16px;
+  --radius-md: 12px;
+  --control-height-md: 44px;
+}
+
+[data-mode="light"] {
+  --bg-primary: #f5faff;
+  --text-primary: #203846;
+  --accent: #2f6f92;
+}
+
+.button--primary {
+  color: var(--text-on-accent);
+  background: var(--accent);
+}</code></pre>
+            </div>
+
+            <h2 id="slow-systems"><span class="article-section-number">02</span>用 TypeScript 固定语义契约</h2>
+            <p>CSS 自定义属性允许任意字符串，这意味着拼写错误通常要到浏览器里才会暴露。将公开 token 列表同步为类型，可以在构建阶段发现缺失或越层引用。</p>
+            <div class="article-code" aria-label="Token 类型契约示例">
+              <div class="article-code__bar"><span>theme-contract.ts</span><span>TypeScript</span></div>
+              <pre><code>export const semanticTokens = [
+  "bg-primary",
+  "bg-elevated",
+  "text-primary",
+  "text-secondary",
+  "accent",
+  "border-strong",
+] as const;
+
+export type SemanticToken =
+  (typeof semanticTokens)[number];
+
+export type ThemeMap = Record&lt;SemanticToken, string&gt;;</code></pre>
+            </div>
+
+            <div class="article-table-wrap" role="region" aria-label="Token 分层职责表" tabindex="0">
+              <table class="article-table">
+                <thead><tr><th scope="col">层级</th><th scope="col">允许包含</th><th scope="col">禁止包含</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Foundation</th><td>尺寸、字体、间距、动效</td><td>品牌颜色、页面名</td></tr>
+                  <tr><th scope="row">Semantic</th><td>背景、文字、状态、边界</td><td>组件结构</td></tr>
+                  <tr><th scope="row">Component</th><td>少量稳定的组件别名</td><td>私有色板、业务页面变量</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h2 id="attention"><span class="article-section-number">03</span>让运行时只切换模式</h2>
+            <p>单主题产品只需要一个主题入口。运行时通过根节点的 <code>data-mode</code> 在 Light/Dark 之间切换，不要同时把主题名、系统偏好和用户选择揉进一个函数。</p>
+            <div class="article-code" aria-label="明暗模式切换代码示例">
+              <div class="article-code__bar"><span>mode.ts</span><span>runtime</span></div>
+              <pre><code>const modes = new Set(["light", "dark"]);
+
+export function setMode(mode: string) {
+  if (!modes.has(mode)) {
+    throw new TypeError(`Unsupported mode: ${mode}`);
+  }
+
+  document.documentElement.dataset.mode = mode;
+  localStorage.setItem("ui:mode", mode);
+}</code></pre>
+            </div>
+            <aside class="article-callout article-callout--warning" aria-label="模式初始化注意事项">
+              <svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 4 3.5 19h17L12 4Z"/><path d="M12 9v4M12 16h.01"/></svg>
+              <div><strong>避免首屏闪色</strong><p>模式初始化脚本应在主题 CSS 之前同步执行；否则暗色偏好的用户会先看到一次亮色页面。</p></div>
+            </aside>
+
+            <h2 id="after-rain"><span class="article-section-number">04</span>用工程边界换取长期自由</h2>
+            <p>Token 系统并不是越多越好。最小可用集合应覆盖页面、文字、交互、状态、边界、阴影与玻璃表面；只有同一种语义反复出现时，才增加组件别名。</p>
+            <ul class="article-checklist">
+              <li><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>具体色值只出现在主题 token 文件。</span></li>
+              <li><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>Light/Dark 具有完全一致的 token 路径。</span></li>
+              <li><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>组件不读取 Primitive，也不编码主题名称。</span></li>
+              <li><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>焦点、禁用、错误与加载状态使用同一语义轴。</span></li>
+            </ul>
+
+            <div class="article-end">
+              <span class="article-end__avatar" aria-hidden="true">屿</span>
+              <div><h2>林屿</h2><p>独立设计师与开发者，记录前端工程、设计系统与长期维护。</p></div>
+              <a class="mist-button" href="about.html">关于作者</a>
+            </div>
+          </div>
+
+          <aside class="article-toc mist-glass" aria-label="文章目录" data-toc>
+            <h2 class="article-toc__title">本文目录</h2>
+            <ol>
+              <li><a href="#gentle-interface" aria-current="location">三层 Token 模型</a></li>
+              <li><a href="#slow-systems">TypeScript 契约</a></li>
+              <li><a href="#attention">运行时模式</a></li>
+              <li><a href="#after-rain">工程边界</a></li>
+            </ol>
+            <div class="article-toc__actions">
+              <button class="mist-button mist-button--ghost" type="button" data-copy-link>
+                <svg class="mist-icon mist-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                复制链接
+              </button>
+              <a class="mist-button mist-button--ghost" href="archives.html">返回归档</a>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <nav class="mist-container article-pagination" aria-label="相邻文章">
+        <a class="article-pagination__link article-pagination__link--previous" href="article.html?slug=maintaining-a-personal-blog">
+          <span class="article-pagination__direction">
+            <svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+            上一篇
+          </span>
+          <strong>把博客重新写一遍，我保留了什么</strong>
+          <span class="article-pagination__meta">独立开发 · 11 分钟</span>
+        </a>
+        <a class="article-pagination__link article-pagination__link--next" href="article.html?slug=vue-composable-boundaries">
+          <span class="article-pagination__direction">
+            下一篇
+            <svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </span>
+          <strong>Composable 的边界：什么时候该拆，什么时候不该</strong>
+          <span class="article-pagination__meta">Vue 3 · 9 分钟</span>
+        </a>
+      </nav>
+    </main>
+
+    <div class="mist-toast-region" data-toast-region aria-label="消息通知"></div>
+    <button class="mist-button mist-button--icon mist-backtop" type="button" aria-label="返回页面顶部" data-backtop><svg class="mist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>
+  </body>
+</html>

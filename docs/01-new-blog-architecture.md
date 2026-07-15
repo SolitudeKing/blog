@@ -51,7 +51,7 @@ flowchart LR
 - Sass：设计变量、mixins、响应式断点、组件样式。
 - Axios 或 Fetch 封装：统一请求、错误处理、JWT 刷新。
 - Markdown 渲染：可使用 Markdown 解析/高亮库，但页面 UI 不使用组件库。
-- CreamyUI：自研组件的视觉参考来源，使用 `strawberry` / `forest` 主题与 `light` / `dark` 模式思路，但通过本项目 Sass token 落地，不直接引入第三方 UI 组件库。
+- Mist UI：提供雾境海盐、雾境青森的精确色调、语义 token、氛围系统与组件交互规范。项目按业务需求把单主题交付规则适配为二维运行时架构，通过 Sass 同时提供 `mist-sea-salt/mist-forest × light/dark`，但不直接引入第三方 UI 组件库。
 
 ### 后端
 
@@ -92,7 +92,7 @@ Celery 是 Python 生态任务队列。为了与 Go 服务稳定协作，建议�
 - API client。
 - 类型定义。
 - 自研基础组件。
-- 参考 CreamyUI 的 Sass 设计变量与语义 token。
+- 参考 Mist UI 的 Sass 设计变量、雾面氛围与语义 token。
 
 二者独立：
 
@@ -101,6 +101,14 @@ Celery 是 Python 生态任务队列。为了与 Go 服务稳定协作，建议�
 - Store。
 - 权限菜单。
 - 错误页与空状态。
+
+主题状态采用两个独立来源：
+
+- `theme` 是站点级全局配置，只允许 `mist-sea-salt`、`mist-forest`，由管理员在后台修改并持久化到服务端。
+- `mode` 只允许 `light`、`dark`。服务端配置只提供访客默认模式；公开前台允许访客切换，并用浏览器 `blog:mode` 保存个人偏好。
+- `GET setting/lobby` 同时返回 `theme` 与默认 `mode`。客户端先应用合法的本地 mode；没有本地偏好时才采用服务端默认 mode。
+- 修改站点主题或默认模式后，Go service 必须使站点配置缓存失效；当前客户端应用响应中的新配置，其他访客在下次读取 lobby 时生效。
+- 主题变化不得清除或改写访客 mode，前台也不得暴露主题色选择器。
 
 ### Go API
 
@@ -306,8 +314,8 @@ web/
 - 所有页面组件使用 `<script setup lang="ts">`。
 - 所有接口响应有 TypeScript 类型。
 - 所有基础 UI 控件由项目内部实现。
-- Sass 变量集中管理颜色、字号、间距、层级、断点，并对齐 CreamyUI 的 `--bg-*`、`--text-*`、`--accent*`、`--border*`、`--shadow-*`、`--radius-*`、`--space-*` 等语义 token。
-- 自研组件实现时参考 CreamyUI 的 Vue3 组件规则：`modelValue` / `update:modelValue`、props、emits、slots、composables 与完整交互状态。
+- Sass 变量集中管理颜色、字号、间距、层级、断点，并对齐 Mist UI 的 `--bg-*`、`--text-*`、`--accent*`、`--border*`、`--shadow-*`、`--surface-*`、`--fog-*`、`--radius-*`、`--space-*` 等语义 token。
+- 自研组件实现时参考 Mist UI 的 Vue3 组件规则：`modelValue` / `update:modelValue`、props、emits、slots、composables 与完整交互状态。
 - 后台表格、弹窗、抽屉、分页、上传、Toast 均自研。
 
 ## 鉴权架构

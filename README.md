@@ -20,7 +20,7 @@
 - 前台文章列表、文章详情和站点配置已接入 Redis 缓存与写入失效。
 - 站点配置、公告管理、后台仪表盘和媒体资源管理已完成后台日常维护能力。
 - 旧博客迁移链路已支持 SQLite、Markdown、PicBed Base64 和图片文件导出/导入，并生成迁移报告。
-- Vue 前端 API client、路由、Pinia、基础 CreamyUI token 和示例页面。
+- Vue 前端 API client、路由、Pinia，以及 Mist UI 海盐/青森二维主题 token 与自研组件。
 - Celery worker 基础配置与任务命名。
 - Docker Compose、Nginx、健康检查、Redis AOF、上传文件卷、日志限制、MySQL 备份与恢复脚本。
 - M5 已完成，公开站点已支持文章搜索、`/rss.xml` 和 `/sitemap.xml`；后台已支持增强统计面板、文章版本记录和编辑器自动保存。

@@ -1,0 +1,193 @@
+/* Mist Sea Salt is the only theme in this product. */
+:root,
+[data-mode="light"] {
+  color-scheme: light;
+
+  --bg-primary: #f5faff;
+  --bg-secondary: #eaf4fb;
+  --bg-card: #f0f8fc;
+  --bg-elevated: #ffffff;
+  --bg-inset: #e6f1f8;
+  --bg-hover: #dceef8;
+  --bg-active: #cbe5f2;
+  --bg-disabled: #e1eaf0;
+
+  --text-primary: #203846;
+  --text-secondary: #3d5c6c;
+  --text-muted: #587485;
+  --text-disabled: rgb(32 56 70 / 42%);
+  --text-on-accent: #ffffff;
+  --text-link: #245f80;
+  --text-inverse: #eaf6fc;
+
+  --accent: #2f6f92;
+  --accent-hover: #255e7c;
+  --accent-active: #1b4d68;
+  --accent-soft: #d7ecf7;
+  --accent-softer: rgb(215 236 247 / 58%);
+
+  --success: #25723f;
+  --success-soft: rgb(61 153 91 / 14%);
+  --warning: #875b15;
+  --warning-soft: #fff4d8;
+  --danger: #b42318;
+  --danger-soft: rgb(217 72 63 / 14%);
+  --info: #2f6f92;
+  --info-soft: #d7ecf7;
+
+  --border: #d4e5ef;
+  --border-strong: #6e93a6;
+  --border-focus: var(--accent);
+  --focus-ring: rgb(78 145 181 / 38%);
+  --divider-fade: linear-gradient(90deg, transparent, #b6cfdd, transparent);
+
+  --shadow-xs: var(--shadow-xs-offset) rgb(78 145 181 / 8%);
+  --shadow-sm: var(--shadow-sm-offset) rgb(78 145 181 / 12%);
+  --shadow-md: var(--shadow-md-offset) rgb(78 145 181 / 18%);
+  --shadow-lg: var(--shadow-lg-offset) rgb(78 145 181 / 22%);
+  --shadow-xl: var(--shadow-xl-offset) rgb(78 145 181 / 24%);
+  --shadow-inset: var(--shadow-inset-offset) rgb(255 255 255 / 58%);
+  --shadow-glow: var(--shadow-glow-offset) rgb(78 145 181 / 25%);
+
+  --surface-glass-subtle: rgb(255 255 255 / 32%);
+  --surface-glass: rgb(255 255 255 / 45%);
+  --surface-glass-strong: rgb(255 255 255 / 72%);
+  --surface-glass-border: rgb(255 255 255 / 70%);
+  --surface-glass-highlight: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 82%) 0%,
+    rgb(199 223 242 / 28%) 54%,
+    rgb(139 190 216 / 18%) 100%
+  );
+  --surface-glass-shadow:
+    0 20px 60px rgb(120 170 210 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 68%);
+  --surface-highlight: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 80%) 0%,
+    rgb(199 223 242 / 50%) 52%,
+    rgb(139 190 216 / 30%) 100%
+  );
+
+  --light-gradient-primary:
+    radial-gradient(circle at 12% 14%, rgb(255 255 255 / 82%) 0%, transparent 38%),
+    radial-gradient(circle at 78% 24%, rgb(199 223 242 / 52%) 0%, transparent 42%),
+    radial-gradient(circle at 68% 82%, rgb(139 190 216 / 30%) 0%, transparent 44%);
+  --light-gradient-secondary: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 72%) 0%,
+    rgb(199 223 242 / 34%) 52%,
+    transparent 88%
+  );
+  --accent-gradient: linear-gradient(135deg, #255e7c 0%, #2f6f92 54%, #3c7c9e 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #1b4d68 0%, #255e7c 54%, #2f6f92 100%);
+  --fog-color-1: rgb(255 255 255 / 84%);
+  --fog-color-2: rgb(199 223 242 / 78%);
+  --fog-color-3: rgb(139 190 216 / 46%);
+  --fog-opacity: 0.42;
+  --fog-blend-mode: screen;
+
+  --nav-bg: var(--surface-glass-strong);
+  --scrim: rgb(32 56 70 / 42%);
+  --code-bg: #132630;
+  --code-text: #dceff7;
+  --figure-bg: #dceef8;
+  --line-soft: rgb(78 145 181 / 28%);
+  --line-strong: #4e91b5;
+}
+
+[data-mode="dark"] {
+  color-scheme: dark;
+
+  --bg-primary: #101b22;
+  --bg-secondary: #0b141a;
+  --bg-card: #162630;
+  --bg-elevated: #1c303c;
+  --bg-inset: #0b141a;
+  --bg-hover: #243c49;
+  --bg-active: rgb(139 190 216 / 20%);
+  --bg-disabled: #26343c;
+
+  --text-primary: #eaf6fc;
+  --text-secondary: #bcd0da;
+  --text-muted: #91acb9;
+  --text-disabled: rgb(188 208 218 / 42%);
+  --text-on-accent: #102a37;
+  --text-link: #a5d9ed;
+  --text-inverse: #203846;
+
+  --accent: #8bcbe6;
+  --accent-hover: #a5d9ed;
+  --accent-active: #6bb5d5;
+  --accent-soft: rgb(139 190 216 / 18%);
+  --accent-softer: rgb(139 190 216 / 10%);
+
+  --success: #76d497;
+  --success-soft: rgb(118 212 151 / 16%);
+  --warning: #e7bc69;
+  --warning-soft: rgb(231 188 105 / 17%);
+  --danger: #ff8982;
+  --danger-soft: rgb(255 137 130 / 16%);
+  --info: #8bcbe6;
+  --info-soft: rgb(139 203 230 / 16%);
+
+  --border: #29424f;
+  --border-strong: #6e91a3;
+  --border-focus: var(--accent);
+  --focus-ring: rgb(139 203 230 / 42%);
+  --divider-fade: linear-gradient(90deg, transparent, #3d5d6e, transparent);
+
+  --shadow-xs: var(--shadow-xs-offset) rgb(5 31 44 / 28%);
+  --shadow-sm: var(--shadow-sm-offset) rgb(5 31 44 / 32%);
+  --shadow-md: var(--shadow-md-offset) rgb(5 31 44 / 40%);
+  --shadow-lg: var(--shadow-lg-offset) rgb(5 31 44 / 48%);
+  --shadow-xl: var(--shadow-xl-offset) rgb(5 31 44 / 54%);
+  --shadow-inset: var(--shadow-inset-offset) rgb(220 242 252 / 10%);
+  --shadow-glow: var(--shadow-glow-offset) rgb(139 203 230 / 28%);
+
+  --surface-glass-subtle: rgb(22 38 48 / 42%);
+  --surface-glass: rgb(22 38 48 / 58%);
+  --surface-glass-strong: rgb(28 48 60 / 82%);
+  --surface-glass-border: rgb(234 246 252 / 15%);
+  --surface-glass-highlight: linear-gradient(
+    135deg,
+    rgb(234 246 252 / 15%) 0%,
+    rgb(139 190 216 / 8%) 52%,
+    rgb(78 145 181 / 5%) 100%
+  );
+  --surface-glass-shadow:
+    0 20px 60px rgb(5 31 44 / 48%),
+    inset 0 1px 0 rgb(234 246 252 / 12%);
+  --surface-highlight: linear-gradient(
+    135deg,
+    rgb(139 203 230 / 18%) 0%,
+    rgb(78 145 181 / 12%) 54%,
+    rgb(22 38 48 / 8%) 100%
+  );
+
+  --light-gradient-primary:
+    radial-gradient(circle at 12% 14%, rgb(165 217 237 / 16%) 0%, transparent 38%),
+    radial-gradient(circle at 78% 24%, rgb(139 190 216 / 18%) 0%, transparent 42%),
+    radial-gradient(circle at 68% 82%, rgb(78 145 181 / 14%) 0%, transparent 44%);
+  --light-gradient-secondary: linear-gradient(
+    135deg,
+    rgb(234 246 252 / 12%) 0%,
+    rgb(139 190 216 / 10%) 52%,
+    transparent 88%
+  );
+  --accent-gradient: linear-gradient(135deg, #a5d9ed 0%, #8bcbe6 54%, #6bb5d5 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #b8e3f2 0%, #a5d9ed 54%, #8bcbe6 100%);
+  --fog-color-1: rgb(234 246 252 / 24%);
+  --fog-color-2: rgb(139 190 216 / 28%);
+  --fog-color-3: rgb(78 145 181 / 20%);
+  --fog-opacity: 0.34;
+  --fog-blend-mode: screen;
+
+  --nav-bg: var(--surface-glass-strong);
+  --scrim: rgb(5 15 22 / 70%);
+  --code-bg: #081116;
+  --code-text: #dceff7;
+  --figure-bg: #172d38;
+  --line-soft: rgb(139 190 216 / 20%);
+  --line-strong: #8bbed8;
+}

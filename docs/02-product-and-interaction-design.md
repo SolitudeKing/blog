@@ -1,5 +1,7 @@
 # 产品与交互设计
 
+本文描述目标产品体验，不等同于当前功能清单。页面是否已实现、是否通过验收以 [设计进度追踪](./05-design-progress.md) 为准；精确主题色值见 [雾境主题色调系统](./11-theme-color-system.md)，UI 与布局的已知源码偏差分别记录在 [UI 设计系统](./09-ui-design-system.md#实现偏差清单) 和 [布局模式](./10-layout-patterns.md#16-当前实现偏差清单)。
+
 ## 产品定位
 
 新版博客应从“简单文章展示”升级为“个人知识主页”。它既要适合访客阅读，也要让作者自己愿意长期写作、整理和维护。
@@ -54,7 +56,7 @@ flowchart TD
 
 - 文章列表使用服务端游标分页。
 - 支持按分类、标签、关键词过滤。
-- 移动端优先展示文章列表，侧边信息折叠到列表之后。
+- 移动端只在文章列表前保留紧凑的站点身份摘要，完整作者卡与其他侧边信息下沉到列表之后。
 - 骨架屏替代全局遮罩 loading。
 
 ### 文章详情
@@ -245,95 +247,60 @@ flowchart TD
 - 社交链接：GitHub/Gitee、Bilibili、抖音、邮箱。
 - 关于页面：Markdown 内容。
 - SEO：默认标题、默认描述、关键词。
-- 外观：主题色、头像、站点图标。
+- 外观：站点主题、访客默认明暗模式、头像、站点图标。
 - 统计：是否启用访问统计。
+
+外观配置遵循两个独立维度：
+
+- 站点主题由管理员通过可访问的单选卡片在“雾境海盐（`mist-sea-salt`）”和“雾境青森（`mist-forest`）”之间选择。该选择全站生效，前台不提供主题色切换入口。
+- 访客默认模式由管理员设置为 `light` 或 `dark`，只用于没有个人偏好的首次访问者。
+- 前台导航提供明暗模式控件。访客主动选择后写入 `blog:mode`，后续优先于服务端默认模式；切换站点主题不得重置该偏好。
+- 保存外观设置后，当前后台立即应用响应中的新主题；默认模式只更新无本地偏好时的回退值，不覆盖当前浏览器的 `blog:mode`。主题卡片必须同时显示名称和文字说明，不能只靠色块区分。
 
 ## 自研 UI 设计系统
 
-新版不使用 UI 组件库，因此需要在项目内沉淀基础组件。自研组件的 UI 风格参考 `C:\Users\XiaoMeng\.cc-switch\skills\creamy-ui\SKILL.md` 中的 CreamyUI 设计系统：以温暖、柔和、圆润、轻量层级为主，但不把“奶油风”理解为整站米色化或低对比度。
+新版不使用第三方 UI 组件库，在项目内维护满足业务需要的最小组件集合。完整规范拆分为三个职责互斥的权威文档：
 
-### CreamyUI 风格约束
+- [UI 设计系统](./09-ui-design-system.md)：语义 token 契约、字体、间距、圆角、阴影、动效、组件 API 与状态。
+- [雾境主题色调系统](./11-theme-color-system.md)：雾境海盐、雾境青森的 light/dark 精确映射、氛围规则与对比度基线。
+- [布局模式](./10-layout-patterns.md)：公共站点、文章阅读、后台管理和移动端的结构与断点。
 
-- 主题结构参考 CreamyUI 的二维主题：`data-theme="strawberry|forest"` 与 `data-mode="light|dark"`。
-- 第一阶段推荐默认 `forest + light`，更适合技术博客的阅读与后台管理；保留切换到 `strawberry` 和 `dark` 的 token 结构。
-- 组件优先消费语义 token，不直接写死草莓色、森林色或具体色值。
-- 视觉语言遵循圆润优先、柔和层级、hover 轻微上浮、active 压下反馈。
-- 状态覆盖 default、hover、focus、active、disabled、loading、empty、error。
-- 图标使用 SVG/Icon 组件，不依赖 emoji 作为真实图标系统。
-- 后台管理台保持信息密度，CreamyUI 只作为组件质感参考，不做大面积装饰化背景。
+### 核心设计决策
 
-### Design Tokens
+| 决策 | 产品含义 |
+| --- | --- |
+| 默认 `mist-sea-salt + light` | 以清爽安静的海雾蓝玻璃保证长文可读性，并为未设置偏好的访客提供稳定回退 |
+| 支持 `mist-sea-salt/mist-forest × light/dark` | 主题风格与明暗模式形成四种组合，切换任一维度不改变另一维度 |
+| 后台管理主题与访客默认模式 | 管理员决定全站色调和首次访问默认值，公开前台不暴露主题选择器 |
+| 前台只切换明暗模式 | `blog:mode` 保存访客主动选择，并优先于服务端默认模式 |
+| 组件只消费语义 token | 主题切换不复制组件样式，也不在业务页面写死颜色 |
+| 公开站点柔和、后台克制 | 共享圆角、层级和状态语言，信息密度按场景区分 |
+| Grid 页面骨架 + Flex 组件布局 | 避免 Float、固定高度与固定大宽度造成的布局限制 |
+| 完整状态与键盘行为 | default、hover、focus-visible、active、disabled、loading、empty、error 均有规则 |
 
-建议定义并映射到 CreamyUI 语义层：
+### 页面视觉分工
 
-- 背景：`--bg-primary`、`--bg-secondary`、`--bg-card`、`--bg-elevated`、`--bg-inset`、`--bg-hover`。
-- 文字：`--text-primary`、`--text-secondary`、`--text-muted`、`--text-on-accent`、`--text-link`。
-- 强调色：`--accent`、`--accent-hover`、`--accent-active`、`--accent-soft`。
-- 状态色：`--success`、`--warning`、`--danger`、`--info` 与对应 soft token。
-- 边框与焦点：`--border`、`--border-strong`、`--border-color`、`--border-focus`、`--focus-ring`。
-- 阴影：`--shadow-xs`、`--shadow-sm`、`--shadow-md`、`--shadow-lg`、`--shadow-inset`、`--shadow-glow`。
-- 圆角：使用 `--radius-*`，公开站点可更柔和，后台表格与密集控件保持克制。
-- 间距：使用 `--space-*`，保留 4、8、12、16、24、32、48 等常用阶梯。
-- 字号：正文、小字、标题、页面标题。
-- 层级：Header、Drawer、Modal、Toast。
-- 断点：mobile、tablet、desktop、wide。
+| 场景 | 视觉重点 | 避免 |
+| --- | --- | --- |
+| 首页 | 氛围背景、清晰品牌区、文章列表与轻量辅助信息 | 首屏堆叠过多卡片、背景抢夺正文对比度 |
+| 文章详情 | 760px 左右可读列宽、稳定目录、代码和图片工具 | 正文过宽、目录挤压正文、持续动效 |
+| 归档与搜索 | 高扫描效率、明确筛选与空状态 | 为每一行增加重阴影或嵌套卡片 |
+| 后台 | 紧凑导航、短操作路径、清晰表格和表单状态 | 大面积装饰、危险操作无确认、仅靠颜色传达状态 |
+| 登录 | 单一任务、明确错误反馈、桌面分栏与移动端单栏 | 固定像素居中导致小屏溢出 |
 
-### 基础组件
+### 基础组件范围
 
-优先实现：
+首批基础组件包括 `BaseButton`、`BaseInput`、`BaseTextarea`、`BaseSelect`、`BaseToggle`、`BaseCard`、`BaseToast`、`BaseSkeleton`、`BaseEmpty`；按业务需要继续补充 Modal、Drawer、Table、Pagination、Upload 和 Tabs。
 
-- `BaseButton`
-- `BaseIconButton`
-- `BaseInput`
-- `BaseTextarea`
-- `BaseSelect`
-- `BaseCheckbox`
-- `BaseSwitch`
-- `BaseTag`
-- `BaseModal`
-- `BaseDrawer`
-- `BaseTable`
-- `BasePagination`
-- `BaseTabs`
-- `BaseToast`
-- `BaseUpload`
-- `BaseSkeleton`
-- `BaseEmpty`
+表单组件使用 `modelValue` / `update:modelValue`；浮层组件处理 ESC、焦点圈定与回收、背景滚动锁定和 ARIA；图标使用 SVG/Icon 组件，不以 emoji 充当正式图标系统。
 
-这些组件只服务本项目，不追求通用组件库复杂度。
+## 视觉与响应式方向
 
-命名与样式约定：
-
-- Vue 文件可继续使用 `BaseButton`、`BaseInput` 等项目内命名。
-- CSS 类建议参考 CreamyUI 使用 `cui-*` BEM 风格，例如 `cui-button cui-button--primary is-loading`。
-- 表单组件使用 `modelValue` / `update:modelValue`，复杂交互抽成 composable。
-- 弹窗、Toast、Upload、Select 等浮层类组件必须处理键盘行为、焦点回收、滚动锁定和 aria 语义。
-
-## 视觉方向
-
-公开站点：
-
-- 使用大面积留白。
-- 文章卡片信息密度适中。
-- 颜色参考 CreamyUI 的 `forest` 或 `strawberry` 语义 token，保持温暖但克制，强调文字可读性。
-- 避免过度装饰和花哨背景。
-- 保持技术博客的清晰、沉稳和个人气质。
-
-后台管理：
-
-- 信息密度更高。
-- 操作路径短。
-- 表格、筛选、编辑器优先。
-- 少用装饰性大卡片。
-- CreamyUI 的圆角、阴影和状态反馈用于提升质感，但不牺牲可扫描性。
-- 每个危险操作必须二次确认。
-
-## 响应式规则
-
-- 小屏：单列布局，导航折叠，目录浮层化。
-- 中屏：文章列表单列，侧边栏下沉。
-- 大屏：文章列表 + 侧边栏，文章详情 + 目录。
-- 后台小屏只保证可用，不强求复杂表格完整体验；关键编辑流程可以转为抽屉或分段表单。
+- 公开站点保留充分留白和温暖层次，氛围光斑只放在页面背景，不降低正文对比度。
+- 后台沿用相同 token 与状态语言，但缩小圆角和阴影强度，以可扫描性和操作效率优先。
+- 大屏允许文章列表加辅助栏、正文加目录；空间不足时先移除辅助信息，不压缩主内容。
+- 首页在紧凑桌面隐藏辅助栏，平板和手机转为单列；后台侧栏在窄屏改为带遮罩的抽屉。
+- 表格在小屏优先转换为卡片行或允许局部横向滚动，不能让整个页面产生水平滚动。
 
 ## 可访问性要求
 

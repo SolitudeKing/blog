@@ -201,24 +201,33 @@ erDiagram
 
 ### site_settings
 
-站点配置表。建议使用 key-value，便于扩展。
+站点配置采用单行列式表，当前固定读取主键 `id = 1`，字段与实际 GORM model 保持一致。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| id | bigint unsigned | 主键 |
-| setting_key | varchar(100) | 配置 key，唯一 |
-| setting_value | json | 配置值 |
-| description | varchar(255) | 描述 |
+| id | bigint unsigned | 主键；当前站点配置固定为 `1` |
+| site_name | varchar(120) | 站点名称，非空 |
+| author | varchar(80) | 作者名称，非空 |
+| essay | varchar(500) | 站点签名 |
+| theme | varchar(32) | 全局主题 ID，非空 |
+| mode | varchar(32) | 访客默认明暗模式，非空 |
+| social_links_json | json | 社交链接对象 |
 | created_at | datetime | 创建时间 |
 | updated_at | datetime | 更新时间 |
 
-常见 key：
+外观字段的 API 结构固定为：
 
-- `site.profile`
-- `site.social_links`
-- `site.seo`
-- `site.about`
-- `site.appearance`
+```json
+{
+  "theme": "mist-sea-salt",
+  "mode": "light"
+}
+```
+
+- `theme` 是站点级主题，只允许 `mist-sea-salt`、`mist-forest`，默认 `mist-sea-salt`。
+- `mode` 是无个人偏好访客的默认模式，只允许 `light`、`dark`，默认 `light`。
+- 服务端不保存单个访客的明暗偏好；访客主动选择由浏览器 `blog:mode` 保存。
+- 写接口收到枚举外的值时返回参数错误。服务端历史数据迁移采用显式映射：旧 `forest` → `mist-forest`；旧 `mist-violet`、`strawberry`、空值和其他未知值 → `mist-sea-salt`。该映射只迁移数据，不表示可以复用旧 `_forest.scss`。
 
 ### article_versions
 
@@ -407,6 +416,10 @@ GET setting/lobby
 - 头像。
 - 社交链接。
 - SEO 默认配置。
+- 全局主题 `theme`：`mist-sea-salt` 或 `mist-forest`。
+- 访客默认模式 `mode`：`light` 或 `dark`。
+
+`theme` 与 `mode` 必须始终返回合法值。前端以 lobby 的 `theme` 作为全局主题；`mode` 只在浏览器不存在合法 `blog:mode` 时作为默认值。
 
 ### 首页文章列表
 
@@ -534,6 +547,20 @@ DELETE notice/delete/{id}
 GET setting/detail
 PUT setting/update
 ```
+
+`setting/detail` 和 `setting/update` 的外观字段使用同一契约：
+
+```json
+{
+  "theme": "mist-sea-salt",
+  "mode": "light"
+}
+```
+
+- 后台可修改 `theme` 与访客默认 `mode`，公开 API 没有主题写入口。
+- `theme` 只接受 `mist-sea-salt`、`mist-forest`；`mode` 只接受 `light`、`dark`。
+- 更新成功后必须失效 `blog:v1:site:settings`，响应返回归一化后的完整站点配置。
+- 修改全局主题不得删除或覆盖任何浏览器中的 `blog:mode`；访客本地偏好仍具有更高优先级。
 
 ### 任务
 
