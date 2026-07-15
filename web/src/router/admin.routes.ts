@@ -6,6 +6,7 @@ export const adminRoutes: RouteRecordRaw[] = [
     path: '/admin/login',
     name: 'admin-login',
     component: () => import('@/pages/admin/LoginPage.vue'),
+    meta: { guestOnly: true },
   },
   {
     path: '/admin',

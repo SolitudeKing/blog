@@ -12,7 +12,6 @@ export interface TokenPair {
 export interface UserInfo {
   id: number
   username: string
-  nickname: string
+  nickname?: string
   role: 'owner' | 'editor' | 'viewer'
 }
-
