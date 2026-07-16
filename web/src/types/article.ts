@@ -1,10 +1,18 @@
+export interface ArticleTopic {
+  id: number
+  name: string
+  label: string
+  slug: string
+}
+
 export interface ArticleListItem {
   id: number
   title: string
   slug: string
   summary: string
   status: 'draft' | 'published' | 'private' | 'archived'
-  category: string
+  topic_id: number
+  topic: ArticleTopic
   tags: string[]
   view_count: number
   published_at: string
@@ -14,7 +22,6 @@ export interface ArticleListItem {
 
 export interface ArticleDetail extends ArticleListItem {
   content_md: string
-  category_id: number
   tag_ids: number[]
 }
 
@@ -38,7 +45,7 @@ export interface ArticleSavePayload {
   slug: string
   summary: string
   content_md: string
-  category_id: number
+  topic_id: number
   tag_ids: number[]
   status: ArticleListItem['status']
 }

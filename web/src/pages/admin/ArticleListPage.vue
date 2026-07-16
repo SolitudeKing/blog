@@ -41,7 +41,7 @@
       <div class="admin-table__row admin-table__row--head" role="row">
         <span class="admin-table__cell" role="columnheader">标题</span>
         <span class="admin-table__cell" role="columnheader">状态</span>
-        <span class="admin-table__cell" role="columnheader">分类</span>
+        <span class="admin-table__cell" role="columnheader">专题</span>
         <span class="admin-table__cell" role="columnheader">更新时间</span>
         <span class="admin-table__cell" role="columnheader">操作</span>
       </div>
@@ -55,7 +55,9 @@
             {{ statusText(article.status) }}
           </span>
         </div>
-        <span class="admin-table__cell" role="cell" data-label="分类">{{ article.category }}</span>
+        <span class="admin-table__cell" role="cell" data-label="专题">
+          {{ article.topic?.label || article.topic?.name || '未设置' }}
+        </span>
         <span class="admin-table__cell" role="cell" data-label="更新时间">
           {{ formatTime(article.updated_at) }}
         </span>

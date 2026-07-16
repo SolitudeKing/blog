@@ -29,15 +29,24 @@ type SettingService struct {
 }
 
 type LobbySetting struct {
-	SiteName    string            `json:"site_name"`
-	Author      string            `json:"author"`
-	Essay       string            `json:"essay"`
-	Theme       string            `json:"theme"`
-	Mode        string            `json:"mode"`
-	SocialLinks map[string]string `json:"social_links"`
+	SiteName      string                     `json:"site_name"`
+	Author        string                     `json:"author"`
+	Essay         string                     `json:"essay"`
+	Theme         string                     `json:"theme"`
+	Mode          string                     `json:"mode"`
+	SocialLinks   map[string]string          `json:"social_links"`
+	ThemeElements appearance.ThemeElementMap `json:"theme_elements"`
 }
 
-type SettingSaveRequest = LobbySetting
+type SettingSaveRequest struct {
+	SiteName      string                      `json:"site_name"`
+	Author        string                      `json:"author"`
+	Essay         string                      `json:"essay"`
+	Theme         string                      `json:"theme"`
+	Mode          string                      `json:"mode"`
+	SocialLinks   map[string]string           `json:"social_links"`
+	ThemeElements *appearance.ThemeElementMap `json:"theme_elements"`
+}
 
 func NewSettingService(db *gorm.DB, redisClient *redis.Client) *SettingService {
 	return &SettingService{
@@ -71,13 +80,12 @@ func (s *SettingService) Detail() (LobbySetting, error) {
 }
 
 func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
-	normalized, err := normalizeSetting(req)
-	if err != nil {
-		return LobbySetting{}, err
-	}
-
 	if s.db != nil {
 		row, err := s.loadOrCreate()
+		if err != nil {
+			return LobbySetting{}, err
+		}
+		normalized, err := normalizeSetting(req, settingFromModel(row).ThemeElements)
 		if err != nil {
 			return LobbySetting{}, err
 		}
@@ -87,6 +95,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		row.Theme = normalized.Theme
 		row.Mode = normalized.Mode
 		row.SocialLinksJSON = mustMarshalSocialLinks(normalized.SocialLinks)
+		row.ThemeElementsJSON = mustMarshalThemeElements(normalized.ThemeElements)
 		if err := s.db.Save(&row).Error; err != nil {
 			return LobbySetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
@@ -96,6 +105,10 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	normalized, err := normalizeSetting(req, s.setting.ThemeElements)
+	if err != nil {
+		return LobbySetting{}, err
+	}
 	s.setting = cloneSetting(normalized)
 	return cloneSetting(s.setting), nil
 }
@@ -114,6 +127,7 @@ func (s *SettingService) getCachedSetting() (LobbySetting, bool) {
 	}
 	item.Theme = appearance.NormalizeTheme(item.Theme)
 	item.Mode = appearance.NormalizeMode(item.Mode)
+	item.ThemeElements = appearance.NormalizeThemeElements(item.ThemeElements)
 	return item, true
 }
 
@@ -147,13 +161,14 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 
 	defaults := defaultLobbySetting()
 	row = model.SiteSetting{
-		ID:              defaultSiteSettingID,
-		SiteName:        defaults.SiteName,
-		Author:          defaults.Author,
-		Essay:           defaults.Essay,
-		Theme:           defaults.Theme,
-		Mode:            defaults.Mode,
-		SocialLinksJSON: mustMarshalSocialLinks(defaults.SocialLinks),
+		ID:                defaultSiteSettingID,
+		SiteName:          defaults.SiteName,
+		Author:            defaults.Author,
+		Essay:             defaults.Essay,
+		Theme:             defaults.Theme,
+		Mode:              defaults.Mode,
+		SocialLinksJSON:   mustMarshalSocialLinks(defaults.SocialLinks),
+		ThemeElementsJSON: mustMarshalThemeElements(defaults.ThemeElements),
 	}
 	if err := s.db.Create(&row).Error; err != nil {
 		return model.SiteSetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -161,17 +176,35 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 	return row, nil
 }
 
-func normalizeSetting(req SettingSaveRequest) (LobbySetting, error) {
+func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.ThemeElementMap) (LobbySetting, error) {
 	if req.SiteName == "" || req.Author == "" {
 		return LobbySetting{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
 	if !appearance.IsValidTheme(req.Theme) || !appearance.IsValidMode(req.Mode) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
+	if req.ThemeElements != nil && !appearance.IsValidThemeElements(*req.ThemeElements) {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
 	if req.SocialLinks == nil {
 		req.SocialLinks = map[string]string{}
 	}
-	return cloneSetting(req), nil
+	themeElements := appearance.NormalizeThemeElements(currentThemeElements)
+	if req.ThemeElements != nil {
+		provided := appearance.NormalizeThemeElements(*req.ThemeElements)
+		for theme := range *req.ThemeElements {
+			themeElements[theme] = provided[theme]
+		}
+	}
+	return cloneSetting(LobbySetting{
+		SiteName:      req.SiteName,
+		Author:        req.Author,
+		Essay:         req.Essay,
+		Theme:         req.Theme,
+		Mode:          req.Mode,
+		SocialLinks:   req.SocialLinks,
+		ThemeElements: themeElements,
+	}), nil
 }
 
 func settingFromModel(row model.SiteSetting) LobbySetting {
@@ -179,23 +212,29 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 	if row.SocialLinksJSON != "" {
 		_ = json.Unmarshal([]byte(row.SocialLinksJSON), &links)
 	}
+	themeElements := appearance.ThemeElementMap{}
+	if row.ThemeElementsJSON != "" {
+		_ = json.Unmarshal([]byte(row.ThemeElementsJSON), &themeElements)
+	}
 	return LobbySetting{
-		SiteName:    row.SiteName,
-		Author:      row.Author,
-		Essay:       row.Essay,
-		Theme:       appearance.NormalizeTheme(row.Theme),
-		Mode:        appearance.NormalizeMode(row.Mode),
-		SocialLinks: links,
+		SiteName:      row.SiteName,
+		Author:        row.Author,
+		Essay:         row.Essay,
+		Theme:         appearance.NormalizeTheme(row.Theme),
+		Mode:          appearance.NormalizeMode(row.Mode),
+		SocialLinks:   links,
+		ThemeElements: appearance.NormalizeThemeElements(themeElements),
 	}
 }
 
 func defaultLobbySetting() LobbySetting {
 	return LobbySetting{
-		SiteName: "Solitude Blog",
-		Author:   "Solitude King",
-		Essay:    "Keep writing, keep shipping.",
-		Theme:    appearance.DefaultTheme,
-		Mode:     appearance.DefaultMode,
+		SiteName:      "Solitude Blog",
+		Author:        "Solitude King",
+		Essay:         "Keep writing, keep shipping.",
+		Theme:         appearance.DefaultTheme,
+		Mode:          appearance.DefaultMode,
+		ThemeElements: appearance.DefaultThemeElements(),
 		SocialLinks: map[string]string{
 			"gitee":    "",
 			"bilibili": "",
@@ -211,11 +250,20 @@ func cloneSetting(setting LobbySetting) LobbySetting {
 		links[key] = value
 	}
 	setting.SocialLinks = links
+	setting.ThemeElements = appearance.CloneThemeElements(setting.ThemeElements)
 	return setting
 }
 
 func mustMarshalSocialLinks(links map[string]string) string {
 	payload, err := json.Marshal(links)
+	if err != nil {
+		return "{}"
+	}
+	return string(payload)
+}
+
+func mustMarshalThemeElements(elements appearance.ThemeElementMap) string {
+	payload, err := json.Marshal(appearance.NormalizeThemeElements(elements))
 	if err != nil {
 		return "{}"
 	}

@@ -1,43 +1,54 @@
 <template>
-  <section class="admin-page" :aria-busy="loading || savingCategory || savingTag">
+  <section class="admin-page" :aria-busy="loading || savingTopic || savingTag">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Taxonomy</p>
-        <h1>分类标签</h1>
+        <h1>专题与标签</h1>
       </div>
       <BaseButton variant="secondary" :loading="loading" @click="loadAll">刷新</BaseButton>
     </header>
 
     <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
-    <p v-else-if="loading && !categories.length && !tags.length" class="admin-page__status" role="status" aria-live="polite">
-      正在加载分类与标签…
+    <p v-else-if="loading && !topics.length && !tags.length" class="admin-page__status" role="status" aria-live="polite">
+      正在加载专题与标签…
     </p>
 
     <div class="taxonomy-grid">
       <section class="taxonomy-panel">
-        <h2>分类</h2>
-        <form class="taxonomy-form" :aria-busy="savingCategory" @submit.prevent="saveCategory">
-          <BaseInput v-model="categoryForm.name" label="名称" />
-          <BaseInput v-model="categoryForm.slug" label="Slug" />
-          <BaseInput v-model="categorySortOrder" label="排序" type="number" />
-          <BaseTextarea v-model="categoryForm.description" label="描述" :rows="3" />
+        <h2>专题</h2>
+        <form class="taxonomy-form" :aria-busy="savingTopic" @submit.prevent="saveTopic">
+          <BaseInput v-model="topicForm.name" label="专题名称" required />
+          <BaseInput
+            v-model="topicForm.label"
+            label="Label"
+            hint="用于文章卡片等紧凑位置的短标签"
+            required
+          />
+          <BaseInput v-model="topicForm.slug" label="Slug" required />
+          <BaseInput
+            v-model="topicForm.cover_url"
+            label="封面 URL"
+            hint="可填写 /uploads/... 相对路径或 https://... 绝对地址"
+          />
+          <BaseInput v-model="topicSortOrder" label="排序" type="number" />
+          <BaseTextarea v-model="topicForm.description" label="描述" :rows="3" />
           <div class="taxonomy-form__actions">
-            <BaseButton type="submit" :loading="savingCategory">{{ editingCategoryId ? '保存分类' : '新增分类' }}</BaseButton>
-            <BaseButton v-if="editingCategoryId" type="button" variant="secondary" @click="resetCategoryForm">
+            <BaseButton type="submit" :loading="savingTopic">{{ editingTopicId ? '保存专题' : '新增专题' }}</BaseButton>
+            <BaseButton v-if="editingTopicId" type="button" variant="secondary" @click="resetTopicForm">
               取消
             </BaseButton>
           </div>
         </form>
 
         <div class="taxonomy-list">
-          <div v-for="category in categories" :key="category.id" class="taxonomy-item">
+          <div v-for="topic in topics" :key="topic.id" class="taxonomy-item">
             <div>
-              <strong>{{ category.name }}</strong>
-              <p>{{ category.slug }}</p>
+              <strong>{{ topic.name }}</strong>
+              <p>{{ topic.label }} · {{ topic.slug }}<template v-if="topic.article_count !== undefined"> · 已发布 {{ topic.article_count }} 篇</template></p>
             </div>
             <div class="taxonomy-item__actions">
-              <button class="text-link" type="button" @click="editCategory(category)">编辑</button>
-              <button class="text-link text-link--danger" type="button" @click="removeCategory(category.id)">
+              <button class="text-link" type="button" @click="editTopic(topic)">编辑</button>
+              <button class="text-link text-link--danger" type="button" @click="removeTopic(topic.id)">
                 删除
               </button>
             </div>
@@ -89,30 +100,32 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import {
-  createCategory,
   createTag,
-  deleteCategory,
+  createTopic,
   deleteTag,
-  getCategoryList,
+  deleteTopic,
   getTagList,
-  updateCategory,
+  getTopicList,
   updateTag,
+  updateTopic,
 } from '@/api/modules/taxonomy'
-import type { CategoryItem, CategoryPayload, TagItem, TagPayload } from '@/types/taxonomy'
+import type { TagItem, TagPayload, TopicItem, TopicPayload } from '@/types/taxonomy'
 
-const categories = ref<CategoryItem[]>([])
+const topics = ref<TopicItem[]>([])
 const tags = ref<TagItem[]>([])
 const loading = ref(false)
-const savingCategory = ref(false)
+const savingTopic = ref(false)
 const savingTag = ref(false)
 const error = ref('')
-const editingCategoryId = ref<number | null>(null)
+const editingTopicId = ref<number | null>(null)
 const editingTagId = ref<number | null>(null)
 
-const categoryForm = reactive<CategoryPayload>({
+const topicForm = reactive<TopicPayload>({
   name: '',
+  label: '',
   slug: '',
   description: '',
+  cover_url: '',
   sort_order: 0,
 })
 
@@ -123,10 +136,10 @@ const tagForm = reactive<TagPayload>({
   color: '#5f8d62',
 })
 
-const categorySortOrder = computed({
-  get: () => String(categoryForm.sort_order),
+const topicSortOrder = computed({
+  get: () => String(topicForm.sort_order),
   set: (value: string) => {
-    categoryForm.sort_order = Number(value) || 0
+    topicForm.sort_order = Number(value) || 0
   },
 })
 
@@ -146,12 +159,12 @@ onMounted(() => {
 })
 
 watch(
-  () => categoryForm.name,
+  () => topicForm.name,
   (name) => {
-    if (editingCategoryId.value || categoryForm.slug) {
+    if (editingTopicId.value || topicForm.slug) {
       return
     }
-    categoryForm.slug = toSlug(name)
+    topicForm.slug = toSlug(name)
   },
 )
 
@@ -169,60 +182,72 @@ async function loadAll() {
   loading.value = true
   error.value = ''
   try {
-    const [categoryItems, tagItems] = await Promise.all([getCategoryList(), getTagList()])
-    categories.value = categoryItems
+    const [topicItems, tagItems] = await Promise.all([getTopicList(), getTagList()])
+    topics.value = topicItems
     tags.value = tagItems
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载分类标签失败'
+    error.value = err instanceof Error ? err.message : '加载专题与标签失败'
   } finally {
     loading.value = false
   }
 }
 
-async function saveCategory() {
-  savingCategory.value = true
+async function saveTopic() {
+  savingTopic.value = true
   error.value = ''
   try {
-    if (editingCategoryId.value) {
-      await updateCategory(editingCategoryId.value, categoryForm)
-    } else {
-      await createCategory(categoryForm)
+    const payload: TopicPayload = {
+      ...topicForm,
+      name: topicForm.name.trim(),
+      label: topicForm.label.trim(),
+      slug: topicForm.slug.trim(),
+      description: topicForm.description.trim(),
+      cover_url: topicForm.cover_url.trim(),
     }
-    resetCategoryForm()
+    if (editingTopicId.value) {
+      await updateTopic(editingTopicId.value, payload)
+    } else {
+      await createTopic(payload)
+    }
+    resetTopicForm()
     await loadAll()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存分类失败'
+    error.value = err instanceof Error ? err.message : '保存专题失败'
   } finally {
-    savingCategory.value = false
+    savingTopic.value = false
   }
 }
 
-function editCategory(category: CategoryItem) {
-  editingCategoryId.value = category.id
-  categoryForm.name = category.name
-  categoryForm.slug = category.slug
-  categoryForm.description = category.description
-  categoryForm.sort_order = category.sort_order
+function editTopic(topic: TopicItem) {
+  editingTopicId.value = topic.id
+  topicForm.name = topic.name
+  topicForm.label = topic.label
+  topicForm.slug = topic.slug
+  topicForm.description = topic.description
+  topicForm.cover_url = topic.cover_url
+  topicForm.sort_order = topic.sort_order
 }
 
-async function removeCategory(id: number) {
-  if (!window.confirm('确认删除这个分类？已被文章使用的分类不能删除。')) {
+async function removeTopic(id: number) {
+  if (!window.confirm('确认删除这个专题？已被文章使用的专题不能删除。')) {
     return
   }
   try {
-    await deleteCategory(id)
+    await deleteTopic(id)
     await loadAll()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '删除分类失败'
+    error.value = err instanceof Error ? err.message : '删除专题失败'
   }
 }
 
-function resetCategoryForm() {
-  editingCategoryId.value = null
-  categoryForm.name = ''
-  categoryForm.slug = ''
-  categoryForm.description = ''
-  categoryForm.sort_order = 0
+function resetTopicForm() {
+  editingTopicId.value = null
+  topicForm.name = ''
+  topicForm.label = ''
+  topicForm.slug = ''
+  topicForm.description = ''
+  topicForm.cover_url = ''
+  topicForm.sort_order = 0
 }
 
 async function saveTag() {

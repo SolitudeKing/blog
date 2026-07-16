@@ -6,22 +6,29 @@ import (
 	"fmt"
 )
 
-const prefix = "blog:v1"
+const (
+	prefix        = "blog:v1"
+	articlePrefix = "blog:v2"
+)
 
 func ArticleDetailKey(slug string) string {
-	return fmt.Sprintf("%s:article:detail:%s", prefix, slug)
+	return fmt.Sprintf("%s:article:detail:%s", articlePrefix, slug)
+}
+
+func ArticleDetailPattern() string {
+	return articlePrefix + ":article:detail:*"
 }
 
 func ArticleListKey(cursor string, limit int, filterHash string) string {
-	return fmt.Sprintf("%s:article:list:%s:%d:%s", prefix, cursor, limit, filterHash)
+	return fmt.Sprintf("%s:article:list:%s:%d:%s", articlePrefix, cursor, limit, filterHash)
 }
 
 func ArticleListPattern() string {
-	return prefix + ":article:list:*"
+	return articlePrefix + ":article:list:*"
 }
 
-func ArticleListFilterHash(category string, tag string, keyword string, status string) string {
-	hash := sha1.Sum([]byte(category + "|" + tag + "|" + keyword + "|" + status))
+func ArticleListFilterHash(topic string, tag string, keyword string, status string) string {
+	hash := sha1.Sum([]byte(topic + "|" + tag + "|" + keyword + "|" + status))
 	return hex.EncodeToString(hash[:])
 }
 

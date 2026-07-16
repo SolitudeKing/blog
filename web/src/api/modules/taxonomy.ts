@@ -1,33 +1,33 @@
 import { request } from '@/api/http'
-import type { CategoryItem, CategoryPayload, TagItem, TagPayload } from '@/types/taxonomy'
+import type { TagItem, TagPayload, TopicItem, TopicPayload } from '@/types/taxonomy'
 
-export function getCategoryList() {
-  return request<CategoryItem[]>({
+export function getTopicList() {
+  return request<TopicItem[]>({
     method: 'GET',
-    url: 'category/list',
+    url: 'topic/list',
   })
 }
 
-export function createCategory(payload: CategoryPayload) {
-  return request<CategoryItem>({
+export function createTopic(payload: TopicPayload) {
+  return request<TopicItem>({
     method: 'POST',
-    url: 'category/create',
+    url: 'topic/create',
     data: payload,
   })
 }
 
-export function updateCategory(id: number | string, payload: CategoryPayload) {
-  return request<CategoryItem>({
+export function updateTopic(id: number | string, payload: TopicPayload) {
+  return request<TopicItem>({
     method: 'PUT',
-    url: `category/update/${id}`,
+    url: `topic/update/${id}`,
     data: payload,
   })
 }
 
-export function deleteCategory(id: number | string) {
+export function deleteTopic(id: number | string) {
   return request<{ id: string; deleted: boolean }>({
     method: 'DELETE',
-    url: `category/delete/${id}`,
+    url: `topic/delete/${id}`,
   })
 }
 

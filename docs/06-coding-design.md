@@ -139,7 +139,7 @@ web/
 - 注入 `Authorization: Bearer <token>`。
 - 解析统一响应。
 - 处理 `10001 token expired` 并触发刷新。
-- 识别游标分页响应。
+- 识别游标分页响应，以及 `topic/list`、`tag/list` 的完整数组响应。
 - 将业务错误转换为前端可识别的 `ApiError`。
 
 当前实现已覆盖版本号与 access token 注入、统一响应解析、单次 refresh、并发刷新复用、原请求重放，以及刷新失败后的凭证清理与登录跳转。尚缺的是这条故障链的前端自动化测试，以及服务端登出后的 token 主动失效能力，见本文“当前实现偏差与迁移清单”。
@@ -170,13 +170,45 @@ export interface ApiListResponse<T> {
 
 ### 类型组织
 
-- `types/article.ts`：文章领域类型。
+- `types/article.ts`：文章领域类型与轻量 `ArticleTopic` 引用。
+- `types/taxonomy.ts`：专题与标签领域类型；`TopicItem` 固定包含 `name`、`label`、`slug`、`description`、`cover_url`、`sort_order`。
 - `types/auth.ts`：登录、token、用户信息。
 - `types/setting.ts`：站点配置。
 - `types/asset.ts`：媒体资源。
 - `api/modules/*.ts`：只写请求函数，不写页面状态。
 - `stores/*.ts`：只放跨页面状态。
 - 页面内部状态优先放在页面组件或 composable 中。
+
+专题与文章的前端领域契约统一使用 Topic 命名，不保留 Category 别名：
+
+```ts
+export interface TopicItem {
+  id: number
+  name: string
+  label: string
+  slug: string
+  description: string
+  cover_url: string
+  sort_order: number
+  article_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export type TopicPayload = Pick<
+  TopicItem,
+  'name' | 'label' | 'slug' | 'description' | 'cover_url' | 'sort_order'
+>
+
+export interface ArticleTopicFields {
+  topic_id: number
+  topic: Pick<TopicItem, 'id' | 'name' | 'label' | 'slug'>
+}
+```
+
+文章列表、详情与编辑 DTO 组合 `ArticleTopicFields`，确保专题字段在各接口保持同名；文章响应不嵌入描述、封面、排序或统计等完整专题字段。
+
+迁移期间若服务端仍收到旧 `category_id`，应在数据迁移层显式转换并拒绝进入新的页面/API 类型，避免长期维护双字段。
 
 ### 自研组件编码规则
 
@@ -291,7 +323,7 @@ auth       # 登录、刷新、登出
 user       # 当前用户信息
 setting    # 站点配置
 article    # 文章
-category   # 分类
+topic      # 专题
 tag        # 标签
 asset      # 媒体
 notice     # 公告
@@ -407,7 +439,7 @@ func SiteSettingsKey() string
 
 缓存失效在 service 层完成：
 
-- 创建/更新/发布/下线文章后失效文章详情、列表、归档、分类标签相关缓存。
+- 创建/更新/发布/下线文章后失效文章详情、列表、归档、专题与标签相关缓存。
 - 修改站点配置后失效 `setting/lobby` 缓存。
 - 修改公告后失效当前公告缓存。
 
@@ -531,7 +563,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/2
 2. 创建 `web`，完成 Vite、路由、Sass token、API client。
 3. 创建 `deploy/docker-compose.yml`，跑 MySQL 和 Redis。
 4. 实现 server migration 和 users/auth。
-5. 实现 article/category/tag 模型和 CRUD。
+5. 实现 article/topic/tag 模型和 CRUD，文章使用 `topic_id` 关联专题。
 6. 实现 web 登录、公开首页、文章详情。
 7. 创建 `worker`，跑通 Celery health task。
 8. 接入图片处理、阅读量聚合、索引任务。

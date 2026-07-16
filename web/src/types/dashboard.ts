@@ -7,7 +7,7 @@ export interface DashboardArticleCounts {
 }
 
 export interface DashboardTaxonomyCounts {
-  categories: number
+  topics: number
   tags: number
 }
 
@@ -32,9 +32,10 @@ export interface DashboardTopArticle {
   updated_at: string
 }
 
-export interface DashboardCategoryStat {
+export interface DashboardTopicStat {
   id: number
   name: string
+  label: string
   slug: string
   article_count: number
 }
@@ -56,7 +57,7 @@ export interface DashboardSummary {
   total_views: number
   recent_articles: DashboardArticleItem[]
   top_articles: DashboardTopArticle[]
-  category_stats: DashboardCategoryStat[]
+  topic_stats: DashboardTopicStat[]
   active_notice: DashboardNoticeItem | null
   generated_at: string
 }

@@ -60,8 +60,8 @@
             <dd>{{ articles.length }}</dd>
           </div>
           <div>
-            <dt>分类</dt>
-            <dd>{{ categories.length }}</dd>
+            <dt>专题</dt>
+            <dd>{{ topics.length }}</dd>
           </div>
           <div>
             <dt>标签</dt>
@@ -93,32 +93,33 @@
       </header>
 
       <div class="home-post-state" :aria-busy="loading || loadingMore">
-        <div v-if="featuredArticle" class="home-catalog">
-          <ArticleCard :article="featuredArticle" :index="1" variant="featured" />
-          <div v-if="sideArticles.length" class="home-catalog__side" aria-label="更多近期文章">
+        <template v-if="featuredArticle">
+          <div class="home-latest-flow">
+            <ArticleCard :article="featuredArticle" :index="1" variant="featured" />
+            <div v-if="railArticles.length" class="home-story-rail" aria-label="更多近期博客">
+              <ArticleCard
+                v-for="(article, index) in railArticles"
+                :key="article.id"
+                :article="article"
+                :index="index + 2"
+                variant="rail"
+              />
+            </div>
+          </div>
+
+          <div v-if="remainingArticles.length" class="home-stream" aria-label="更多文章">
             <ArticleCard
-              v-for="(article, index) in sideArticles"
+              v-for="(article, index) in remainingArticles"
               :key="article.id"
               :article="article"
-              :index="index + 2"
-              :offset="index === 1"
-              variant="compact"
+              :index="index + 5"
+              variant="stream"
             />
           </div>
-        </div>
-
-        <div v-if="remainingArticles.length" class="home-stream" aria-label="更多文章">
-          <ArticleCard
-            v-for="(article, index) in remainingArticles"
-            :key="article.id"
-            :article="article"
-            :index="index + 4"
-            variant="stream"
-          />
-        </div>
-
-        <div v-else-if="loading && !articles.length" class="page-state">
-          <BaseSkeleton variant="card" :count="3" />
+        </template>
+        <div v-else-if="loading" class="home-latest-skeleton">
+          <BaseSkeleton variant="card" height="480px" :count="1" gap="0" label="正在加载主文章" />
+          <BaseSkeleton variant="rect" height="120px" :count="3" gap="32px" label="正在加载近期文章" />
         </div>
         <div v-else-if="error && !articles.length" class="page-state page-state--error" role="alert">
           <p>{{ error }}</p>
@@ -127,7 +128,7 @@
         <BaseEmpty
           v-else-if="!articles.length"
           title="暂时还没有发布文章"
-          description="第一篇文章正在潮汐之外酝酿。"
+          :description="currentThemeElements.home_latest_empty_description"
         >
           <template #icon>
             <svg viewBox="0 0 24 24">
@@ -145,7 +146,9 @@
           <BaseButton v-if="page.has_more" variant="secondary" :loading="loadingMore" @click="loadMore">
             加载更多
           </BaseButton>
-          <span v-else class="home-section__end">已经读到潮汐尽头</span>
+          <span v-else class="home-section__end">
+            {{ currentThemeElements.home_latest_end_text }}
+          </span>
         </div>
       </div>
     </section>
@@ -192,12 +195,13 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import { getArticleList } from '@/api/modules/article'
 import { getActiveNotice } from '@/api/modules/notice'
-import { getCategoryList, getTagList } from '@/api/modules/taxonomy'
+import { getTagList, getTopicList } from '@/api/modules/taxonomy'
+import { resolveLobbyThemeElements } from '@/config/themeAppearance'
 import { useSettingStore } from '@/stores/setting'
 import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 import type { NoticeItem } from '@/types/notice'
-import type { CategoryItem, TagItem } from '@/types/taxonomy'
+import type { TagItem, TopicItem } from '@/types/taxonomy'
 
 interface TopicLink {
   key: string
@@ -208,7 +212,7 @@ interface TopicLink {
 const setting = useSettingStore()
 const articles = ref<ArticleListItem[]>([])
 const activeNotice = ref<NoticeItem | null>(null)
-const categories = ref<CategoryItem[]>([])
+const topics = ref<TopicItem[]>([])
 const tags = ref<TagItem[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -223,6 +227,7 @@ const page = reactive<CursorPage>({
 const siteName = computed(() => setting.lobby?.site_name ?? 'Solitude Blog')
 const author = computed(() => setting.lobby?.author ?? 'Solitude King')
 const essay = computed(() => setting.lobby?.essay?.trim() || '把复杂的技术写清楚，也把无法量化的感受留在字里行间。')
+const currentThemeElements = computed(() => resolveLobbyThemeElements(setting.lobby))
 const authorInitial = computed(() => author.value.trim().slice(0, 1).toUpperCase())
 const authorHandle = computed(() =>
   author.value
@@ -232,8 +237,8 @@ const authorHandle = computed(() =>
     .replace(/[^a-z0-9.\u4e00-\u9fa5]/g, ''),
 )
 const featuredArticle = computed(() => articles.value[0] ?? null)
-const sideArticles = computed(() => articles.value.slice(1, 3))
-const remainingArticles = computed(() => articles.value.slice(3))
+const railArticles = computed(() => articles.value.slice(1, 4))
+const remainingArticles = computed(() => articles.value.slice(4))
 
 const socialEntries = computed(() => {
   const labelMap: Record<string, string> = {
@@ -248,25 +253,11 @@ const socialEntries = computed(() => {
 })
 
 const topicLinks = computed<TopicLink[]>(() => {
-  const result: TopicLink[] = categories.value.slice(0, 3).map((category) => ({
-    key: `category-${category.id}`,
-    name: category.name,
-    description: category.description || `浏览 ${category.name} 相关内容`,
+  return topics.value.slice(0, 3).map((topic) => ({
+    key: `topic-${topic.id}`,
+    name: topic.label || topic.name,
+    description: topic.description || `浏览 ${topic.name} 专题内容`,
   }))
-  if (result.length >= 3) {
-    return result
-  }
-  for (const tag of tags.value) {
-    if (result.length >= 3 || result.some((item) => item.name === tag.name)) {
-      continue
-    }
-    result.push({
-      key: `tag-${tag.id}`,
-      name: tag.name,
-      description: tag.description || `查看标记为 ${tag.name} 的文章`,
-    })
-  }
-  return result
 })
 
 onMounted(async () => {
@@ -283,11 +274,11 @@ async function loadNotice() {
 
 async function loadTaxonomy() {
   try {
-    const [categoryItems, tagItems] = await Promise.all([getCategoryList(), getTagList()])
-    categories.value = categoryItems
+    const [topicItems, tagItems] = await Promise.all([getTopicList(), getTagList()])
+    topics.value = topicItems
     tags.value = tagItems
   } catch {
-    categories.value = []
+    topics.value = []
     tags.value = []
   }
 }

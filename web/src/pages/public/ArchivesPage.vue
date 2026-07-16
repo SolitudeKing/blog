@@ -96,7 +96,7 @@
               <li v-for="entry in month.entries" :key="entry.id" class="archive-item">
                 <time :datetime="entry.datetime">{{ entry.displayDate }}</time>
                 <RouterLink :to="`/articles/${entry.slug}`">{{ entry.title }}</RouterLink>
-                <span v-if="entry.category" class="archive-tag">{{ entry.category }}</span>
+                <span v-if="entry.topic" class="archive-tag">{{ entry.topic }}</span>
               </li>
             </ol>
           </section>
@@ -124,7 +124,7 @@ interface ArchiveEntry {
   id: number
   slug: string
   title: string
-  category: string
+  topic: string
   year: number
   month: number
   day: string
@@ -176,7 +176,7 @@ function toEntry(item: ArticleListItem): ArchiveEntry | null {
     id: item.id,
     slug: item.slug,
     title: item.title,
-    category: item.category,
+    topic: item.topic?.label || item.topic?.name || '',
     year: date.getFullYear(),
     month,
     day,

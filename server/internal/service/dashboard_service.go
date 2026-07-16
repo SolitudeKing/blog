@@ -22,7 +22,7 @@ type DashboardSummary struct {
 	TotalViews     uint64                  `json:"total_views"`
 	RecentArticles []DashboardArticleItem  `json:"recent_articles"`
 	TopArticles    []DashboardTopArticle   `json:"top_articles"`
-	CategoryStats  []DashboardCategoryStat `json:"category_stats"`
+	TopicStats     []DashboardTopicStat    `json:"topic_stats"`
 	ActiveNotice   *DashboardNoticeItem    `json:"active_notice"`
 	GeneratedAt    time.Time               `json:"generated_at"`
 }
@@ -36,8 +36,8 @@ type DashboardArticleCounts struct {
 }
 
 type DashboardTaxonomyCounts struct {
-	Categories int64 `json:"categories"`
-	Tags       int64 `json:"tags"`
+	Topics int64 `json:"topics"`
+	Tags   int64 `json:"tags"`
 }
 
 type DashboardNoticeCounts struct {
@@ -61,9 +61,10 @@ type DashboardTopArticle struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type DashboardCategoryStat struct {
+type DashboardTopicStat struct {
 	ID           uint64 `json:"id"`
 	Name         string `json:"name"`
+	Label        string `json:"label"`
 	Slug         string `json:"slug"`
 	ArticleCount int64  `json:"article_count"`
 }
@@ -87,8 +88,8 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 		return DashboardSummary{
 			ArticleCounts: DashboardArticleCounts{Total: 1, Published: 1},
 			TaxonomyCounts: DashboardTaxonomyCounts{
-				Categories: 1,
-				Tags:       2,
+				Topics: 1,
+				Tags:   2,
 			},
 			NoticeCounts: DashboardNoticeCounts{Total: 1, Enabled: 1},
 			AssetCount:   0,
@@ -110,8 +111,8 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 					UpdatedAt: now,
 				},
 			},
-			CategoryStats: []DashboardCategoryStat{
-				{ID: 1, Name: "Notes", Slug: "notes", ArticleCount: 1},
+			TopicStats: []DashboardTopicStat{
+				{ID: 1, Name: "Notes", Label: "Notes", Slug: "notes", ArticleCount: 1},
 			},
 			ActiveNotice: &DashboardNoticeItem{
 				ID:        1,
@@ -142,7 +143,7 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 	if err := s.fillTopArticles(&summary); err != nil {
 		return DashboardSummary{}, err
 	}
-	if err := s.fillCategoryStats(&summary); err != nil {
+	if err := s.fillTopicStats(&summary); err != nil {
 		return DashboardSummary{}, err
 	}
 	if err := s.fillActiveNotice(&summary); err != nil {
@@ -176,7 +177,7 @@ func (s *DashboardService) fillArticleCounts(summary *DashboardSummary) error {
 }
 
 func (s *DashboardService) fillTaxonomyCounts(summary *DashboardSummary) error {
-	if err := s.db.Model(&model.Category{}).Count(&summary.TaxonomyCounts.Categories).Error; err != nil {
+	if err := s.db.Model(&model.Topic{}).Count(&summary.TaxonomyCounts.Topics).Error; err != nil {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 	if err := s.db.Model(&model.Tag{}).Count(&summary.TaxonomyCounts.Tags).Error; err != nil {
@@ -242,29 +243,31 @@ func (s *DashboardService) fillTopArticles(summary *DashboardSummary) error {
 	return nil
 }
 
-func (s *DashboardService) fillCategoryStats(summary *DashboardSummary) error {
-	type categoryStatRow struct {
+func (s *DashboardService) fillTopicStats(summary *DashboardSummary) error {
+	type topicStatRow struct {
 		ID           uint64
 		Name         string
+		Label        string
 		Slug         string
 		ArticleCount int64
 	}
-	var rows []categoryStatRow
-	if err := s.db.Table("categories").
-		Select("categories.id, categories.name, categories.slug, COUNT(articles.id) AS article_count").
-		Joins("LEFT JOIN articles ON articles.category_id = categories.id AND articles.deleted_at IS NULL").
-		Where("categories.deleted_at IS NULL").
-		Group("categories.id, categories.name, categories.slug").
-		Order("article_count DESC, categories.sort_order ASC, categories.id ASC").
+	var rows []topicStatRow
+	if err := s.db.Table("topics").
+		Select("topics.id, topics.name, topics.label, topics.slug, COUNT(articles.id) AS article_count").
+		Joins("LEFT JOIN articles ON articles.topic_id = topics.id AND articles.deleted_at IS NULL").
+		Where("topics.deleted_at IS NULL").
+		Group("topics.id, topics.name, topics.label, topics.slug").
+		Order("article_count DESC, topics.sort_order ASC, topics.id ASC").
 		Limit(8).
 		Scan(&rows).Error; err != nil {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	summary.CategoryStats = make([]DashboardCategoryStat, 0, len(rows))
+	summary.TopicStats = make([]DashboardTopicStat, 0, len(rows))
 	for _, row := range rows {
-		summary.CategoryStats = append(summary.CategoryStats, DashboardCategoryStat{
+		summary.TopicStats = append(summary.TopicStats, DashboardTopicStat{
 			ID:           row.ID,
 			Name:         row.Name,
+			Label:        row.Label,
 			Slug:         row.Slug,
 			ArticleCount: row.ArticleCount,
 		})

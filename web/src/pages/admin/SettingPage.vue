@@ -8,15 +8,27 @@
       <BaseButton variant="secondary" :loading="loading" @click="loadSetting">刷新</BaseButton>
     </header>
 
-    <form class="settings-form" :aria-busy="saving" @submit.prevent="saveSetting">
-      <section class="settings-panel">
-        <h2>基础信息</h2>
-        <BaseInput v-model="form.site_name" label="站点名称" />
-        <BaseInput v-model="form.author" label="作者" />
-        <BaseTextarea v-model="form.essay" label="站点签名" :rows="4" />
-      </section>
+      <form class="settings-form" :aria-busy="saving" @submit.prevent="saveSetting">
+        <div class="settings-form__main">
+          <section class="settings-panel">
+            <h2>基础信息</h2>
+            <BaseInput v-model="form.site_name" label="站点名称" />
+            <BaseInput v-model="form.author" label="作者" />
+            <BaseTextarea v-model="form.essay" label="站点签名" :rows="4" />
+          </section>
 
-      <section class="settings-panel settings-panel--appearance">
+          <section class="settings-panel">
+            <h2>社交链接</h2>
+            <BaseInput
+              v-for="item in socialItems"
+              :key="item.key"
+              v-model="form.social_links[item.key]"
+              :label="item.label"
+            />
+          </section>
+        </div>
+
+        <section class="settings-panel settings-panel--appearance">
         <h2>主题外观</h2>
         <p id="site-theme-hint" class="settings-panel__description">
           主题色由后台统一发布；访客只能在前台切换明暗模式。
@@ -26,7 +38,7 @@
           <legend class="mist-field__label">站点主题色</legend>
           <div class="settings-theme-picker__options">
             <label
-              v-for="option in themeOptions"
+              v-for="option in themeAppearanceOptions"
               :key="option.value"
               class="settings-theme-option"
               :class="{ 'is-selected': form.theme === option.value }"
@@ -66,6 +78,29 @@
           </span>
         </label>
 
+        <fieldset class="settings-theme-elements" aria-describedby="theme-elements-hint">
+          <legend class="mist-field__label">主题元素 · {{ selectedTheme.label }}</legend>
+          <p id="theme-elements-hint" class="settings-theme-elements__description">
+            以下文案跟随当前主题发布；切换主题可分别维护，未保存前不会影响前台。
+          </p>
+          <BaseInput
+            v-model="selectedThemeElements.home_latest_empty_description"
+            name="home-latest-empty-description"
+            label="首页文章空状态"
+            hint="用于“最近发布”暂时没有文章时的说明，最多 160 字。"
+            :maxlength="160"
+            required
+          />
+          <BaseInput
+            v-model="selectedThemeElements.home_latest_end_text"
+            name="home-latest-end-text"
+            label="首页文章结束提示"
+            hint="用于全部文章加载完毕后的结束提示，最多 80 字。"
+            :maxlength="80"
+            required
+          />
+        </fieldset>
+
         <section
           class="settings-theme-preview"
           :data-theme="form.theme"
@@ -75,21 +110,21 @@
           <p class="settings-theme-preview__eyebrow">Theme preview</p>
           <h3 id="settings-theme-preview-title">{{ selectedTheme.label }}</h3>
           <p>{{ selectedTheme.preview }}</p>
+          <dl class="settings-theme-preview__elements">
+            <div>
+              <dt>首页空状态</dt>
+              <dd>{{ selectedThemeElements.home_latest_empty_description }}</dd>
+            </div>
+            <div>
+              <dt>首页列表结尾</dt>
+              <dd>{{ selectedThemeElements.home_latest_end_text }}</dd>
+            </div>
+          </dl>
           <span class="settings-theme-preview__action" aria-hidden="true">主操作</span>
         </section>
       </section>
 
-      <section class="settings-panel">
-        <h2>社交链接</h2>
-        <BaseInput
-          v-for="item in socialItems"
-          :key="item.key"
-          v-model="form.social_links[item.key]"
-          :label="item.label"
-        />
-      </section>
-
-      <div class="settings-actions">
+        <div class="settings-actions">
         <BaseButton type="submit" :loading="saving">保存设置</BaseButton>
         <p v-if="message" class="settings-message" role="status" aria-live="polite">{{ message }}</p>
         <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
@@ -103,10 +138,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import {
+  cloneThemeElementMap,
+  createDefaultThemeElementMap,
+  normalizeThemeElementMap,
+  themeAppearanceOptions,
+} from '@/config/themeAppearance'
 import { useToast } from '@/composables/useToast'
 import { getSettingDetail, updateSetting } from '@/api/modules/setting'
 import { useSettingStore } from '@/stores/setting'
-import type { LobbySetting, SettingPayload, ThemeName } from '@/types/setting'
+import type { LobbySetting, SettingPayload } from '@/types/setting'
 
 const socialItems = [
   { key: 'gitee', label: 'Gitee' },
@@ -114,26 +155,6 @@ const socialItems = [
   { key: 'bilibili', label: 'Bilibili' },
   { key: 'douyin', label: 'Douyin' },
 ] as const
-
-const themeOptions = [
-  {
-    value: 'mist-sea-salt',
-    label: '雾境海盐',
-    description: '清爽安静的海岸晨雾与透明蓝玻璃。',
-    preview: '深海蓝交互色穿过轻盈海雾，适合专注阅读。',
-  },
-  {
-    value: 'mist-forest',
-    label: '雾境青森',
-    description: '自然平静的森林晨雾与露水冷光。',
-    preview: '深森绿交互色配合青绿雾层，适合长时间浏览。',
-  },
-] as const satisfies ReadonlyArray<{
-  value: ThemeName
-  label: string
-  description: string
-  preview: string
-}>
 
 const loading = ref(false)
 const saving = ref(false)
@@ -148,6 +169,7 @@ const form = reactive<SettingPayload>({
   essay: '',
   theme: 'mist-sea-salt',
   mode: 'light',
+  theme_elements: createDefaultThemeElementMap(),
   social_links: {
     gitee: '',
     github: '',
@@ -157,8 +179,11 @@ const form = reactive<SettingPayload>({
 })
 
 const selectedTheme = computed(
-  () => themeOptions.find((option) => option.value === form.theme) ?? themeOptions[0],
+  () =>
+    themeAppearanceOptions.find((option) => option.value === form.theme) ??
+    themeAppearanceOptions[0],
 )
+const selectedThemeElements = computed(() => form.theme_elements[form.theme])
 
 onMounted(() => {
   void loadSetting()
@@ -170,6 +195,7 @@ function assignSetting(setting: LobbySetting) {
   form.essay = setting.essay
   form.theme = setting.theme
   form.mode = setting.mode
+  form.theme_elements = normalizeThemeElementMap(setting.theme_elements)
   form.social_links = {
     gitee: setting.social_links.gitee ?? '',
     github: setting.social_links.github ?? '',
@@ -200,6 +226,7 @@ async function saveSetting() {
   try {
     const saved = await updateSetting({
       ...form,
+      theme_elements: cloneThemeElementMap(form.theme_elements),
       social_links: { ...form.social_links },
     })
     settingStore.applyLobby(saved)

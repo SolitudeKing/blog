@@ -3,8 +3,10 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
@@ -122,16 +124,138 @@ func openRedis(ctx context.Context, cfg config.Config) (*redis.Client, error) {
 }
 
 func migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.User{},
-		&model.Category{},
+		&model.Topic{},
 		&model.Tag{},
-		&model.Article{},
-		&model.ArticleVersion{},
 		&model.Asset{},
 		&model.SiteSetting{},
 		&model.Notice{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// Existing installations need topic_id populated before AutoMigrate adds the
+	// Article -> Topic foreign key. Add only the column first, then copy legacy
+	// taxonomy data without dropping categories/category_id.
+	if db.Migrator().HasTable(&model.Article{}) {
+		if !db.Migrator().HasColumn(&model.Article{}, "TopicID") {
+			if err := db.Migrator().AddColumn(&model.Article{}, "TopicID"); err != nil {
+				return err
+			}
+		}
+		if err := migrateLegacyCategories(db); err != nil {
+			return err
+		}
+	}
+
+	return db.AutoMigrate(&model.Article{}, &model.ArticleVersion{})
+}
+
+type legacyCategoryRow struct {
+	ID          uint64
+	Name        string
+	Slug        string
+	Description string
+	SortOrder   int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt
+}
+
+type legacyArticleRow struct {
+	CategoryID uint64
+}
+
+func (legacyArticleRow) TableName() string {
+	return "articles"
+}
+
+// migrateLegacyCategories is intentionally idempotent. It keeps the legacy
+// table and column in place so an upgrade can be rolled back or audited.
+func migrateLegacyCategories(db *gorm.DB) error {
+	if !db.Migrator().HasTable("categories") {
+		return ensureArticleTopics(db, nil)
+	}
+
+	var categories []legacyCategoryRow
+	if err := db.Unscoped().Table("categories").Find(&categories).Error; err != nil {
+		return err
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		mapping := make(map[uint64]uint64, len(categories))
+		for _, category := range categories {
+			topicID, err := migrateLegacyCategory(tx, category)
+			if err != nil {
+				return err
+			}
+			mapping[category.ID] = topicID
+		}
+		return ensureArticleTopics(tx, mapping)
+	})
+}
+
+func migrateLegacyCategory(db *gorm.DB, category legacyCategoryRow) (uint64, error) {
+	var existing model.Topic
+	err := db.Unscoped().Where("slug = ?", category.Slug).First(&existing).Error
+	if err == nil {
+		return existing.ID, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, err
+	}
+
+	legacyIDAvailable := true
+	err = db.Unscoped().First(&existing, category.ID).Error
+	if err == nil {
+		legacyIDAvailable = false
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, err
+	}
+
+	topic := model.Topic{
+		Name:        category.Name,
+		Label:       model.DefaultTopicLabel(category.Name),
+		Slug:        category.Slug,
+		Description: category.Description,
+		SortOrder:   category.SortOrder,
+		CreatedAt:   category.CreatedAt,
+		UpdatedAt:   category.UpdatedAt,
+		DeletedAt:   category.DeletedAt,
+	}
+	if legacyIDAvailable {
+		topic.ID = category.ID
+	}
+	if err := db.Unscoped().Create(&topic).Error; err != nil {
+		return 0, err
+	}
+	return topic.ID, nil
+}
+
+func ensureArticleTopics(db *gorm.DB, legacyMapping map[uint64]uint64) error {
+	if !db.Migrator().HasTable(&model.Article{}) || !db.Migrator().HasColumn(&model.Article{}, "TopicID") {
+		return nil
+	}
+	if legacyMapping != nil && db.Migrator().HasColumn(&legacyArticleRow{}, "CategoryID") {
+		for categoryID, topicID := range legacyMapping {
+			if err := db.Table("articles").
+				Where("category_id = ? AND (topic_id IS NULL OR topic_id = 0)", categoryID).
+				Update("topic_id", topicID).Error; err != nil {
+				return err
+			}
+		}
+	}
+	if err := seedDefaultTopic(db); err != nil {
+		return err
+	}
+	var notes model.Topic
+	if err := db.Where("slug = ?", "notes").First(&notes).Error; err != nil {
+		return err
+	}
+	return db.Table("articles").
+		Where("topic_id IS NULL OR topic_id = 0").
+		Update("topic_id", notes.ID).Error
 }
 
 func seedAdmin(db *gorm.DB, cfg config.Config) error {
@@ -157,7 +281,7 @@ func seedAdmin(db *gorm.DB, cfg config.Config) error {
 		}
 	}
 
-	if err := seedDefaultCategory(db); err != nil {
+	if err := seedDefaultTopic(db); err != nil {
 		return err
 	}
 	if err := seedDefaultTags(db); err != nil {
@@ -170,15 +294,19 @@ func seedAdmin(db *gorm.DB, cfg config.Config) error {
 	return nil
 }
 
-func seedDefaultCategory(db *gorm.DB) error {
-	var categoryCount int64
-	if err := db.Model(&model.Category{}).Where("slug = ?", "notes").Count(&categoryCount).Error; err != nil {
-		return err
-	}
-	if categoryCount > 0 {
+func seedDefaultTopic(db *gorm.DB) error {
+	var topic model.Topic
+	err := db.Unscoped().Where("slug = ?", "notes").First(&topic).Error
+	if err == nil {
+		if topic.DeletedAt.Valid {
+			return db.Unscoped().Model(&topic).Update("deleted_at", nil).Error
+		}
 		return nil
 	}
-	return db.Create(&model.Category{Name: "Notes", Slug: "notes", SortOrder: 1}).Error
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return db.Create(&model.Topic{Name: "Notes", Label: "Notes", Slug: "notes", SortOrder: 1}).Error
 }
 
 func seedDefaultTags(db *gorm.DB) error {
@@ -207,24 +335,40 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 	if err == nil {
 		theme := appearance.NormalizeTheme(row.Theme)
 		mode := appearance.NormalizeMode(row.Mode)
-		if theme == row.Theme && mode == row.Mode {
+		updates := map[string]any{}
+		if theme != row.Theme {
+			updates["theme"] = theme
+		}
+		if mode != row.Mode {
+			updates["mode"] = mode
+		}
+		themeElementsJSON, changed, err := normalizeStoredThemeElements(row.ThemeElementsJSON)
+		if err != nil {
+			return err
+		}
+		if changed {
+			updates["theme_elements_json"] = themeElementsJSON
+		}
+		if len(updates) == 0 {
 			return nil
 		}
-		return db.Model(&row).Updates(map[string]any{
-			"theme": theme,
-			"mode":  mode,
-		}).Error
+		return db.Model(&row).Updates(updates).Error
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
+	themeElementsJSON, err := marshalThemeElements(appearance.DefaultThemeElements())
+	if err != nil {
+		return err
+	}
 	return db.Create(&model.SiteSetting{
-		ID:       1,
-		SiteName: "Solitude Blog",
-		Author:   "Solitude King",
-		Essay:    "Keep writing, keep shipping.",
-		Theme:    appearance.DefaultTheme,
-		Mode:     appearance.DefaultMode,
+		ID:                1,
+		SiteName:          "Solitude Blog",
+		Author:            "Solitude King",
+		Essay:             "Keep writing, keep shipping.",
+		Theme:             appearance.DefaultTheme,
+		Mode:              appearance.DefaultMode,
+		ThemeElementsJSON: themeElementsJSON,
 		SocialLinksJSON: `{
 			"gitee": "",
 			"bilibili": "",
@@ -232,6 +376,28 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 			"github": ""
 		}`,
 	}).Error
+}
+
+func normalizeStoredThemeElements(raw string) (string, bool, error) {
+	stored := appearance.ThemeElementMap{}
+	if raw == "" || json.Unmarshal([]byte(raw), &stored) != nil {
+		payload, err := marshalThemeElements(appearance.DefaultThemeElements())
+		return payload, true, err
+	}
+	normalized := appearance.NormalizeThemeElements(stored)
+	if reflect.DeepEqual(stored, normalized) {
+		return raw, false, nil
+	}
+	payload, err := marshalThemeElements(normalized)
+	return payload, true, err
+}
+
+func marshalThemeElements(elements appearance.ThemeElementMap) (string, error) {
+	payload, err := json.Marshal(elements)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
 }
 
 func Close(resources Resources) error {

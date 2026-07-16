@@ -180,7 +180,7 @@
           </div>
         </section>
 
-        <aside class="dashboard-side" aria-label="热门文章与分类分布">
+        <aside class="dashboard-side" aria-label="热门文章与专题分布">
           <section aria-labelledby="dashboard-top-title">
             <header class="dashboard-section-header">
               <div>
@@ -202,25 +202,25 @@
             </div>
           </section>
 
-          <section aria-labelledby="dashboard-category-title">
+          <section aria-labelledby="dashboard-topic-title">
             <header class="dashboard-section-header">
               <div>
                 <span class="admin-page__eyebrow">Taxonomy</span>
-                <h2 id="dashboard-category-title">分类分布</h2>
+                <h2 id="dashboard-topic-title">专题分布</h2>
               </div>
               <RouterLink class="text-link" to="/admin/taxonomy">管理</RouterLink>
             </header>
-            <div v-if="summary.category_stats.length" class="dashboard-bars">
-              <div v-for="item in summary.category_stats" :key="item.id" class="dashboard-bar">
+            <div v-if="summary.topic_stats.length" class="dashboard-bars">
+              <div v-for="item in summary.topic_stats" :key="item.id" class="dashboard-bar">
                 <div>
-                  <strong>{{ item.name }}</strong>
+                  <strong :title="item.name">{{ item.label || item.name }}</strong>
                   <span>{{ item.article_count }}</span>
                 </div>
-                <i :style="{ width: categoryPercent(item.article_count) + '%' }" aria-hidden="true" />
+                <i :style="{ width: topicPercent(item.article_count) + '%' }" aria-hidden="true" />
               </div>
             </div>
             <div v-else class="dashboard-inline-empty dashboard-inline-empty--compact">
-              <p>暂无分类统计</p>
+              <p>暂无专题统计</p>
             </div>
           </section>
         </aside>
@@ -272,9 +272,9 @@ const metrics = computed(() => {
       featured: true,
     },
     {
-      label: '分类与标签',
-      value: data.taxonomy_counts.categories + data.taxonomy_counts.tags,
-      detail: `分类 ${data.taxonomy_counts.categories} · 标签 ${data.taxonomy_counts.tags}`,
+      label: '专题与标签',
+      value: data.taxonomy_counts.topics + data.taxonomy_counts.tags,
+      detail: `专题 ${data.taxonomy_counts.topics} · 标签 ${data.taxonomy_counts.tags}`,
     },
     {
       label: '媒体资源',
@@ -331,8 +331,8 @@ function formatNoticeRange(notice: DashboardNoticeItem) {
   return `${notice.starts_at ? formatTime(notice.starts_at) : '立即'} - ${notice.ends_at ? formatTime(notice.ends_at) : '不限'}`
 }
 
-function categoryPercent(value: number) {
-  const max = Math.max(...(summary.value?.category_stats.map((item) => item.article_count) ?? [0]))
+function topicPercent(value: number) {
+  const max = Math.max(...(summary.value?.topic_stats.map((item) => item.article_count) ?? [0]))
   if (!max) {
     return 0
   }

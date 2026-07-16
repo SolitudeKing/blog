@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
@@ -23,31 +24,35 @@ import (
 )
 
 type exportPackage struct {
-	Version     int              `json:"version"`
-	GeneratedAt string           `json:"generated_at"`
-	Settings    exportedSetting  `json:"settings"`
-	Categories  []exportCategory `json:"categories"`
-	Tags        []exportTag      `json:"tags"`
-	Articles    []exportArticle  `json:"articles"`
-	Assets      []exportAsset    `json:"assets"`
-	Notices     []exportNotice   `json:"notices"`
+	Version     int             `json:"version"`
+	GeneratedAt string          `json:"generated_at"`
+	Settings    exportedSetting `json:"settings"`
+	Topics      []exportTopic   `json:"topics"`
+	Categories  []exportTopic   `json:"categories"`
+	Tags        []exportTag     `json:"tags"`
+	Articles    []exportArticle `json:"articles"`
+	Assets      []exportAsset   `json:"assets"`
+	Notices     []exportNotice  `json:"notices"`
 }
 
 type exportedSetting struct {
-	SiteName     string            `json:"site_name"`
-	Author       string            `json:"author"`
-	Essay        string            `json:"essay"`
-	Theme        string            `json:"theme"`
-	Mode         string            `json:"mode"`
-	SocialLinks  map[string]string `json:"social_links"`
-	AboutContent string            `json:"about_content"`
+	SiteName      string                      `json:"site_name"`
+	Author        string                      `json:"author"`
+	Essay         string                      `json:"essay"`
+	Theme         string                      `json:"theme"`
+	Mode          string                      `json:"mode"`
+	SocialLinks   map[string]string           `json:"social_links"`
+	ThemeElements *appearance.ThemeElementMap `json:"theme_elements"`
+	AboutContent  string                      `json:"about_content"`
 }
 
-type exportCategory struct {
+type exportTopic struct {
 	LegacyID    string `json:"legacy_id"`
 	Name        string `json:"name"`
+	Label       string `json:"label"`
 	Slug        string `json:"slug"`
 	Description string `json:"description"`
+	CoverURL    string `json:"cover_url"`
 	SortOrder   int    `json:"sort_order"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
@@ -70,6 +75,7 @@ type exportArticle struct {
 	Summary          string   `json:"summary"`
 	ContentMD        string   `json:"content_md"`
 	Status           string   `json:"status"`
+	TopicLegacyID    string   `json:"topic_legacy_id"`
 	CategoryLegacyID string   `json:"category_legacy_id"`
 	TagLegacyIDs     []string `json:"tag_legacy_ids"`
 	ViewCount        uint64   `json:"view_count"`
@@ -135,7 +141,8 @@ func main() {
 	if err != nil {
 		exitWithReport(report, *reportPath, fmt.Errorf("load package: %w", err))
 	}
-	report.Counts["categories_planned"] = len(pkg.Categories)
+	report.Counts["topics_planned"] = len(pkg.Topics) + len(pkg.Categories)
+	report.Counts["legacy_categories_planned"] = len(pkg.Categories)
 	report.Counts["tags_planned"] = len(pkg.Tags)
 	report.Counts["articles_planned"] = len(pkg.Articles)
 	report.Counts["assets_planned"] = len(pkg.Assets)
@@ -162,7 +169,7 @@ func main() {
 	}
 	if err := db.AutoMigrate(
 		&model.User{},
-		&model.Category{},
+		&model.Topic{},
 		&model.Tag{},
 		&model.Article{},
 		&model.Asset{},
@@ -172,7 +179,7 @@ func main() {
 		exitWithReport(report, *reportPath, fmt.Errorf("auto migrate: %w", err))
 	}
 
-	if err := importPackage(db, pkg, filepath.Dir(*input), *storageRoot, &report); err != nil {
+	if err := importPackage(db, pkg, filepath.Dir(*input), *storageRoot, cfg, &report); err != nil {
 		exitWithReport(report, *reportPath, err)
 	}
 
@@ -198,12 +205,26 @@ func loadPackage(path string) (exportPackage, error) {
 	return pkg, nil
 }
 
-func importPackage(db *gorm.DB, pkg exportPackage, packageDir string, storageRoot string, report *importReport) error {
+func importPackage(
+	db *gorm.DB,
+	pkg exportPackage,
+	packageDir string,
+	storageRoot string,
+	cfg config.Config,
+	report *importReport,
+) error {
 	return db.Transaction(func(tx *gorm.DB) error {
+		authorID, err := ensureImportAuthor(tx, cfg)
+		if err != nil {
+			return err
+		}
+		report.Mappings["author:"+cfg.AdminUsername] = authorID
 		if err := upsertSetting(tx, pkg.Settings, report); err != nil {
 			return err
 		}
-		categoryMap, err := upsertCategories(tx, pkg.Categories, report)
+		topics := append([]exportTopic{}, pkg.Topics...)
+		topics = append(topics, pkg.Categories...)
+		topicMap, err := upsertTopics(tx, topics, report)
 		if err != nil {
 			return err
 		}
@@ -214,7 +235,7 @@ func importPackage(db *gorm.DB, pkg exportPackage, packageDir string, storageRoo
 		if err := upsertAssets(tx, pkg.Assets, packageDir, storageRoot, report); err != nil {
 			return err
 		}
-		if err := upsertArticles(tx, pkg.Articles, categoryMap, tagMap, report); err != nil {
+		if err := upsertArticles(tx, pkg.Articles, topicMap, tagMap, authorID, report); err != nil {
 			return err
 		}
 		if err := upsertNotices(tx, pkg.Notices, report); err != nil {
@@ -222,6 +243,38 @@ func importPackage(db *gorm.DB, pkg exportPackage, packageDir string, storageRoo
 		}
 		return nil
 	})
+}
+
+func ensureImportAuthor(tx *gorm.DB, cfg config.Config) (uint64, error) {
+	var row model.User
+	err := tx.Unscoped().Where("username = ?", cfg.AdminUsername).First(&row).Error
+	if err == nil {
+		if row.DeletedAt.Valid {
+			if err := tx.Unscoped().Model(&row).Update("deleted_at", nil).Error; err != nil {
+				return 0, fmt.Errorf("restore import author: %w", err)
+			}
+		}
+		return row.ID, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("load import author: %w", err)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, fmt.Errorf("hash import author password: %w", err)
+	}
+	row = model.User{
+		Username:     cfg.AdminUsername,
+		PasswordHash: string(passwordHash),
+		Nickname:     cfg.AdminNickname,
+		Role:         "owner",
+		Status:       "active",
+	}
+	if err := tx.Create(&row).Error; err != nil {
+		return 0, fmt.Errorf("create import author: %w", err)
+	}
+	return row.ID, nil
 }
 
 func upsertSetting(tx *gorm.DB, setting exportedSetting, report *importReport) error {
@@ -244,12 +297,21 @@ func upsertSetting(tx *gorm.DB, setting exportedSetting, report *importReport) e
 	} else if err != nil {
 		return fmt.Errorf("load setting: %w", err)
 	}
+	themeElements, err := mergeImportedThemeElements(row.ThemeElementsJSON, setting.ThemeElements)
+	if err != nil {
+		return err
+	}
+	themeElementsJSON, err := json.Marshal(themeElements)
+	if err != nil {
+		return fmt.Errorf("marshal theme elements: %w", err)
+	}
 	row.SiteName = setting.SiteName
 	row.Author = setting.Author
 	row.Essay = setting.Essay
 	row.Theme = setting.Theme
 	row.Mode = setting.Mode
 	row.SocialLinksJSON = string(links)
+	row.ThemeElementsJSON = string(themeElementsJSON)
 	if err := tx.Save(&row).Error; err != nil {
 		return fmt.Errorf("upsert setting: %w", err)
 	}
@@ -257,20 +319,48 @@ func upsertSetting(tx *gorm.DB, setting exportedSetting, report *importReport) e
 	return nil
 }
 
-func upsertCategories(tx *gorm.DB, categories []exportCategory, report *importReport) (map[string]uint64, error) {
+func mergeImportedThemeElements(
+	currentJSON string,
+	incoming *appearance.ThemeElementMap,
+) (appearance.ThemeElementMap, error) {
+	current := appearance.ThemeElementMap{}
+	if currentJSON != "" {
+		_ = json.Unmarshal([]byte(currentJSON), &current)
+	}
+	merged := appearance.NormalizeThemeElements(current)
+	if incoming == nil {
+		return merged, nil
+	}
+	if !appearance.IsValidThemeElements(*incoming) {
+		return nil, fmt.Errorf("invalid theme elements")
+	}
+	provided := appearance.NormalizeThemeElements(*incoming)
+	for theme := range *incoming {
+		merged[theme] = provided[theme]
+	}
+	return merged, nil
+}
+
+func upsertTopics(tx *gorm.DB, topics []exportTopic, report *importReport) (map[string]uint64, error) {
 	result := map[string]uint64{}
-	for _, item := range categories {
+	for _, item := range topics {
 		if item.Name == "" || item.Slug == "" {
-			report.Warnings = append(report.Warnings, "skip category with empty name or slug")
+			report.Warnings = append(report.Warnings, "skip topic with empty name or slug")
 			continue
 		}
-		row := model.Category{}
+		label := model.DefaultTopicLabel(item.Label)
+		if strings.TrimSpace(item.Label) == "" {
+			label = model.DefaultTopicLabel(item.Name)
+		}
+		row := model.Topic{}
 		err := tx.Where("slug = ?", item.Slug).First(&row).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			row = model.Category{
+			row = model.Topic{
 				Name:        item.Name,
+				Label:       label,
 				Slug:        item.Slug,
 				Description: item.Description,
+				CoverURL:    item.CoverURL,
 				SortOrder:   item.SortOrder,
 				CreatedAt:   parseImportTime(item.CreatedAt),
 				UpdatedAt:   parseImportTime(item.UpdatedAt),
@@ -278,16 +368,18 @@ func upsertCategories(tx *gorm.DB, categories []exportCategory, report *importRe
 			err = tx.Create(&row).Error
 		} else if err == nil {
 			row.Name = item.Name
+			row.Label = label
 			row.Description = item.Description
+			row.CoverURL = item.CoverURL
 			row.SortOrder = item.SortOrder
 			err = tx.Save(&row).Error
 		}
 		if err != nil {
-			return nil, fmt.Errorf("upsert category %s: %w", item.Slug, err)
+			return nil, fmt.Errorf("upsert topic %s: %w", item.Slug, err)
 		}
 		result[item.LegacyID] = row.ID
-		report.Mappings["category:"+item.LegacyID] = row.ID
-		report.Counts["categories_imported"]++
+		report.Mappings["topic:"+item.LegacyID] = row.ID
+		report.Counts["topics_imported"]++
 	}
 	return result, nil
 }
@@ -383,8 +475,9 @@ func upsertAssets(tx *gorm.DB, assets []exportAsset, packageDir string, storageR
 func upsertArticles(
 	tx *gorm.DB,
 	articles []exportArticle,
-	categoryMap map[string]uint64,
+	topicMap map[string]uint64,
 	tagMap map[string]uint64,
+	authorID uint64,
 	report *importReport,
 ) error {
 	for _, item := range articles {
@@ -392,9 +485,18 @@ func upsertArticles(
 			report.Warnings = append(report.Warnings, "skip article with empty title or slug")
 			continue
 		}
-		categoryID := categoryMap[item.CategoryLegacyID]
-		if categoryID == 0 {
-			categoryID = ensureFallbackCategory(tx, report)
+		legacyTopicID := item.TopicLegacyID
+		if legacyTopicID == "" {
+			legacyTopicID = item.CategoryLegacyID
+		}
+		topicID := topicMap[legacyTopicID]
+		if topicID == 0 {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("article %s missing topic mapping %s; using fallback", item.Slug, legacyTopicID))
+			var err error
+			topicID, err = ensureFallbackTopic(tx)
+			if err != nil {
+				return fmt.Errorf("ensure fallback topic for article %s: %w", item.Slug, err)
+			}
 		}
 		tagIDs := make([]uint64, 0, len(item.TagLegacyIDs))
 		for _, legacyID := range item.TagLegacyIDs {
@@ -415,8 +517,8 @@ func upsertArticles(
 				Summary:     item.Summary,
 				ContentMD:   item.ContentMD,
 				Status:      normalizeArticleStatus(item.Status),
-				CategoryID:  categoryID,
-				AuthorID:    1,
+				TopicID:     topicID,
+				AuthorID:    authorID,
 				ViewCount:   item.ViewCount,
 				PublishedAt: publishedAt,
 				CreatedAt:   parseImportTime(item.CreatedAt),
@@ -428,7 +530,7 @@ func upsertArticles(
 			article.Summary = item.Summary
 			article.ContentMD = item.ContentMD
 			article.Status = normalizeArticleStatus(item.Status)
-			article.CategoryID = categoryID
+			article.TopicID = topicID
 			article.ViewCount = item.ViewCount
 			article.PublishedAt = publishedAt
 			err = tx.Save(&article).Error
@@ -485,18 +587,20 @@ func upsertNotices(tx *gorm.DB, notices []exportNotice, report *importReport) er
 	return nil
 }
 
-func ensureFallbackCategory(tx *gorm.DB, report *importReport) uint64 {
-	row := model.Category{}
+func ensureFallbackTopic(tx *gorm.DB) (uint64, error) {
+	row := model.Topic{}
 	err := tx.Where("slug = ?", "legacy").First(&row).Error
 	if err == nil {
-		return row.ID
+		return row.ID, nil
 	}
-	row = model.Category{Name: "Legacy", Slug: "legacy", SortOrder: 999}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, err
+	}
+	row = model.Topic{Name: "Legacy", Label: "Legacy", Slug: "legacy", SortOrder: 999}
 	if err := tx.Create(&row).Error; err != nil {
-		report.Warnings = append(report.Warnings, "fallback category create failed: "+err.Error())
-		return 0
+		return 0, err
 	}
-	return row.ID
+	return row.ID, nil
 }
 
 func copyAsset(source string, target string) (string, uint64, error) {

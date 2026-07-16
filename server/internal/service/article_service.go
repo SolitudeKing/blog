@@ -28,33 +28,40 @@ type ArticleService struct {
 }
 
 type ArticleListQuery struct {
-	Cursor   string
-	Limit    int
-	Category string
-	Tag      string
-	Keyword  string
-	Status   string
+	Cursor  string
+	Limit   int
+	Topic   string
+	Tag     string
+	Keyword string
+	Status  string
+}
+
+type TopicReference struct {
+	ID    uint64 `json:"id"`
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Slug  string `json:"slug"`
 }
 
 type ArticleItem struct {
-	ID          uint64    `json:"id"`
-	Title       string    `json:"title"`
-	Slug        string    `json:"slug"`
-	Summary     string    `json:"summary"`
-	Status      string    `json:"status"`
-	Category    string    `json:"category"`
-	Tags        []string  `json:"tags"`
-	ViewCount   uint64    `json:"view_count"`
-	PublishedAt time.Time `json:"published_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uint64         `json:"id"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Summary     string         `json:"summary"`
+	Status      string         `json:"status"`
+	TopicID     uint64         `json:"topic_id"`
+	Topic       TopicReference `json:"topic"`
+	Tags        []string       `json:"tags"`
+	ViewCount   uint64         `json:"view_count"`
+	PublishedAt time.Time      `json:"published_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 type ArticleDetail struct {
 	ArticleItem
-	ContentMD  string   `json:"content_md"`
-	CategoryID uint64   `json:"category_id"`
-	TagIDs     []uint64 `json:"tag_ids"`
+	ContentMD string   `json:"content_md"`
+	TagIDs    []uint64 `json:"tag_ids"`
 }
 
 type ArticleVersionItem struct {
@@ -73,13 +80,13 @@ type cachedArticleList struct {
 }
 
 type ArticleCreateRequest struct {
-	Title      string   `json:"title"`
-	Slug       string   `json:"slug"`
-	Summary    string   `json:"summary"`
-	ContentMD  string   `json:"content_md"`
-	CategoryID uint64   `json:"category_id"`
-	TagIDs     []uint64 `json:"tag_ids"`
-	Status     string   `json:"status"`
+	Title     string   `json:"title"`
+	Slug      string   `json:"slug"`
+	Summary   string   `json:"summary"`
+	ContentMD string   `json:"content_md"`
+	TopicID   uint64   `json:"topic_id"`
+	TagIDs    []uint64 `json:"tag_ids"`
+	Status    string   `json:"status"`
 }
 
 type ArticleUpdateRequest = ArticleCreateRequest
@@ -97,16 +104,16 @@ func NewArticleService(db *gorm.DB, redisClient *redis.Client) *ArticleService {
 					Slug:        "welcome",
 					Summary:     "The first article from the new blog scaffold.",
 					Status:      "published",
-					Category:    "notes",
+					TopicID:     1,
+					Topic:       TopicReference{ID: 1, Name: "Notes", Label: "Notes", Slug: "notes"},
 					Tags:        []string{"go", "vue"},
 					ViewCount:   0,
 					PublishedAt: now,
 					CreatedAt:   now,
 					UpdatedAt:   now,
 				},
-				ContentMD:  "# Welcome\n\nThis is the new blog API scaffold.",
-				CategoryID: 1,
-				TagIDs:     []uint64{1, 2},
+				ContentMD: "# Welcome\n\nThis is the new blog API scaffold.",
+				TagIDs:    []uint64{1, 2},
 			},
 		},
 	}
@@ -134,7 +141,7 @@ func (s *ArticleService) Detail(slug string) (ArticleDetail, error) {
 			return item, nil
 		}
 		var article model.Article
-		err := s.db.Preload("Category").Preload("Tags").
+		err := s.db.Preload("Topic").Preload("Tags").
 			Where("slug = ? AND status = ?", slug, "published").
 			First(&article).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -166,7 +173,7 @@ func (s *ArticleService) Info(id string) (ArticleDetail, error) {
 
 	if s.db != nil {
 		var article model.Article
-		err := s.db.Preload("Category").Preload("Tags").First(&article, parsed).Error
+		err := s.db.Preload("Topic").Preload("Tags").First(&article, parsed).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeResourceNotFound)
 		}
@@ -196,7 +203,7 @@ func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
 	}
 
 	if s.db != nil {
-		categoryID, err := s.resolveCategoryID(req.CategoryID)
+		topicID, err := s.resolveTopicID(req.TopicID)
 		if err != nil {
 			return ArticleItem{}, err
 		}
@@ -209,13 +216,13 @@ func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
 		}
 
 		article := model.Article{
-			Title:      req.Title,
-			Slug:       req.Slug,
-			Summary:    req.Summary,
-			ContentMD:  req.ContentMD,
-			Status:     status,
-			CategoryID: categoryID,
-			AuthorID:   1,
+			Title:     req.Title,
+			Slug:      req.Slug,
+			Summary:   req.Summary,
+			ContentMD: req.ContentMD,
+			Status:    status,
+			TopicID:   topicID,
+			AuthorID:  1,
 		}
 		if status == "published" {
 			now := time.Now().UTC()
@@ -261,7 +268,7 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 	}
 
 	if s.db != nil {
-		categoryID, err := s.resolveCategoryID(req.CategoryID)
+		topicID, err := s.resolveTopicID(req.TopicID)
 		if err != nil {
 			return ArticleDetail{}, err
 		}
@@ -273,6 +280,7 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 		if err != nil {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		oldSlug := article.Slug
 
 		var slugCount int64
 		if err := s.db.Model(&model.Article{}).
@@ -289,7 +297,7 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 		article.Summary = req.Summary
 		article.ContentMD = req.ContentMD
 		article.Status = status
-		article.CategoryID = categoryID
+		article.TopicID = topicID
 		if status == "published" && article.PublishedAt == nil {
 			now := time.Now().UTC()
 			article.PublishedAt = &now
@@ -314,30 +322,38 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 		if err != nil {
 			return ArticleDetail{}, err
 		}
-		s.invalidateArticleCaches(article.Slug, req.Slug)
+		s.invalidateArticleCaches(oldSlug, article.Slug)
 		return detail, nil
 	}
 
 	return s.updateInMemory(parsed, req, status)
 }
 
-func (s *ArticleService) resolveCategoryID(categoryID uint64) (uint64, error) {
-	if categoryID > 0 {
-		return categoryID, nil
+func (s *ArticleService) resolveTopicID(topicID uint64) (uint64, error) {
+	if topicID > 0 {
+		var topic model.Topic
+		err := s.db.Select("id").First(&topic, topicID).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, apperrors.New(apperrors.CodeResourceNotFound)
+		}
+		if err != nil {
+			return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		}
+		return topic.ID, nil
 	}
-	var category model.Category
-	err := s.db.Where("slug = ?", "notes").First(&category).Error
+	var topic model.Topic
+	err := s.db.Where("slug = ?", "notes").First(&topic).Error
 	if err == nil {
-		return category.ID, nil
+		return topic.ID, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	category = model.Category{Name: "Notes", Slug: "notes", SortOrder: 1}
-	if err := s.db.Create(&category).Error; err != nil {
+	topic = model.Topic{Name: "Notes", Label: "Notes", Slug: "notes", SortOrder: 1}
+	if err := s.db.Create(&topic).Error; err != nil {
 		return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	return category.ID, nil
+	return topic.ID, nil
 }
 
 func (s *ArticleService) Delete(id string) error {
@@ -441,7 +457,7 @@ func (s *ArticleService) list(query ArticleListQuery, onlyPublished bool) ([]Art
 }
 
 func (s *ArticleService) listFromDB(query ArticleListQuery, limit int, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {
-	dbQuery := s.db.Model(&model.Article{}).Preload("Category").Preload("Tags")
+	dbQuery := s.db.Model(&model.Article{}).Preload("Topic").Preload("Tags")
 	if onlyPublished {
 		dbQuery = dbQuery.Where("status = ?", "published")
 	} else if query.Status != "" {
@@ -450,9 +466,9 @@ func (s *ArticleService) listFromDB(query ArticleListQuery, limit int, onlyPubli
 	if query.Keyword != "" {
 		dbQuery = dbQuery.Where("title LIKE ?", "%"+query.Keyword+"%")
 	}
-	if query.Category != "" {
-		dbQuery = dbQuery.Joins("JOIN categories ON categories.id = articles.category_id").
-			Where("categories.slug = ?", query.Category)
+	if query.Topic != "" {
+		dbQuery = dbQuery.Joins("JOIN topics ON topics.id = articles.topic_id").
+			Where("topics.slug = ?", query.Topic)
 	}
 	if query.Tag != "" {
 		dbQuery = dbQuery.Joins("JOIN article_tags ON article_tags.article_id = articles.id").
@@ -525,7 +541,7 @@ func (s *ArticleService) listInMemory(query ArticleListQuery, limit int, onlyPub
 		if query.Keyword != "" && !strings.Contains(strings.ToLower(item.Title), strings.ToLower(query.Keyword)) {
 			continue
 		}
-		if query.Category != "" && item.Category != query.Category {
+		if query.Topic != "" && item.Topic.Slug != query.Topic {
 			continue
 		}
 		if query.Tag != "" && !contains(item.Tags, query.Tag) {
@@ -594,7 +610,8 @@ func (s *ArticleService) createInMemory(req ArticleCreateRequest, status string)
 			Slug:        req.Slug,
 			Summary:     req.Summary,
 			Status:      status,
-			Category:    "uncategorized",
+			TopicID:     inMemoryTopicID(req.TopicID),
+			Topic:       inMemoryTopicReference(req.TopicID),
 			Tags:        []string{},
 			ViewCount:   0,
 			PublishedAt: publishedAt,
@@ -624,6 +641,8 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 			item.Summary = req.Summary
 			item.ContentMD = req.ContentMD
 			item.Status = status
+			item.TopicID = inMemoryTopicID(req.TopicID)
+			item.Topic = inMemoryTopicReference(req.TopicID)
 			item.UpdatedAt = now
 			if status == "published" && item.PublishedAt.IsZero() {
 				item.PublishedAt = now
@@ -709,7 +728,7 @@ func (s *ArticleService) invalidateArticleCaches(slugs ...string) {
 }
 
 func publicListCacheKey(query ArticleListQuery) string {
-	filterHash := cache.ArticleListFilterHash(query.Category, query.Tag, query.Keyword, query.Status)
+	filterHash := cache.ArticleListFilterHash(query.Topic, query.Tag, query.Keyword, query.Status)
 	return cache.ArticleListKey(query.Cursor, pagination.NormalizeLimit(query.Limit), filterHash)
 }
 
@@ -717,7 +736,6 @@ func detailFromModel(article model.Article) ArticleDetail {
 	return ArticleDetail{
 		ArticleItem: itemFromModel(article),
 		ContentMD:   article.ContentMD,
-		CategoryID:  article.CategoryID,
 		TagIDs:      tagIDsFromModel(article.Tags),
 	}
 }
@@ -727,27 +745,40 @@ func itemFromModel(article model.Article) ArticleItem {
 	if article.PublishedAt != nil {
 		publishedAt = *article.PublishedAt
 	}
-	category := "uncategorized"
-	if article.Category.Slug != "" {
-		category = article.Category.Slug
-	}
 	tags := make([]string, 0, len(article.Tags))
 	for _, tag := range article.Tags {
 		tags = append(tags, tag.Slug)
 	}
 	return ArticleItem{
-		ID:          article.ID,
-		Title:       article.Title,
-		Slug:        article.Slug,
-		Summary:     article.Summary,
-		Status:      article.Status,
-		Category:    category,
+		ID:      article.ID,
+		Title:   article.Title,
+		Slug:    article.Slug,
+		Summary: article.Summary,
+		Status:  article.Status,
+		TopicID: article.TopicID,
+		Topic: TopicReference{
+			ID:    article.Topic.ID,
+			Name:  article.Topic.Name,
+			Label: article.Topic.Label,
+			Slug:  article.Topic.Slug,
+		},
 		Tags:        tags,
 		ViewCount:   article.ViewCount,
 		PublishedAt: publishedAt,
 		CreatedAt:   article.CreatedAt,
 		UpdatedAt:   article.UpdatedAt,
 	}
+}
+
+func inMemoryTopicID(topicID uint64) uint64 {
+	if topicID == 0 {
+		return 1
+	}
+	return topicID
+}
+
+func inMemoryTopicReference(topicID uint64) TopicReference {
+	return TopicReference{ID: inMemoryTopicID(topicID), Name: "Notes", Label: "Notes", Slug: "notes"}
 }
 
 func normalizeArticleStatus(status string) (string, error) {

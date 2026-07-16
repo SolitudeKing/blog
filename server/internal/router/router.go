@@ -14,7 +14,7 @@ type Handlers struct {
 	User         *handler.UserHandler
 	Setting      *handler.SettingHandler
 	Article      *handler.ArticleHandler
-	Category     *handler.CategoryHandler
+	Topic        *handler.TopicHandler
 	Tag          *handler.TagHandler
 	Notice       *handler.NoticeHandler
 	Dashboard    *handler.DashboardHandler
@@ -58,10 +58,10 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.PUT("article/update/:id", h.AuthRequired, h.Article.Update)
 	r.DELETE("article/delete/:id", h.AuthRequired, h.Article.Delete)
 
-	r.GET("category/list", h.Category.List)
-	r.POST("category/create", h.AuthRequired, h.Category.Create)
-	r.PUT("category/update/:id", h.AuthRequired, h.Category.Update)
-	r.DELETE("category/delete/:id", h.AuthRequired, h.Category.Delete)
+	r.GET("topic/list", h.Topic.List)
+	r.POST("topic/create", h.AuthRequired, h.Topic.Create)
+	r.PUT("topic/update/:id", h.AuthRequired, h.Topic.Update)
+	r.DELETE("topic/delete/:id", h.AuthRequired, h.Topic.Delete)
 
 	r.GET("tag/list", h.Tag.List)
 	r.POST("tag/create", h.AuthRequired, h.Tag.Create)

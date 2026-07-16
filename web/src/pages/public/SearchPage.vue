@@ -4,7 +4,7 @@
       <div class="search-hero__copy">
         <p class="search-kicker">Search the current</p>
         <h1 id="search-title">打捞一段想法</h1>
-        <p>输入一个词，沿着标题、摘要、正文与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p>
+        <p>输入一个词，沿着标题、摘要、正文、专题与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p>
       </div>
 
       <aside class="search-hero__aside" :aria-label="searchOverview">
@@ -22,7 +22,7 @@
     <section class="search-workbench mist-glass--strong" aria-labelledby="search-workbench-title">
       <h2 id="search-workbench-title" class="sr-only">文章搜索工作台</h2>
       <form class="search-form" role="search" @submit.prevent="submitSearch">
-        <label class="sr-only" for="article-search">搜索文章标题、摘要、正文或标签</label>
+        <label class="sr-only" for="article-search">搜索文章标题、摘要、正文、专题或标签</label>
         <div class="search-input-wrap">
           <svg class="search-input-wrap__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
             <circle cx="11" cy="11" r="6.5" />
@@ -111,7 +111,7 @@
               </p>
               <div class="search-result__meta">
                 <time :datetime="item.published_at || item.created_at">{{ formatDate(item) }}</time>
-                <span v-if="item.category" class="search-result__tag">{{ item.category }}</span>
+                <span v-if="item.topic" class="search-result__tag">{{ item.topic.label || item.topic.name }}</span>
                 <span v-for="field in item.matched_fields" :key="field">命中 {{ displayField(field) }}</span>
               </div>
             </article>
@@ -192,7 +192,9 @@ const fieldLabels: Record<string, string> = {
   title: '标题',
   summary: '摘要',
   content: '正文',
-  category: '分类',
+  topic: '专题',
+  topic_name: '专题名称',
+  topic_label: '专题 Label',
   tag: '标签',
 }
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {

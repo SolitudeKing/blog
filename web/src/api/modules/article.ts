@@ -11,7 +11,7 @@ export interface ArticleListParams {
   cursor?: string
   limit?: number
   keyword?: string
-  category?: string
+  topic?: string
   tag?: string
   status?: string
 }

@@ -19,7 +19,7 @@
         <header class="article-detail__header">
           <div class="article-detail__headline">
             <p class="article-detail__meta">
-              <span v-if="article.category"><strong>{{ article.category }}</strong></span>
+              <span v-if="article.topic"><strong>{{ topicLabel }}</strong></span>
               <span>{{ formattedDate }}</span>
             </p>
             <h1>{{ article.title }}</h1>
@@ -60,7 +60,7 @@
             <circle cx="720" cy="96" r="42" />
             <path d="M130 94h260M130 126h190M130 158h225" />
           </svg>
-          <figcaption>{{ article.category || 'Notes' }} · {{ formattedDate }}</figcaption>
+          <figcaption>{{ topicLabel }} · {{ formattedDate }}</figcaption>
         </figure>
 
         <div class="article-detail__layout">
@@ -254,6 +254,7 @@ const authorInitial = computed(() => author.value.trim().slice(0, 1).toUpperCase
 const authorEssay = computed(() =>
   setting.lobby?.essay?.trim() || '持续记录工程实践、设计判断与缓慢生长的想法。',
 )
+const topicLabel = computed(() => article.value?.topic?.label || article.value?.topic?.name || 'Notes')
 
 const prev = computed(() => {
   const slug = article.value?.slug

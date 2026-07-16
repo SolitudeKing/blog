@@ -274,7 +274,7 @@ const pageTitles: Record<string, { kicker: string; title: string }> = {
   'admin-articles': { kicker: 'Articles', title: '文章管理' },
   'admin-article-new': { kicker: 'Editor', title: '新建文章' },
   'admin-article-edit': { kicker: 'Editor', title: '编辑文章' },
-  'admin-taxonomy': { kicker: 'Taxonomy', title: '分类与标签' },
+  'admin-taxonomy': { kicker: 'Taxonomy', title: '专题与标签' },
   'admin-media': { kicker: 'Media', title: '媒体库' },
   'admin-notices': { kicker: 'Notices', title: '公告管理' },
   'admin-settings': { kicker: 'Settings', title: '站点设置' },
@@ -302,7 +302,7 @@ const IconDashboard = () =>
   svg('M4 4h6v7H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 15h6v5H4z')
 const IconArticle = () =>
   svg('M6 3h9l4 4v14H6z|M15 3v5h4|M9 12h7|M9 16h7')
-const IconTaxonomy = () =>
+const IconTopic = () =>
   svg('M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z')
 const IconMedia = () =>
   svg('M4 5h16v14H4z|m4 10 3-3 3 3 2-2 4 4|M9 9h.01')
@@ -320,7 +320,7 @@ const navigationGroups = [
     label: '内容',
     items: [
       { to: '/admin/articles', label: '文章管理', icon: IconArticle },
-      { to: '/admin/taxonomy', label: '分类标签', icon: IconTaxonomy },
+      { to: '/admin/taxonomy', label: '专题与标签', icon: IconTopic },
       { to: '/admin/media', label: '媒体库', icon: IconMedia },
       { to: '/admin/notices', label: '公告管理', icon: IconNotice },
     ],

@@ -42,15 +42,15 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 		return []ArticleSearchItem{}, pagination.CursorPage{Cursor: query.Cursor, Limit: limit}, nil
 	}
 
-	dbQuery := s.db.WithContext(ctx).Model(&model.Article{}).Preload("Category").Preload("Tags").
+	dbQuery := s.db.WithContext(ctx).Model(&model.Article{}).Preload("Topic").Preload("Tags").
 		Where("articles.status = ?", "published")
 	like := "%" + keyword + "%"
 	dbQuery = dbQuery.Where(
 		`articles.title LIKE ? OR articles.summary LIKE ? OR articles.content_md LIKE ?
 		OR EXISTS (
-			SELECT 1 FROM categories
-			WHERE categories.id = articles.category_id
-			AND (categories.name LIKE ? OR categories.slug LIKE ?)
+			SELECT 1 FROM topics
+			WHERE topics.id = articles.topic_id
+			AND (topics.name LIKE ? OR topics.label LIKE ? OR topics.slug LIKE ?)
 		)
 		OR EXISTS (
 			SELECT 1 FROM article_tags
@@ -58,6 +58,7 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 			WHERE article_tags.article_id = articles.id
 			AND (tags.name LIKE ? OR tags.slug LIKE ?)
 		)`,
+		like,
 		like,
 		like,
 		like,
@@ -141,8 +142,8 @@ func matchedArticleFields(article model.Article, keyword string) []string {
 	if containsFold(article.ContentMD, lowerKeyword) {
 		fields = append(fields, "content")
 	}
-	if containsFold(article.Category.Name, lowerKeyword) || containsFold(article.Category.Slug, lowerKeyword) {
-		fields = append(fields, "category")
+	if containsFold(article.Topic.Name, lowerKeyword) || containsFold(article.Topic.Label, lowerKeyword) || containsFold(article.Topic.Slug, lowerKeyword) {
+		fields = append(fields, "topic")
 	}
 	for _, tag := range article.Tags {
 		if containsFold(tag.Name, lowerKeyword) || containsFold(tag.Slug, lowerKeyword) {

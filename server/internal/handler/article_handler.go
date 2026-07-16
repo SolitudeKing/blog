@@ -105,11 +105,11 @@ func (h *ArticleHandler) Delete(c *gin.Context) {
 func articleListQuery(c *gin.Context) service.ArticleListQuery {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	return service.ArticleListQuery{
-		Cursor:   c.Query("cursor"),
-		Limit:    pagination.NormalizeLimit(limit),
-		Category: c.Query("category"),
-		Tag:      c.Query("tag"),
-		Keyword:  c.Query("keyword"),
-		Status:   c.Query("status"),
+		Cursor:  c.Query("cursor"),
+		Limit:   pagination.NormalizeLimit(limit),
+		Topic:   c.Query("topic"),
+		Tag:     c.Query("tag"),
+		Keyword: c.Query("keyword"),
+		Status:  c.Query("status"),
 	}
 }

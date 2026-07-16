@@ -23,7 +23,7 @@ export default defineConfig({
       '/uploads': 'http://localhost:8080',
       '/setting': 'http://localhost:8080',
       '^/article(?:/|\\?|$)': 'http://localhost:8080',
-      '/category': 'http://localhost:8080',
+      '/topic': 'http://localhost:8080',
       '/tag': 'http://localhost:8080',
       '/notice': 'http://localhost:8080',
     },

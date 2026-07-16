@@ -34,7 +34,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	authService := service.NewAuthService(cfg, resources.DB)
 	settingService := service.NewSettingService(resources.DB, resources.Redis)
 	articleService := service.NewArticleService(resources.DB, resources.Redis)
-	categoryService := service.NewCategoryService(resources.DB)
+	topicService := service.NewTopicService(resources.DB, resources.Redis)
 	tagService := service.NewTagService(resources.DB)
 	noticeService := service.NewNoticeService(resources.DB)
 	dashboardService := service.NewDashboardService(resources.DB)
@@ -49,7 +49,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 		User:         handler.NewUserHandler(),
 		Setting:      handler.NewSettingHandler(settingService),
 		Article:      handler.NewArticleHandler(articleService),
-		Category:     handler.NewCategoryHandler(categoryService),
+		Topic:        handler.NewTopicHandler(topicService),
 		Tag:          handler.NewTagHandler(tagService),
 		Notice:       handler.NewNoticeHandler(noticeService),
 		Dashboard:    handler.NewDashboardHandler(dashboardService),

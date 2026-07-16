@@ -8,16 +8,16 @@ import (
 	"solitude-blog/server/internal/service"
 )
 
-type CategoryHandler struct {
-	category *service.CategoryService
+type TopicHandler struct {
+	topic *service.TopicService
 }
 
-func NewCategoryHandler(category *service.CategoryService) *CategoryHandler {
-	return &CategoryHandler{category: category}
+func NewTopicHandler(topic *service.TopicService) *TopicHandler {
+	return &TopicHandler{topic: topic}
 }
 
-func (h *CategoryHandler) List(c *gin.Context) {
-	items, err := h.category.List()
+func (h *TopicHandler) List(c *gin.Context) {
+	items, err := h.topic.List()
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -25,13 +25,13 @@ func (h *CategoryHandler) List(c *gin.Context) {
 	response.OK(c, items)
 }
 
-func (h *CategoryHandler) Create(c *gin.Context) {
-	var req service.CategorySaveRequest
+func (h *TopicHandler) Create(c *gin.Context) {
+	var req service.TopicSaveRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
 		return
 	}
-	item, err := h.category.Create(req)
+	item, err := h.topic.Create(req)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -39,13 +39,13 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	response.Created(c, item)
 }
 
-func (h *CategoryHandler) Update(c *gin.Context) {
-	var req service.CategorySaveRequest
+func (h *TopicHandler) Update(c *gin.Context) {
+	var req service.TopicSaveRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
 		return
 	}
-	item, err := h.category.Update(c.Param("id"), req)
+	item, err := h.topic.Update(c.Param("id"), req)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -53,8 +53,8 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	response.OK(c, item)
 }
 
-func (h *CategoryHandler) Delete(c *gin.Context) {
-	if err := h.category.Delete(c.Param("id")); err != nil {
+func (h *TopicHandler) Delete(c *gin.Context) {
+	if err := h.topic.Delete(c.Param("id")); err != nil {
 		response.Error(c, err)
 		return
 	}

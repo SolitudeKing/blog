@@ -13,8 +13,8 @@ type Article struct {
 	Summary     string         `gorm:"size:500" json:"summary"`
 	ContentMD   string         `gorm:"type:longtext" json:"content_md"`
 	Status      string         `gorm:"size:32;not null;index" json:"status"`
-	CategoryID  uint64         `gorm:"index" json:"category_id"`
-	Category    Category       `json:"category_detail"`
+	TopicID     uint64         `gorm:"index" json:"topic_id"`
+	Topic       Topic          `json:"topic_detail"`
 	AuthorID    uint64         `gorm:"index" json:"author_id"`
 	Author      User           `json:"author_detail"`
 	Tags        []Tag          `gorm:"many2many:article_tags;" json:"tag_details"`

@@ -683,6 +683,7 @@
 .media-layout > *,
 .notice-grid > *,
 .settings-form > *,
+.settings-form__main > *,
 .taxonomy-grid > * {
   min-width: 0;
 }
@@ -1184,13 +1185,43 @@
   gap: var(--space-5);
 }
 
-.settings-panel:nth-child(2) {
+.settings-form__main {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--space-5);
+}
+
+.settings-panel--appearance {
   position: sticky;
   top: calc(var(--layout-admin-header, 64px) + var(--space-5));
 }
 
 .settings-panel__description {
   margin: calc(var(--space-2) * -1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.settings-theme-elements {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+  margin: 0;
+  border: 0;
+  border-top: var(--border-thin) solid var(--border);
+  padding: var(--space-5) 0 0;
+}
+
+.settings-theme-elements > legend {
+  width: 100%;
+  margin-bottom: calc(var(--space-2) * -1);
+  padding: 0;
+}
+
+.settings-theme-elements__description {
+  margin: 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
@@ -1344,6 +1375,36 @@
 .settings-theme-preview p:not(.settings-theme-preview__eyebrow) {
   margin-top: var(--space-2);
   color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.settings-theme-preview__elements {
+  display: grid;
+  margin: var(--space-4) 0 0;
+  border-top: var(--border-thin) solid var(--border);
+  border-bottom: var(--border-thin) solid var(--border);
+}
+
+.settings-theme-preview__elements > div {
+  min-width: 0;
+  padding: var(--space-3) 0;
+}
+
+.settings-theme-preview__elements > div + div {
+  border-top: var(--border-thin) solid var(--border);
+}
+
+.settings-theme-preview__elements dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+}
+
+.settings-theme-preview__elements dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
@@ -2306,7 +2367,7 @@
   .editor-panel,
   .media-panel,
   .notice-panel,
-  .settings-panel:nth-child(2) {
+  .settings-panel--appearance {
     position: static;
   }
 

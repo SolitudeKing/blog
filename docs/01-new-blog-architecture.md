@@ -10,7 +10,7 @@
 - 后台管理高效，围绕写作、发布、资源管理、站点配置展开。
 - 后端具备清晰分层、统一鉴权、缓存、异步任务和可观测性。
 - 数据模型从字符串拼接升级为关系化建模。
-- 支持从旧项目迁移文章、图片、分类、标签和站点配置。
+- 支持从旧项目迁移文章、图片、旧分类、标签和站点配置，其中旧分类统一转换为专题。
 
 非目标：
 
@@ -83,9 +83,9 @@ Celery 是 Python 生态任务队列。为了与 Go 服务稳定协作，建议�
 同一个 Vite 应用内分为两个路由组：
 
 - `public`
-  - 首页、文章详情、归档、分类、标签、搜索、关于。
+  - 首页、文章详情、归档、专题、标签、搜索、关于。
 - `admin`
-  - 登录、仪表盘、文章管理、编辑器、媒体库、分类标签、公告、站点配置、系统任务。
+  - 登录、仪表盘、文章管理、编辑器、媒体库、专题与标签、公告、站点配置、系统任务。
 
 公开站点和管理台共用：
 
@@ -192,7 +192,7 @@ server/
     model/
       article.go
       user.go
-      category.go
+      topic.go
       tag.go
       asset.go
       site_setting.go
@@ -334,7 +334,7 @@ web/
 第一阶段只需要单管理员，但模型预留角色：
 
 - `owner`：全部权限。
-- `editor`：文章、媒体、分类标签。
+- `editor`：文章、媒体、专题与标签。
 - `viewer`：只读后台。
 
 权限点示例：
@@ -353,7 +353,7 @@ Redis 缓存适合存放：
 - 站点配置。
 - 首页文章列表。
 - 文章详情。
-- 分类标签列表。
+- 专题与标签列表。
 - 归档统计。
 - 热门文章。
 - 阅读量增量计数。
@@ -373,7 +373,7 @@ Redis 缓存适合存放：
 blog:v1:site:settings
 blog:v1:article:detail:{slug}
 blog:v1:article:list:{cursor}:{limit}:{filter_hash}
-blog:v1:taxonomy:categories
+blog:v1:taxonomy:topics
 blog:v1:taxonomy:tags
 blog:v1:views:article:{article_id}
 blog:v1:jwt:blacklist:{jti}
@@ -445,7 +445,7 @@ redis
 1. 管理员在后台编辑 Markdown。
 2. 前端携带 `X-API-Version: v1` 提交 `POST article/create` 或 `PUT article/update/{id}`。
 3. API 校验 JWT 与权限。
-4. Service 开启事务，写文章、标签关系、版本记录。
-5. 事务成功后失效文章列表、归档、分类标签缓存。
+4. Service 开启事务，写文章的 `topic_id`、标签关系和版本记录。
+5. 事务成功后失效文章列表、归档、专题与标签缓存。
 6. API 投递 Celery 任务：提取摘要、生成目录、重建索引、生成 sitemap/rss。
 7. 前端显示发布成功。

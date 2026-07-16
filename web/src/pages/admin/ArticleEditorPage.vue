@@ -33,9 +33,9 @@
         />
 
         <BaseSelect
-          v-model="categorySelection"
-          :options="categoryOptions"
-          label="分类"
+          v-model="topicSelection"
+          :options="topicOptions"
+          label="专题"
         />
 
         <div class="mist-field">
@@ -84,17 +84,17 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { createArticle, getArticleVersions, getManagedArticleInfo, updateArticle } from '@/api/modules/article'
-import { getCategoryList, getTagList } from '@/api/modules/taxonomy'
+import { getTagList, getTopicList } from '@/api/modules/taxonomy'
 import { useToast } from '@/composables/useToast'
 import type { ArticleSavePayload, ArticleVersionItem } from '@/types/article'
-import type { CategoryItem, TagItem } from '@/types/taxonomy'
+import type { TagItem, TopicItem } from '@/types/taxonomy'
 
 const route = useRoute()
 const router = useRouter()
 const saving = ref(false)
 const error = ref('')
 const isEditing = computed(() => route.name === 'admin-article-edit')
-const categories = ref<CategoryItem[]>([])
+const topics = ref<TopicItem[]>([])
 const tags = ref<TagItem[]>([])
 const versions = ref<ArticleVersionItem[]>([])
 const autosaveStatus = ref('自动保存待命')
@@ -112,7 +112,7 @@ const form = reactive<ArticleSavePayload>({
   slug: '',
   summary: '',
   content_md: '',
-  category_id: 0,
+  topic_id: 0,
   tag_ids: [],
   status: 'draft',
 })
@@ -126,18 +126,18 @@ const statusOptions: Array<{ label: string; value: ArticleSavePayload['status'] 
   { label: '归档', value: 'archived' },
 ]
 
-const categorySelection = computed<number>({
-  get: () => form.category_id || 0,
+const topicSelection = computed<number>({
+  get: () => form.topic_id || 0,
   set: (value) => {
-    form.category_id = Number(value) || 0
+    form.topic_id = Number(value) || 0
   },
 })
 
-const categoryOptions = computed(() => [
-  { label: '默认分类', value: 0 },
-  ...categories.value.map((category) => ({
-    label: category.name,
-    value: category.id,
+const topicOptions = computed(() => [
+  { label: '请选择专题', value: 0, disabled: true },
+  ...topics.value.map((topic) => ({
+    label: topic.label && topic.label !== topic.name ? `${topic.name} · ${topic.label}` : topic.name,
+    value: topic.id,
   })),
 ])
 
@@ -155,7 +155,7 @@ onMounted(async () => {
     form.summary = article.summary
     form.content_md = article.content_md
     form.status = article.status
-    form.category_id = article.category_id
+    form.topic_id = article.topic_id
     form.tag_ids = article.tag_ids
     await loadVersions()
     loadLocalDraft()
@@ -195,14 +195,14 @@ watch(
 
 async function loadTaxonomy() {
   try {
-    const [categoryItems, tagItems] = await Promise.all([getCategoryList(), getTagList()])
-    categories.value = categoryItems
+    const [topicItems, tagItems] = await Promise.all([getTopicList(), getTagList()])
+    topics.value = topicItems
     tags.value = tagItems
-    if (!isEditing.value && form.category_id === 0 && categoryItems.length > 0) {
-      form.category_id = categoryItems[0].id
+    if (!isEditing.value && form.topic_id === 0 && topicItems.length > 0) {
+      form.topic_id = topicItems[0].id
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载分类标签失败'
+    error.value = err instanceof Error ? err.message : '加载专题与标签失败'
   }
 }
 
@@ -215,13 +215,18 @@ async function publish() {
 }
 
 async function submit(status: ArticleSavePayload['status']) {
+  if (!Number(form.topic_id)) {
+    error.value = '请选择文章专题'
+    toast.error(error.value)
+    return
+  }
   saving.value = true
   error.value = ''
   try {
     const payload: ArticleSavePayload = {
       ...form,
       status,
-      category_id: Number(form.category_id) || 0,
+      topic_id: Number(form.topic_id),
       tag_ids: form.tag_ids.map(Number),
     }
     if (isEditing.value) {
@@ -254,7 +259,7 @@ function saveLocalDraft() {
   const draft: AutoSavedDraft = {
     payload: {
       ...form,
-      category_id: Number(form.category_id) || 0,
+      topic_id: Number(form.topic_id) || 0,
       tag_ids: form.tag_ids.map(Number),
     },
     saved_at: new Date().toISOString(),

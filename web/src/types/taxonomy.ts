@@ -1,17 +1,22 @@
-export interface CategoryItem {
+export interface TopicItem {
   id: number
   name: string
+  label: string
   slug: string
   description: string
+  cover_url: string
   sort_order: number
+  article_count?: number
   created_at: string
   updated_at: string
 }
 
-export interface CategoryPayload {
+export interface TopicPayload {
   name: string
+  label: string
   slug: string
   description: string
+  cover_url: string
   sort_order: number
 }
 
