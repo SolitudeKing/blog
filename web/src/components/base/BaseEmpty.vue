@@ -24,8 +24,6 @@ import BaseButton from './BaseButton.vue'
 
 withDefaults(
   defineProps<{
-    /** @deprecated Use the icon slot. Kept temporarily to absorb legacy emoji props. */
-    icon?: string
     title?: string
     description?: string
     ctaText?: string

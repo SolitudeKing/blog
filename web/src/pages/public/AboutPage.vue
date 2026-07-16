@@ -114,29 +114,14 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useSettingStore } from '@/stores/setting'
+import { createSocialLinkEntries } from '@/utils/socialLinks'
 
 interface Principle {
   title: string
   description: string
 }
 
-interface SocialEntry {
-  key: string
-  label: string
-  href: string
-  external: boolean
-}
-
 const portraitCaptionId = 'about-portrait-caption'
-const socialLabels: Record<string, string> = {
-  github: 'GitHub',
-  gitee: 'Gitee',
-  bilibili: 'Bilibili',
-  douyin: '抖音',
-  email: '电子邮件',
-  mail: '电子邮件',
-  rss: 'RSS',
-}
 const principles: Principle[] = [
   {
     title: '内容先于装饰',
@@ -159,44 +144,7 @@ const essay = computed(
   () => setting.lobby?.essay?.trim() || '关于写作、技术与长期维护的个人记录。',
 )
 const authorInitial = computed(() => Array.from(author.value)[0]?.toUpperCase() || 'S')
-const socialEntries = computed<SocialEntry[]>(() => {
-  const links = setting.lobby?.social_links ?? {}
-  return Object.entries(links).flatMap(([key, value]) => {
-    const href = normalizeSocialUrl(value)
-    if (!href) {
-      return []
-    }
-    const normalizedKey = key.trim().toLowerCase()
-    return [
-      {
-        key,
-        label: socialLabels[normalizedKey] ?? formatSocialLabel(key),
-        href,
-        external: href.startsWith('http://') || href.startsWith('https://'),
-      },
-    ]
-  })
-})
-
-function normalizeSocialUrl(value: string) {
-  const candidate = value.trim()
-  if (!candidate) {
-    return ''
-  }
-  try {
-    const url = new URL(candidate)
-    return ['http:', 'https:', 'mailto:'].includes(url.protocol) ? url.toString() : ''
-  } catch {
-    return ''
-  }
-}
-
-function formatSocialLabel(key: string) {
-  return key
-    .trim()
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-}
+const socialEntries = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
 
 function formatIndex(index: number) {
   return String(index + 1).padStart(2, '0')

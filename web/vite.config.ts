@@ -23,8 +23,9 @@ export default defineConfig({
       '/uploads': 'http://localhost:8080',
       '/setting': 'http://localhost:8080',
       '^/article(?:/|\\?|$)': 'http://localhost:8080',
-      '/topic': 'http://localhost:8080',
-      '/tag': 'http://localhost:8080',
+      // API 前缀必须以路径边界结束，避免把前端页面 /topics/:slug 误代理到后端。
+      '^/topic(?:/|\\?|$)': 'http://localhost:8080',
+      '^/tag(?:/|\\?|$)': 'http://localhost:8080',
       '/notice': 'http://localhost:8080',
     },
   },

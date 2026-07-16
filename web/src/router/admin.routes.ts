@@ -53,6 +53,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'admin-settings',
         component: () => import('@/pages/admin/SettingPage.vue'),
       },
+      {
+        path: ':pathMatch(.*)*',
+        name: 'admin-not-found',
+        component: () => import('@/pages/public/NotFoundPage.vue'),
+      },
     ],
   },
 ]

@@ -100,7 +100,7 @@ const headingId = computed(() => `${props.domId || `article-${props.article.id}`
 const articlePath = computed(() => `/articles/${props.article.slug}`)
 const articleDate = computed(() => props.article.published_at || props.article.created_at)
 const articleNumber = computed(() => String(props.article.id || props.index).padStart(3, '0'))
-const topicLabel = computed(() => props.article.topic?.label || props.article.topic?.name || 'Notes')
+const topicLabel = computed(() => props.article.topic?.label || props.article.topic?.name || 'NODES')
 const primaryTag = computed(() => props.article.tags[0] || '')
 
 const displayDate = computed(() => {

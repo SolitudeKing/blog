@@ -254,7 +254,7 @@ const authorInitial = computed(() => author.value.trim().slice(0, 1).toUpperCase
 const authorEssay = computed(() =>
   setting.lobby?.essay?.trim() || '持续记录工程实践、设计判断与缓慢生长的想法。',
 )
-const topicLabel = computed(() => article.value?.topic?.label || article.value?.topic?.name || 'Notes')
+const topicLabel = computed(() => article.value?.topic?.label || article.value?.topic?.name || 'NODES')
 
 const prev = computed(() => {
   const slug = article.value?.slug

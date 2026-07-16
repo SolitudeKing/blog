@@ -837,6 +837,12 @@
   gap: var(--space-3);
 }
 
+.admin-list-footer {
+  display: flex;
+  margin-top: var(--space-8);
+  justify-content: center;
+}
+
 .text-link {
   display: inline-flex;
   min-height: 36px;

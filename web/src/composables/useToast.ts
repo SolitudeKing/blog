@@ -82,8 +82,6 @@ export function useToast() {
     info: (msg: string, opts?: ToastOptions) => push('info', msg, opts),
     success: (msg: string, opts?: ToastOptions) => push('success', msg, opts),
     warning: (msg: string, opts?: ToastOptions) => push('warning', msg, opts),
-    /** @deprecated Use warning(). */
-    warn: (msg: string, opts?: ToastOptions) => push('warning', msg, opts),
     error: (msg: string, opts?: ToastOptions) => push('error', msg, opts),
     pause,
     resume,

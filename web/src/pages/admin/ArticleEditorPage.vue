@@ -198,9 +198,6 @@ async function loadTaxonomy() {
     const [topicItems, tagItems] = await Promise.all([getTopicList(), getTagList()])
     topics.value = topicItems
     tags.value = tagItems
-    if (!isEditing.value && form.topic_id === 0 && topicItems.length > 0) {
-      form.topic_id = topicItems[0].id
-    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载专题与标签失败'
   }

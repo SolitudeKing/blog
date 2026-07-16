@@ -59,6 +59,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: T | '']
+  change: [value: T | '']
 }>()
 
 const attrs = useAttrs()
@@ -75,6 +76,9 @@ function onChange(event: Event) {
   const target = event.target as HTMLSelectElement
   const option = target.options[target.selectedIndex] as HTMLOptionElement & { _value?: T | '' }
   const value = Object.prototype.hasOwnProperty.call(option, '_value') ? option._value : option.value
-  emit('update:modelValue', value as T | '')
+  const typedValue = value as T | ''
+  // 先同步 v-model，再通知父组件刷新，避免筛选请求读到上一次选项。
+  emit('update:modelValue', typedValue)
+  emit('change', typedValue)
 }
 </script>

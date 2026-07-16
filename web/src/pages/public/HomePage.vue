@@ -27,9 +27,9 @@
             <a
               v-for="entry in socialEntries"
               :key="entry.key"
-              :href="entry.url"
-              target="_blank"
-              rel="noreferrer"
+              :href="entry.href"
+              :target="entry.external ? '_blank' : undefined"
+              :rel="entry.external ? 'noopener noreferrer' : undefined"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M7 17 17 7M9 7h8v8" />
@@ -57,11 +57,13 @@
         <dl class="home-metrics">
           <div>
             <dt>文章</dt>
-            <dd>{{ articles.length }}</dd>
+            <dd :aria-label="articleTotal === null ? '文章总数暂不可用' : `${articleTotal} 篇文章`">
+              {{ articleTotal ?? '—' }}
+            </dd>
           </div>
           <div>
             <dt>专题</dt>
-            <dd>{{ topics.length }}</dd>
+            <dd>{{ topicCatalog.length }}</dd>
           </div>
           <div>
             <dt>标签</dt>
@@ -163,9 +165,10 @@
           <RouterLink
             v-for="topic in topicLinks"
             :key="topic.key"
-            :to="{ path: '/search', query: { q: topic.name } }"
+            :to="`/topics/${topic.slug}`"
           >
             <strong>{{ topic.name }}</strong>
+            <small>{{ topic.label }}</small>
             <span>{{ topic.description }}</span>
           </RouterLink>
         </nav>
@@ -197,7 +200,9 @@ import { getArticleList } from '@/api/modules/article'
 import { getActiveNotice } from '@/api/modules/notice'
 import { getTagList, getTopicList } from '@/api/modules/taxonomy'
 import { resolveLobbyThemeElements } from '@/config/themeAppearance'
+import { normalizeTopicLabel, topicCatalog } from '@/config/topicCatalog'
 import { useSettingStore } from '@/stores/setting'
+import { createSocialLinkEntries } from '@/utils/socialLinks'
 import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 import type { NoticeItem } from '@/types/notice'
@@ -205,7 +210,9 @@ import type { TagItem, TopicItem } from '@/types/taxonomy'
 
 interface TopicLink {
   key: string
+  label: string
   name: string
+  slug: string
   description: string
 }
 
@@ -240,24 +247,32 @@ const featuredArticle = computed(() => articles.value[0] ?? null)
 const railArticles = computed(() => articles.value.slice(1, 4))
 const remainingArticles = computed(() => articles.value.slice(4))
 
-const socialEntries = computed(() => {
-  const labelMap: Record<string, string> = {
-    github: 'GitHub',
-    gitee: 'Gitee',
-    bilibili: 'Bilibili',
-    douyin: 'Douyin',
+const socialEntries = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
+
+const articleTotal = computed(() => {
+  const counts = topicCatalog.map((catalogTopic) => {
+    const topic = findCatalogTopic(catalogTopic)
+    return topic?.article_count
+  })
+
+  // 只有三个固定专题都返回计数时才展示总数，避免把当前分页长度误当作全站总量。
+  if (counts.some((count) => typeof count !== 'number')) {
+    return null
   }
-  return Object.entries(setting.lobby?.social_links ?? {})
-    .filter(([, url]) => Boolean(url))
-    .map(([key, url]) => ({ key, url, label: labelMap[key] ?? key }))
+  return counts.reduce<number>((total, count) => total + (count ?? 0), 0)
 })
 
 const topicLinks = computed<TopicLink[]>(() => {
-  return topics.value.slice(0, 3).map((topic) => ({
-    key: `topic-${topic.id}`,
-    name: topic.label || topic.name,
-    description: topic.description || `浏览 ${topic.name} 专题内容`,
-  }))
+  return topicCatalog.map((catalogTopic) => {
+    const topic = findCatalogTopic(catalogTopic)
+    return {
+      key: catalogTopic.label,
+      label: catalogTopic.label,
+      name: catalogTopic.name,
+      slug: catalogTopic.slug,
+      description: topic?.description?.trim() || catalogTopic.description,
+    }
+  })
 })
 
 onMounted(async () => {
@@ -310,7 +325,7 @@ async function loadArticles(cursor = '') {
 }
 
 async function loadMore() {
-  if (!page.next_cursor) {
+  if (!page.next_cursor || loadingMore.value) {
     return
   }
   loadingMore.value = true
@@ -319,5 +334,13 @@ async function loadMore() {
   } finally {
     loadingMore.value = false
   }
+}
+
+function findCatalogTopic(catalogTopic: { slug: string; label: string }) {
+  // slug 是公开链接的稳定契约；label 仅用于兼容尚未完成迁移的旧接口数据。
+  return (
+    topics.value.find((item) => item.slug.trim().toLowerCase() === catalogTopic.slug) ??
+    topics.value.find((item) => normalizeTopicLabel(item.label) === catalogTopic.label)
+  )
 }
 </script>

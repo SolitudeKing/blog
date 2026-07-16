@@ -39,9 +39,9 @@
               <a
                 v-for="item in socialItems"
                 :key="item.key"
-                :href="item.url"
-                target="_blank"
-                rel="noopener noreferrer"
+                :href="item.href"
+                :target="item.external ? '_blank' : undefined"
+                :rel="item.external ? 'noopener noreferrer' : undefined"
               >
                 {{ item.label }}
               </a>
@@ -78,6 +78,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BlogNavbar from '@/components/blog/BlogNavbar.vue'
 import { useSettingStore } from '@/stores/setting'
+import { createSocialLinkEntries } from '@/utils/socialLinks'
 
 const BACKTOP_THRESHOLD = 720
 const footerNavigation = [
@@ -86,13 +87,6 @@ const footerNavigation = [
   { label: '搜索', to: '/search' },
   { label: '关于我', to: '/about' },
 ] as const
-const socialLabelMap: Record<string, string> = {
-  gitee: 'Gitee',
-  github: 'GitHub',
-  bilibili: 'Bilibili',
-  douyin: 'Douyin',
-}
-
 const setting = useSettingStore()
 const route = useRoute()
 const mainRef = ref<HTMLElement | null>(null)
@@ -106,16 +100,7 @@ const essay = computed(
     setting.lobby?.essay?.trim() ||
     '关于设计、代码与缓慢生活的长期笔记。保持好奇，也保持边界。',
 )
-const social = computed(() => setting.lobby?.social_links ?? {})
-const socialItems = computed(() =>
-  Object.entries(social.value)
-    .filter(([, url]) => url.trim().length > 0)
-    .map(([key, url]) => ({
-      key,
-      url,
-      label: socialLabelMap[key] ?? key,
-    })),
-)
+const socialItems = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
 const year = new Date().getFullYear()
 
 function focusMain() {

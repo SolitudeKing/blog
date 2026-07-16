@@ -1,5 +1,5 @@
 <template>
-  <section class="admin-page" :aria-busy="loading">
+  <section class="admin-page" :aria-busy="loading || loadingMore">
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Articles</p>
@@ -15,15 +15,15 @@
         type="search"
         aria-label="搜索文章标题"
         placeholder="搜索标题"
-        @keyup.enter="loadArticles()"
+        @keyup.enter="reload"
       />
       <BaseSelect
         v-model="status"
         :options="statusOptions"
         label="文章状态"
-        @change="loadArticles()"
+        @change="reload"
       />
-      <BaseButton variant="secondary" :loading="loading" @click="loadArticles()">刷新</BaseButton>
+      <BaseButton variant="secondary" :loading="loading" @click="reload">刷新</BaseButton>
     </div>
 
     <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
@@ -36,7 +36,7 @@
       class="admin-table"
       role="table"
       aria-label="文章列表"
-      :aria-rowcount="articles.length + 1"
+      :aria-rowcount="page.has_more ? -1 : articles.length + 1"
     >
       <div class="admin-table__row admin-table__row--head" role="row">
         <span class="admin-table__cell" role="columnheader">标题</span>
@@ -90,17 +90,24 @@
         </svg>
       </template>
     </BaseEmpty>
+
+    <div v-if="articles.length && page.has_more" class="admin-list-footer">
+      <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">
+        加载更多
+      </BaseButton>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import { deleteArticle, getManagedArticleList } from '@/api/modules/article'
 import { useToast } from '@/composables/useToast'
+import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 
 const articles = ref<ArticleListItem[]>([])
@@ -108,8 +115,17 @@ const route = useRoute()
 const keyword = ref('')
 const status = ref<string>('')
 const loading = ref(false)
+const loadingMore = ref(false)
 const error = ref('')
 const toast = useToast()
+let articleRequestId = 0
+
+const page = reactive<CursorPage>({
+  cursor: '',
+  next_cursor: '',
+  limit: 20,
+  has_more: false,
+})
 
 const statusOptions = [
   { label: '全部状态', value: '' },
@@ -123,25 +139,62 @@ watch(
   () => route.query.keyword,
   (rawKeyword) => {
     keyword.value = typeof rawKeyword === 'string' ? rawKeyword.trim() : ''
-    void loadArticles()
+    void reload()
   },
   { immediate: true },
 )
 
-async function loadArticles() {
-  loading.value = true
+function resetPage() {
+  page.cursor = ''
+  page.next_cursor = ''
+  page.has_more = false
+}
+
+async function reload() {
+  articleRequestId += 1
+  articles.value = []
+  resetPage()
+  await loadArticles()
+}
+
+async function loadArticles(cursor = '') {
+  const requestId = ++articleRequestId
+  if (cursor) {
+    loadingMore.value = true
+  } else {
+    loading.value = true
+  }
   error.value = ''
   try {
     const result = await getManagedArticleList({
+      cursor: cursor || undefined,
+      limit: page.limit,
       keyword: keyword.value || undefined,
       status: status.value || undefined,
     })
-    articles.value = result.data
+    if (requestId !== articleRequestId) {
+      return
+    }
+    articles.value = cursor ? [...articles.value, ...result.data] : result.data
+    Object.assign(page, result.page)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载文章失败'
+    if (requestId === articleRequestId) {
+      error.value = err instanceof Error ? err.message : '加载文章失败'
+    }
   } finally {
-    loading.value = false
+    if (requestId === articleRequestId) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
+}
+
+async function loadMore() {
+  if (!page.next_cursor || loadingMore.value) {
+    return
+  }
+  // 游标只追加当前筛选条件的数据；切换条件必须先由 reload() 清空游标。
+  await loadArticles(page.next_cursor)
 }
 
 async function removeArticle(id: number) {

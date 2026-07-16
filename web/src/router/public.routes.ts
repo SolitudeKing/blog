@@ -17,6 +17,11 @@ export const publicRoutes: RouteRecordRaw[] = [
         component: () => import('@/pages/public/ArticleDetailPage.vue'),
       },
       {
+        path: 'topics/:slug',
+        name: 'topic-detail',
+        component: () => import('@/pages/public/TopicPage.vue'),
+      },
+      {
         path: 'archives',
         name: 'archives',
         component: () => import('@/pages/public/ArchivesPage.vue'),
@@ -30,6 +35,11 @@ export const publicRoutes: RouteRecordRaw[] = [
         path: 'about',
         name: 'about',
         component: () => import('@/pages/public/AboutPage.vue'),
+      },
+      {
+        path: ':pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('@/pages/public/NotFoundPage.vue'),
       },
     ],
   },
