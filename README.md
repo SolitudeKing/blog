@@ -1,64 +1,91 @@
 # Solitude Blog
 
-新个人博客系统工程骨架。旧项目保留在 `blog-mini-serve` 与 `blog-mini-v3`，新实现按文档拆分为：
+以 Vue 3 与 Go 构建的个人博客系统。`web`、`server` 和 `deploy` 构成运行基线；`demo` 作为博客视觉与交互蓝图长期保留，但不参与生产构建和运行。
 
-- `web`：Vue3 + Vite + TypeScript + Sass 前端。
-- `server`：Go + Gin API。
-- `worker`：Celery 异步任务。
-- `deploy`：Docker Compose 与 Nginx 配置。
-- `docs`：设计与进度文档。
+## 工程结构
 
-## 当前阶段
+| 目录 | 职责 |
+| --- | --- |
+| `web/` | Vue 3、Vite、TypeScript 与 Sass 前端，包含公开站点和管理后台 |
+| `server/` | Go、Gin、GORM API，负责认证、文章、专题、标签、媒体和站点配置 |
+| `deploy/` | Docker Compose、Nginx、健康检查与 MySQL 备份恢复脚本 |
+| `docs/` | 当前架构、产品、数据、设计系统、部署与维护文档 |
+| `demo/` | 博客落地页与后台的静态设计蓝图，用于后续视觉、布局和交互演进参考 |
 
-当前已完成 M4 可迁移上线阶段的代码收口，已完成：
+MySQL 是业务数据的唯一可信来源，Redis 用于公开文章、站点配置等读取缓存。当前系统不依赖异步任务服务。
 
-- Go API 基础路由、统一响应、错误码、API 版本头、游标分页结构。
-- Go API 自动读取 `.env`，并接入 MySQL/GORM 自动迁移、Redis 健康检查、管理员初始化、JWT 登录与鉴权。
-- 文章接口已支持数据库优先的列表、详情、创建、更新、删除；数据库不可用时保留内存示例数据降级。
-- 专题与标签已支持后台 CRUD，并可在文章编辑器中选择；专题包含名称、Label、slug、描述、封面和排序字段。
-- 前台文章列表已支持游标分页、空状态和错误重试；文章详情已支持 Markdown 渲染和目录导航。
-- 前台文章列表、文章详情和站点配置已接入 Redis 缓存与写入失效。
-- 站点配置、公告管理、后台仪表盘和媒体资源管理已完成后台日常维护能力。
-- 旧博客迁移链路已支持 SQLite、Markdown、PicBed Base64 和图片文件导出/导入，并生成迁移报告。
-- Vue 前端 API client、路由、Pinia，以及 Mist UI 海盐/青森二维主题 token 与自研组件。
-- Celery worker 基础配置与任务命名。
-- Docker Compose、Nginx、健康检查、Redis AOF、上传文件卷、日志限制、MySQL 备份与恢复脚本。
-- M5 已完成，公开站点已支持文章搜索、`/rss.xml` 和 `/sitemap.xml`；后台已支持增强统计面板、文章版本记录和编辑器自动保存。
+## 固定专题
 
-本机当前缺少 Docker CLI，Compose 实机展开和容器级健康检查需要在部署机继续执行。
+初始化数据库时会确保以下三个专题存在；`label` 和 `slug` 是代码、接口与链接使用的稳定标识，不应随展示文案调整。
 
-## 本地开发
+| 名称 | Label | Slug | 内容方向 |
+| --- | --- | --- | --- |
+| 雾里拾笺 | `NODES` | `nodes` | 学习笔记、知识整理与问题记录 |
+| 微光造物 | `CODE` | `code` | 编程实践、创意实现与作品复盘 |
+| 风过留痕 | `JOTTING` | `jotting` | 随笔、感受与生活片段 |
 
-依赖安装需要联网：
+早期数据库中的完整默认 `Notes / Notes / notes` 会在启动迁移中安全转换为“雾里拾笺”；中间版本的 `categories/category_id` 兼容逻辑仍保留，用于已有数据库升级。
+
+## 使用 Docker Compose 启动
+
+1. 复制 `.env.example` 为 `.env`。
+2. 填写 MySQL、Redis、JWT 和管理员必填凭据。
+3. 保证 `MYSQL_DSN` 中的用户名、密码与 `MYSQL_USER`、`MYSQL_PASSWORD` 一致。
+4. 启动服务：
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+sh deploy/scripts/healthcheck.sh
+```
+
+默认只有 Nginx 的 `${WEB_PORT:-80}` 面向外部监听。MySQL、Redis 和 API 的调试端口仅绑定 `127.0.0.1`。仓库内 Nginx 配置不终止 TLS，生产环境应由边缘代理或平台负责 HTTPS。
+
+## 本机开发
+
+先通过 Compose 启动依赖：
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.yml up -d mysql redis
+```
+
+如果 API 在宿主机运行，需要在本机环境中将连接地址改为 `127.0.0.1`，不要直接沿用容器网络中的 `mysql`、`redis` 主机名。
 
 ```bash
 cd server
-go mod tidy
-
-cd ../web
-npm install
-
-cd ../worker
-pip install -e .
-```
-
-启动顺序建议：
-
-```bash
-cd deploy
-docker compose up -d mysql redis
-
-cd ../server
 go run ./cmd/api
 
 cd ../web
+npm ci
 npm run dev
 ```
 
-API 请求必须携带：
+除 `/healthz`、`/rss.xml` 和 `/sitemap.xml` 外，API 请求需携带版本头：
 
 ```http
 X-API-Version: v1
 ```
 
-首次连接 MySQL 时，服务会自动迁移基础表，并按 `.env` 中的 `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`ADMIN_NICKNAME` 初始化管理员账号。
+## 验证
+
+```bash
+cd server
+go test ./...
+
+cd ../web
+npm run build
+
+cd ..
+sh -n deploy/scripts/backup-mysql.sh deploy/scripts/healthcheck.sh deploy/scripts/restore-mysql.sh
+docker compose --env-file .env -f deploy/docker-compose.yml config --quiet
+```
+
+当前机器若没有 Docker CLI，只能完成源码与脚本级验证；Compose 展开、容器健康检查和备份恢复必须在部署环境继续验收。
+
+## 维护入口
+
+- [文档索引](./docs/README.md)
+- [维护指南](./docs/12-maintenance-guide.md)
+- [本轮项目审查](./docs/13-project-review.md)
+- [部署与备份手册](./docs/08-deployment-runbook.md)
+
+不要提交 `.env`、数据库备份、上传文件、构建产物或本地迁移产物。清理数据前先备份，并通过稳定 slug、引用关系和实际环境查询确认对象，不能仅凭本机历史 ID 执行删除。

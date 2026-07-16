@@ -8,15 +8,16 @@ fi
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/deploy/docker-compose.yml}"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 read_env_key() {
-  [ -f "$ROOT_DIR/.env" ] || return 0
-  awk -v key="$1" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }' "$ROOT_DIR/.env"
+  [ -f "$ENV_FILE" ] || return 0
+  awk -v key="$1" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); exit }' "$ENV_FILE"
 }
 
 MYSQL_DATABASE="${MYSQL_DATABASE:-$(read_env_key MYSQL_DATABASE)}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(read_env_key MYSQL_ROOT_PASSWORD)}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-blog}"
-MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
+: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in the environment or .env}"
 BACKUP_FILE="$1"
 
 if [ ! -f "$BACKUP_FILE" ]; then
@@ -24,13 +25,19 @@ if [ ! -f "$BACKUP_FILE" ]; then
   exit 1
 fi
 
+if [ "${CONFIRM_RESTORE:-}" != "1" ]; then
+  printf 'restore is destructive; rerun with CONFIRM_RESTORE=1 after stopping API writes\n' >&2
+  exit 2
+fi
+
 case "$BACKUP_FILE" in
   *.gz)
-    gzip -dc "$BACKUP_FILE" | docker compose -f "$COMPOSE_FILE" exec -T mysql \
+    gzip -t "$BACKUP_FILE"
+    gzip -dc "$BACKUP_FILE" | docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T mysql \
       mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"
     ;;
   *)
-    docker compose -f "$COMPOSE_FILE" exec -T mysql \
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T mysql \
       mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < "$BACKUP_FILE"
     ;;
 esac

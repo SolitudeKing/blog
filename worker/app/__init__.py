@@ -1,2 +1,0 @@
-"""Solitude Blog worker package."""
-

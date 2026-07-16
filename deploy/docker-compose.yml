@@ -8,18 +8,19 @@ services:
   mysql:
     image: mysql:8.4
     container_name: solitude-blog-mysql
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
       MYSQL_USER: ${MYSQL_USER:-blog}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-blog}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -u root --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -29,21 +30,20 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: solitude-blog-redis
+    restart: unless-stopped
     command: >
-      sh -c 'if [ -n "$${REDIS_PASSWORD}" ]; then
-      redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}";
-      else redis-server --appendonly yes; fi'
+      sh -c 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi",
+          "redis-cli -a \"$${REDIS_PASSWORD}\" ping",
         ]
       interval: 10s
       timeout: 5s
@@ -56,9 +56,17 @@ services:
       context: ../server
       dockerfile: Dockerfile
     container_name: solitude-blog-api
+    restart: unless-stopped
     env_file:
       - ../.env
     environment:
+      # 容器内 API 固定监听 8080；APP_PORT 只作为宿主机调试端口。
+      APP_PORT: 8080
+      MYSQL_DSN: ${MYSQL_DSN:?MYSQL_DSN must be set}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       STORAGE_LOCAL_ROOT: /app/storage/uploads
     depends_on:
       mysql:
@@ -66,7 +74,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
       - api-storage:/app/storage/uploads
     healthcheck:
@@ -77,33 +85,12 @@ services:
       start_period: 20s
     logging: *service-logging
 
-  worker:
-    build:
-      context: ../worker
-      dockerfile: Dockerfile
-    container_name: solitude-blog-worker
-    env_file:
-      - ../.env
-    environment:
-      STORAGE_LOCAL_ROOT: /app/storage/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-    volumes:
-      - api-storage:/app/storage/uploads
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A app.celery_app.celery_app inspect ping --timeout=5 >/dev/null"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    logging: *service-logging
-
   nginx:
     build:
       context: ..
       dockerfile: web/Dockerfile
     container_name: solitude-blog-nginx
+    restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy

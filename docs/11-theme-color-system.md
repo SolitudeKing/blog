@@ -140,7 +140,7 @@ web/src/styles/tokens/_mist-sea-salt.scss
 web/src/styles/tokens/_mist-forest.scss
 ```
 
-核心冻结值以 Mist UI 同名主题 token 为来源快照；项目文件只做选择器作用域和现有组件别名适配。下列 demo 迁移 token 是项目级语义扩展：海盐沿用 `demo/assets/styles/tokens/mist-sea-salt.css` 的冻结值，青森只在自身主题文件中使用青森私有色板建立等价语义，组件不得复制这些具体色值。
+核心冻结值以 Mist UI 同名主题 token 为来源快照；`web/src/styles/tokens/_mist-sea-salt.scss` 与 `_mist-forest.scss` 是当前项目映射源，主题作用域由 `web/src/styles/themes/_mist.scss` 统一组织。组件不得复制这些具体色值。
 
 | Token | 海盐 Light | 海盐 Dark | 青森 Light | 青森 Dark |
 | --- | --- | --- | --- | --- |
@@ -153,7 +153,7 @@ web/src/styles/tokens/_mist-forest.scss
 | `--line-soft` | `rgb(78 145 181 / 28%)` | `rgb(139 190 216 / 20%)` | `rgb(63 128 101 / 28%)` | `rgb(121 184 154 / 20%)` |
 | `--line-strong` | `#4E91B5` | `#8BBED8` | `#3F8065` | `#79B89A` |
 
-`--divider-fade` 的实际值是 `linear-gradient(90deg, transparent, <中点>, transparent)`。这些别名必须在四种组合中同构存在；未迁移到 Vue 的 demo 选择器也不得把海盐值直接写入组件 SCSS。
+`--divider-fade` 的实际值是 `linear-gradient(90deg, transparent, <中点>, transparent)`。这些别名必须在四种组合中同构存在；组件选择器不得把海盐值直接写入业务 SCSS。
 
 ## 5. 五层雾境氛围
 
@@ -193,7 +193,7 @@ web/src/styles/tokens/_mist-forest.scss
 --fog-drift-slower: 30s;
 ```
 
-为兼容 demo 的编辑式排版与布局命名，基础层另提供以下不含颜色的别名：
+为兼容现有编辑式排版与布局命名，基础层另提供以下不含颜色的别名：
 
 ```scss
 --font-serif: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC",
@@ -336,7 +336,7 @@ web/src/styles/
 每次主题系统变更必须检查：
 
 - [ ] 海盐 light / dark 与青森 light / dark 四种组合 token 全部有值。
-- [ ] demo 迁移 token 与基础布局别名均已定义，复制对应样式时不存在未解析的 `var()`。
+- [ ] 编辑式语义 token 与基础布局别名均已定义，构建后不存在未解析的 `var()`。
 - [ ] 后台切换主题后，当前页面、公开页面与新标签页都使用新主题。
 - [ ] 已有本地 dark 的访客仍会接收后台主题更新。
 - [ ] 前台明暗按钮只改变 mode，不改变 theme。

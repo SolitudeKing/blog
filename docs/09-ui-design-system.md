@@ -23,7 +23,7 @@
 
 旧 `_mist-violet.scss`、`_forest.scss`、`_strawberry.scss` 和 `themes/creamy.scss` 已从源码运行时删除，不得恢复引用。旧 `forest` 与 Mist UI 的 `mist-forest` 不是同一主题文件，只允许通过明确的数据迁移规则映射，禁止复用旧样式或静默别名命中。
 
-现有文件是迁移起点，本文与色调系统文档共同构成目标契约。颜色来源、具体值、透明度和颜色派生以色调系统为准；token 名称、组件 API、字体与尺寸、阴影几何、主题控制器和可访问性以本文为准；实时实现状态以 [设计进度追踪](./05-design-progress.md) 和本文偏差清单为准。源码与目标不一致时逐项迁移，不得在业务页面临时覆盖。
+本文与色调系统文档共同构成当前目标契约。颜色来源、具体值、透明度和颜色派生以色调系统为准；token 名称、组件 API、字体与尺寸、阴影几何、主题控制器和可访问性以本文为准；实时实现状态以 [当前进度](./05-design-progress.md) 和本文偏差清单为准。源码与目标不一致时记录偏差，不得在业务页面临时覆盖。
 
 ## 设计决策
 
@@ -97,7 +97,7 @@
 - 层级：`--z-*`
 - 布局：`--layout-*`
 
-为逐步迁移 `demo/assets/styles`，基础层保留 `--layout-workbench-max`、`--layout-rail-width`、`--layout-toolbar-height`、`--layout-toc-width` 四个兼容别名。它们只表达几何，不得承载主题差异；新布局优先使用 `--layout-admin-max`、`--layout-shell-*`、`--layout-*-header` 等项目主 token。
+为兼容现有编辑式布局，基础层保留 `--layout-workbench-max`、`--layout-rail-width`、`--layout-toolbar-height`、`--layout-toc-width` 四个几何别名。它们不得承载主题差异；新布局优先使用 `--layout-admin-max`、`--layout-shell-*`、`--layout-*-header` 等项目主 token。
 
 ### 第二层：主题语义 token
 
@@ -163,7 +163,7 @@
 ```
 
 - 不以网络字体作为首屏可用的前提；Inter 未加载时必须自然回退。
-- 中文正文优先系统中文字体，代码统一使用 `--font-mono`；`--font-serif` 只用于 demo 风格中的引文、题记等明确的编辑式强调，不替代正文默认字体。
+- 中文正文优先系统中文字体，代码统一使用 `--font-mono`；`--font-serif` 只用于引文、题记等明确的编辑式强调，不替代正文默认字体。
 - 正文不使用超细字重；常规正文 `400`，辅助信息 `500`，控件和小标题 `600/700`。
 
 按 Mist UI 基础层补充到 `_base.scss` 的字号与行高：
@@ -405,26 +405,18 @@ interface BaseFieldProps {
 - Label、hint、error 必须通过唯一 id 与控件关联。
 - Select 箭头改用统一 SVG Icon，不使用字符充当图标系统。
 
-#### BaseToggle
+#### 按需组件边界
 
-保留 `modelValue`、`labelOn`、`labelOff`、`size`，补充 `disabled` 和可选 `name`。
+当前基线不保留无调用的 `BaseToggle` 与 `BaseCard`。明暗模式由 `BaseThemeControls` 提供明确按钮语义；内容区优先使用页面结构与语义表面，避免为统一外观重新形成卡片墙。
 
-- 按钮型实现使用 `aria-pressed`；表单型开关应使用 checkbox 语义。
-- 该组件只服务 light/dark 明暗切换，不提供主题色 Toggle；主题色只能在后台外观设置中选择。
-
-#### BaseCard
-
-保留 `title`、`subtitle`、`elevation`、`hoverable`、`bordered`、`padding`、`accent` 与具名 slots。
-
-- `hoverable` 只表示视觉反馈，不自动代表可点击。
-- 可点击卡片必须包含真实链接或按钮，且键盘可达；禁止仅在 `<article>` 上绑定 click。
-- elevation 只能使用 `flat/xs/sm/md`，Modal 等高层级不复用普通 Card。
+- 未来出现三个以上语义一致的开关场景时，再按按钮型 `aria-pressed` 或表单型 checkbox 语义提炼 Toggle。
+- 未来确有跨页面复用的 Card 时，交互入口必须使用真实链接或按钮；视觉悬浮不能替代可点击语义。
 
 #### BaseEmpty / BaseSkeleton / BaseToast
 
 - BaseEmpty 图标改为 Icon slot，不提供 emoji 默认值。
 - BaseSkeleton 在 reduced-motion 下停止 shimmer；加载容器设置 `aria-busy`，骨架条自身保持 `aria-hidden`。
-- Toast variant 统一为 `info/success/warning/error`；迁移期可兼容现有 `warn`，但新代码使用 `warning`。
+- Toast variant 统一为 `info/success/warning/error`；不再保留含义重复的 `warn` 接口。
 - Toast 容器使用 live region；error 使用 `role="alert"`，普通通知使用 `role="status"`。
 - 自动关闭的 Toast 在 hover 或键盘聚焦时应暂停，关闭按钮必须有可见焦点态。
 
@@ -498,12 +490,11 @@ app.mount('#app')
 
 ## 实现偏差清单
 
-基础表单、按钮、空状态、Toast、Skeleton、Toggle 与全局 reduced-motion 契约已完成本轮补齐。下表仅记录仍需继续收敛的工程债务；新功能不得扩大这些差异。
+基础表单、按钮、空状态、Toast、Skeleton、主题控制与全局 reduced-motion 契约已完成本轮补齐；无调用的 Card、Toggle 以及 `BaseEmpty.icon`、`useToast().warn` 兼容入口已经移除。下表仅记录仍需继续收敛的工程债务；新功能不得扩大这些差异。
 
 | 优先级 | 当前实现 | 目标与验收 |
 | --- | --- | --- |
 | P1 | 前台导航、文章目录与后台侧栏分别实现抽屉的焦点圈定、Esc 关闭、滚动锁定和焦点恢复 | 提炼共享 Drawer/Dialog 原语，并以键盘与读屏自动化用例防止行为漂移 |
-| P2 | `BaseEmpty.icon` 与 `useToast().warn` 仍作为废弃兼容入口保留 | 完成旧调用迁移后移除兼容 API 与对应旧选择器 |
 | P2 | 服务端标签色目前只用于装饰色点，并仅校验十六进制格式 | 若未来用于文字背景或状态表达，必须加入对比度计算与语义回退，不能直接扩展现有用法 |
 | P2 | 字号、行高和少量局部尺寸仍按页面语境直接定义 | 仅将跨三个以上组件重复且语义一致的数值提升为 token，避免把一次性构图参数过度抽象 |
 | P2 | 两个主题 × 两个模式尚无自动化视觉回归与组件级无障碍测试 | 为首页、文章、归档、搜索、关于、后台壳层和仪表盘建立截图及 axe 基线 |

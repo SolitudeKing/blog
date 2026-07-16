@@ -24,8 +24,7 @@ flowchart TD
   Public --> Home[首页]
   Public --> Article[文章详情]
   Public --> Archives[归档]
-  Public --> Topics[专题]
-  Public --> Tags[标签]
+  Public --> Topics[专题详情]
   Public --> Search[搜索]
   Public --> About[关于]
   Admin --> Dashboard[仪表盘]
@@ -35,7 +34,6 @@ flowchart TD
   Admin --> Taxonomy[专题与标签]
   Admin --> Notice[公告管理]
   Admin --> Settings[站点配置]
-  Admin --> Tasks[任务与系统]
 ```
 
 ## 公开站点页面设计
@@ -90,16 +88,16 @@ flowchart TD
 
 ### 专题与标签
 
-专题和标签不只是列表，应提供：
+专题和标签用于组织与筛选内容：
 
 - 专题/标签总览。
 - 每个专题/标签下文章数量。
-- 点击后进入文章列表。
+- 专题进入独立详情与文章列表；标签当前进入搜索筛选结果。
 - 当前筛选条件可清晰撤销。
 
 ### 搜索
 
-第一阶段可做标题、摘要、专题名称/Label、标签搜索；后续由 Celery 重建索引支持全文搜索。
+当前搜索覆盖标题、摘要、专题名称/Label 与标签。独立全文索引不在当前基线，只有数据量和查询质量证明需要时才评估。
 
 搜索页包含：
 
@@ -111,7 +109,7 @@ flowchart TD
 
 ### 关于
 
-关于页从站点配置读取 Markdown 内容，适合放：
+关于页读取站点名称、作者、签名与经过协议过滤的社交链接；发布原则等编辑式内容当前随页面源码维护。适合展示：
 
 - 个人介绍。
 - 技术栈。
@@ -123,7 +121,7 @@ flowchart TD
 
 ### 登录
 
-从旧版“上传密钥文件登录”改为账号密码登录。
+后台使用账号密码登录。
 
 页面包含：
 
@@ -146,7 +144,6 @@ flowchart TD
 - 图片数量。
 - 近 7 日阅读量。
 - 最近编辑文章。
-- 最近任务状态。
 - 服务健康状态。
 
 ### 文章管理
@@ -230,7 +227,7 @@ flowchart TD
 
 ### 公告管理
 
-旧项目已有 `BlogNotice` 表，新版应正式加入后台：
+公告管理用于维护前台可见的短消息：
 
 - 公告标题。
 - 公告内容。
@@ -247,7 +244,7 @@ flowchart TD
 
 - 基础信息：站点名、作者、签名、备案号。
 - 社交链接：GitHub/Gitee、Bilibili、抖音、邮箱。
-- 关于页面：Markdown 内容。
+- 主题与首页文案：按当前主题隔离保存。
 - SEO：默认标题、默认描述、关键词。
 - 外观：站点主题、访客默认明暗模式、按主题保存的首页最近发布区文案、头像、站点图标。
 - 统计：是否启用访问统计。
@@ -295,7 +292,7 @@ flowchart TD
 
 ### 基础组件范围
 
-首批基础组件包括 `BaseButton`、`BaseInput`、`BaseTextarea`、`BaseSelect`、`BaseToggle`、`BaseCard`、`BaseToast`、`BaseSkeleton`、`BaseEmpty`；按业务需要继续补充 Modal、Drawer、Table、Pagination、Upload 和 Tabs。
+当前基础组件包括 `BaseButton`、`BaseInput`、`BaseTextarea`、`BaseSelect`、`BaseToast`、`BaseSkeleton`、`BaseEmpty` 与 `BaseThemeControls`。没有稳定复用场景的通用 Card、Toggle、Modal、Drawer、Table、Pagination、Upload 和 Tabs 不保留空壳，待真实业务需要出现后再提炼。
 
 表单组件使用 `modelValue` / `update:modelValue`；浮层组件处理 ESC、焦点圈定与回收、背景滚动锁定和 ARIA；图标使用 SVG/Icon 组件，不以 emoji 充当正式图标系统。
 

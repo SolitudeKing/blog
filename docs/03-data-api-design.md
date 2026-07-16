@@ -295,7 +295,7 @@ GET article/detail/my-post
 
 兼容策略：
 
-- 客户端必须携带 `X-API-Version`。
+- 除 `/healthz`、`/rss.xml`、`/sitemap.xml` 和 `/uploads/*` 外，客户端必须携带 `X-API-Version`。
 - 服务端不支持该版本时返回 HTTP `400`，业务码 `20004`。
 - 版本升级时保持旧版本 header 可用一段兼容期，避免前端和后端必须同时发布。
 
@@ -376,7 +376,7 @@ HTTP 状态码表达协议层语义，业务码表达业务层语义。错误响
 | 422 | 参数格式正确但业务校验失败 |
 | 429 | 触发限流 |
 | 500 | 服务内部错误 |
-| 502 | 上游依赖异常，例如任务网关不可用 |
+| 502 | 上游依赖异常，例如反向代理后的依赖服务不可用 |
 | 503 | 服务不可用，例如数据库或 Redis 不可用 |
 
 ### 业务错误码
@@ -418,10 +418,19 @@ HTTP 状态码表达协议层语义，业务码表达业务层语义。错误响
 | 50000 | internal server error |
 | 50001 | database unavailable |
 | 50002 | cache unavailable |
-| 50003 | task service unavailable |
 | 50004 | storage unavailable |
 
 ## 公开 API
+
+### 健康、订阅与站点地图
+
+```text
+GET healthz
+GET rss.xml
+GET sitemap.xml
+```
+
+`healthz` 返回 API、MySQL 与 Redis 状态，并在 MySQL 或 Redis 异常时使用非 2xx 状态；RSS 与 sitemap 只包含已发布且满足公开约束的文章。
 
 ### 站点配置
 
@@ -470,10 +479,10 @@ GET article/detail/{slug}
 ### 归档
 
 ```text
-GET archive/list?cursor=&limit=20&year=2026
+GET article/list?cursor=&limit=50
 ```
 
-按年份、月份聚合已发布文章。
+当前没有独立的 `archive/list` 接口。归档页复用公开文章游标列表，并在前端按 `published_at` 的年份、月份分组；需要更多数据时继续使用 `next_cursor` 加载。
 
 ### 专题与标签
 
@@ -514,11 +523,9 @@ GET  user/info
 
 ```text
 GET dashboard/summary
-GET dashboard/recent-article-list?cursor=&limit=10
-GET dashboard/task-list?cursor=&limit=10
 ```
 
-摘要统计至少包含文章状态、阅读量、专题数量、标签数量，以及按专题聚合的文章分布。
+摘要响应包含文章状态、阅读量、专题与标签数量、最近文章、热门文章、公告状态，以及按专题聚合的文章分布。当前没有独立的最近文章列表或异步任务列表接口。
 
 ### 文章管理
 
@@ -528,14 +535,10 @@ POST   article/create
 GET    article/info/{id}
 PUT    article/update/{id}
 DELETE article/delete/{id}
-POST   article/publish/{id}
-POST   article/unpublish/{id}
-POST   article/version-create/{id}
-GET    article/version-list/{id}?cursor=&limit=20
-POST   article/version-restore/{id}
+GET    article/version-list/{id}
 ```
 
-文章列表过滤参数 `topic`、`tag` 均使用 slug；创建与更新请求使用 `topic_id` 关联专题，不再接受 `category_id`。公开与后台文章响应统一返回 `topic_id`，以及字段为 `topic` 的轻量引用 `{id,name,label,slug}`。
+文章列表过滤参数 `topic`、`tag` 均使用 slug；创建与更新请求使用 `topic_id` 关联专题，不再接受 `category_id`。发布、撤回与归档通过 `article/update/{id}` 修改 `status`，创建和更新会在同一事务中自动记录版本；当前只提供最近 20 条版本的只读列表，不提供独立发布、手动创建版本或恢复版本接口。公开与后台文章响应统一返回 `topic_id`，以及字段为 `topic` 的轻量引用 `{id,name,label,slug}`。
 
 ### 专题与标签
 
@@ -564,7 +567,7 @@ DELETE tag/delete/{id}
 }
 ```
 
-`name`、`label`、`slug` 必填；`label` 最多 32 个 Unicode 字符，`slug` 全局唯一，`cover_url` 可为空，`sort_order` 默认为 `0`。`article_count` 是列表响应的聚合字段，不写入 `topics`。删除专题前必须检查文章引用，存在引用时返回 `30004 referenced resource exists`。
+`name`、`label`、`slug` 必填；`label` 最多 32 个 Unicode 字符，`slug` 全局唯一，`cover_url` 可为空，`sort_order` 默认为 `0`。`article_count` 是列表响应的聚合字段，不写入 `topics`。固定三个专题允许维护展示名称、说明、封面与排序，但修改其稳定 `label/slug` 或删除专题会返回 `30001 resource conflict`；其他专题删除前必须检查文章引用，存在引用时返回 `30004 referenced resource used`。
 
 ### 媒体库
 
@@ -621,15 +624,6 @@ PUT setting/update
 - 更新成功后必须失效 `blog:v1:site:settings`，响应返回归一化后的完整站点配置。
 - 修改全局主题不得删除或覆盖任何浏览器中的 `blog:mode`；访客本地偏好仍具有更高优先级。
 
-### 任务
-
-```text
-GET  task/list?cursor=&limit=20
-POST task/rebuild-search-index
-POST task/generate-sitemap
-POST task/backup
-```
-
 ## JWT 设计
 
 Access Token claims：
@@ -645,52 +639,30 @@ Access Token claims：
 }
 ```
 
-建议：
+当前实现：
 
-- Access Token 有效期 15 到 30 分钟。
-- Refresh Token 有效期 7 到 30 天。
-- Refresh Token 存服务端记录，支持主动失效。
-- 登出时将 access token 的 `jti` 加入 Redis 黑名单直到过期。
+- Access Token 与 Refresh Token 的有效期分别由环境变量配置。
+- 刷新接口校验 Refresh Token 后签发新令牌。
+- 当前没有完整的服务端 Refresh Token 持久化、轮换和撤销记录；登出不能被视为终止全部刷新会话。
+- 服务端撤销、密码变更失效和多设备会话审计列为 P1，见 [项目审查](./13-project-review.md)。
 
 ## 缓存与失效
 
 | 缓存键 | 内容 | TTL | 失效时机 |
 | --- | --- | --- | --- |
 | `blog:v1:site:settings` | 公开站点配置，含完整 `theme_elements` | 10 分钟 | 修改站点配置或主题元素 |
-| `blog:v1:article:detail:{slug}` | 文章详情 | 10 分钟 | 修改/发布/下线文章 |
+| `blog:v1:article:detail:{slug}` | 文章详情 | 5 分钟 | 修改/发布/下线文章 |
 | `blog:v1:article:list:*` | 文章列表 | 5 分钟 | 修改文章、专题、标签 |
-| `blog:v1:taxonomy:topics` | 专题列表 | 30 分钟 | 修改专题 |
-| `blog:v1:taxonomy:tags` | 标签列表 | 30 分钟 | 修改标签 |
-| `blog:v1:archives` | 归档 | 30 分钟 | 发布/下线文章 |
-| `blog:v1:notice:active` | 当前公告 | 5 分钟 | 修改公告 |
-| `blog:v1:views:article:{id}` | 阅读量增量 | 定时落库 | Celery 聚合后清理 |
 
 读取不含 `theme_elements` 的旧站点设置缓存时，服务端必须按海盐、青森默认值补齐完整映射；包含部分合法字段的旧缓存保留已有值并补齐缺项。任一站点设置更新都会删除该缓存，后续写回统一使用完整结构。
 
-## 旧数据迁移方案
+## 当前数据库升级兼容
 
-迁移来源：
+当前启动迁移仍需要处理已经运行过早期版本的数据库：
 
-- SQLite：`blog-mini-serve/instance/BlogMini.sqlite`
-- Markdown：`blog-mini-serve/articles/*.md`
-- 图片：`blog-mini-serve/pics/*`
+1. 若存在中间版本 `categories` 表和 `articles.category_id`，按分类 slug 幂等写入 `topics`，并回填 `articles.topic_id`。
+2. 若存在完整默认专题 `Notes / Notes / notes`，转换为“雾里拾笺 / NODES / nodes”；匹配不完整时不擅自修改用户同名数据。
+3. 补齐固定的三个专题，并恢复被软删除的固定专题。
+4. 对仍没有专题的文章回填“雾里拾笺”，再建立文章到专题的外键结构。
 
-迁移步骤：
-
-1. 编写迁移脚本读取 SQLite 表。
-2. 创建默认管理员用户。
-3. 迁移旧 `ArticleTypes`（以及已存在的中间态 `categories` 数据）到 `topics`，生成非空 `name`、`label` 和唯一 `slug`；无封面的记录将 `cover_url` 留空。
-4. 迁移 `ArticleLabels` 到 `tags`。
-5. 迁移 `Articles` 到 `articles`，将旧 `category_id` / `article_type` 映射为 `topic_id`。
-   - 将旧状态 `0/1/2` 映射为 `draft/published/private`。
-   - 将标题生成稳定 slug。
-   - 优先使用数据库内容，若为空则读取 Markdown 文件。
-6. 解析旧 `article_label` 字符串，写入 `article_tags`。
-7. 迁移 `PicBed` 到 `assets`。
-   - 文件存在则读取文件。
-   - 文件不存在但 DB 有 Base64 时解码生成文件。
-8. 迁移 `BlogConfig` 到 `site_settings`；旧库迁移新增 `theme_elements_json` 后，对空值、无效 JSON 或局部对象按主题补齐内置默认值，并保留已经存在且合法的字段。
-9. 迁移 `BlogNotice` 到 `notices`。
-10. 触发 Celery 任务重建摘要、目录、搜索索引、sitemap 和 RSS。
-
-迁移报告分别记录 `topics_imported`、`tags_imported`、`articles_imported`，并输出无法解析的旧分类引用；存在悬空 `topic_id` 时迁移不得静默成功。
+上述逻辑是当前系统版本升级能力，不属于已删除的一次性旧博客迁移工具。它必须保持幂等，并在所有持久化环境建立显式迁移基线前继续保留。

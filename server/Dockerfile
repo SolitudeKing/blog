@@ -1,7 +1,7 @@
 FROM golang:1.26-alpine AS build
 
 WORKDIR /app
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN go build -o /out/api ./cmd/api
@@ -11,4 +11,3 @@ WORKDIR /app
 COPY --from=build /out/api /app/api
 EXPOSE 8080
 CMD ["/app/api"]
-

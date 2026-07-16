@@ -1,0 +1,27 @@
+# Docker Web 构建只需要 web 源码与 deploy/nginx 配置；其余本地内容不得进入构建上下文。
+.env
+.env.*
+.git
+.gitignore
+.agents
+.codex
+.idea
+.vscode
+
+blog-mini-serve
+blog-mini-v3
+migration-output
+backups
+storage
+demo
+worker
+scripts
+docs
+server
+
+**/node_modules
+**/dist
+**/bin
+**/__pycache__
+**/*.pyc
+coverage
