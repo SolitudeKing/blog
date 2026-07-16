@@ -1,19 +1,23 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
+	"solitude-blog/server/internal/cache"
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
 )
 
 type TagService struct {
 	db    *gorm.DB
+	redis *redis.Client
 	mu    sync.RWMutex
 	items []TagItem
 }
@@ -35,14 +39,11 @@ type TagSaveRequest struct {
 	Color       string `json:"color"`
 }
 
-func NewTagService(db *gorm.DB) *TagService {
-	now := time.Now().UTC()
+func NewTagService(db *gorm.DB, redisClient *redis.Client) *TagService {
 	return &TagService{
-		db: db,
-		items: []TagItem{
-			{ID: 1, Name: "Go", Slug: "go", Color: "#5f8d62", CreatedAt: now, UpdatedAt: now},
-			{ID: 2, Name: "Vue", Slug: "vue", Color: "#557ea8", CreatedAt: now, UpdatedAt: now},
-		},
+		db:    db,
+		redis: redisClient,
+		items: []TagItem{},
 	}
 }
 
@@ -72,7 +73,7 @@ func (s *TagService) Create(req TagSaveRequest) (TagItem, error) {
 	}
 	if s.db != nil {
 		var count int64
-		if err := s.db.Model(&model.Tag{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
+		if err := s.db.Unscoped().Model(&model.Tag{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		if count > 0 {
@@ -129,7 +130,7 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		var count int64
-		if err := s.db.Model(&model.Tag{}).
+		if err := s.db.Unscoped().Model(&model.Tag{}).
 			Where("slug = ? AND id <> ?", req.Slug, parsed).
 			Count(&count).Error; err != nil {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -144,6 +145,7 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 		if err := s.db.Save(&row).Error; err != nil {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		s.invalidateArticleCaches()
 		return tagFromModel(row), nil
 	}
 
@@ -166,6 +168,24 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 		}
 	}
 	return TagItem{}, apperrors.New(apperrors.CodeResourceNotFound)
+}
+
+// 标签 slug 会出现在文章详情和列表缓存中，维护标签后必须同步失效。
+func (s *TagService) invalidateArticleCaches() {
+	if s.redis == nil {
+		return
+	}
+	ctx := context.Background()
+	keys := make([]string, 0)
+	for _, pattern := range []string{cache.ArticleListPattern(), cache.ArticleDetailPattern()} {
+		iter := s.redis.Scan(ctx, 0, pattern, 100).Iterator()
+		for iter.Next(ctx) {
+			keys = append(keys, iter.Val())
+		}
+	}
+	if len(keys) > 0 {
+		_ = s.redis.Del(ctx, keys...).Err()
+	}
 }
 
 func (s *TagService) Delete(id string) error {

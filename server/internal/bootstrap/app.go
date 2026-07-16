@@ -16,6 +16,9 @@ import (
 )
 
 func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resources, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, database.Resources{}, err
+	}
 	setupLogger(cfg)
 	resources, err := database.Open(ctx, cfg)
 	if err != nil {
@@ -35,7 +38,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	settingService := service.NewSettingService(resources.DB, resources.Redis)
 	articleService := service.NewArticleService(resources.DB, resources.Redis)
 	topicService := service.NewTopicService(resources.DB, resources.Redis)
-	tagService := service.NewTagService(resources.DB)
+	tagService := service.NewTagService(resources.DB, resources.Redis)
 	noticeService := service.NewNoticeService(resources.DB)
 	dashboardService := service.NewDashboardService(resources.DB)
 	assetService := service.NewAssetService(resources.DB, cfg.StorageLocalRoot)

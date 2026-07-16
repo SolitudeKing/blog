@@ -84,43 +84,11 @@ func NewDashboardService(db *gorm.DB) *DashboardService {
 
 func (s *DashboardService) Summary() (DashboardSummary, error) {
 	if s.db == nil {
-		now := time.Now().UTC()
 		return DashboardSummary{
-			ArticleCounts: DashboardArticleCounts{Total: 1, Published: 1},
-			TaxonomyCounts: DashboardTaxonomyCounts{
-				Topics: 1,
-				Tags:   2,
-			},
-			NoticeCounts: DashboardNoticeCounts{Total: 1, Enabled: 1},
-			AssetCount:   0,
-			RecentArticles: []DashboardArticleItem{
-				{
-					ID:        1,
-					Title:     "Welcome to Solitude Blog",
-					Slug:      "welcome",
-					Status:    "published",
-					UpdatedAt: now,
-				},
-			},
-			TopArticles: []DashboardTopArticle{
-				{
-					ID:        1,
-					Title:     "Welcome to Solitude Blog",
-					Slug:      "welcome",
-					ViewCount: 8,
-					UpdatedAt: now,
-				},
-			},
-			TopicStats: []DashboardTopicStat{
-				{ID: 1, Name: "Notes", Label: "Notes", Slug: "notes", ArticleCount: 1},
-			},
-			ActiveNotice: &DashboardNoticeItem{
-				ID:        1,
-				Title:     "Welcome",
-				Content:   "Welcome to Solitude Blog.",
-				UpdatedAt: now,
-			},
-			GeneratedAt: now,
+			RecentArticles: []DashboardArticleItem{},
+			TopArticles:    []DashboardTopArticle{},
+			TopicStats:     []DashboardTopicStat{},
+			GeneratedAt:    time.Now().UTC(),
 		}, nil
 	}
 

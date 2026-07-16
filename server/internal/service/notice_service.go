@@ -49,20 +49,9 @@ type NoticeSaveRequest struct {
 }
 
 func NewNoticeService(db *gorm.DB) *NoticeService {
-	now := time.Now().UTC()
 	return &NoticeService{
-		db: db,
-		items: []NoticeItem{
-			{
-				ID:        1,
-				Title:     "Welcome",
-				Content:   "Welcome to Solitude Blog.",
-				Enabled:   true,
-				SortOrder: 1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-		},
+		db:    db,
+		items: []NoticeItem{},
 	}
 }
 

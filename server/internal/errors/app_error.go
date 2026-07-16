@@ -36,7 +36,7 @@ func HTTPStatus(code int) int {
 		return http.StatusRequestEntityTooLarge
 	case CodeUnsupportedFileType:
 		return http.StatusUnsupportedMediaType
-	case CodeDatabaseUnavailable, CodeCacheUnavailable, CodeTaskServiceUnavailable, CodeStorageUnavailable:
+	case CodeDatabaseUnavailable, CodeCacheUnavailable, CodeStorageUnavailable:
 		return http.StatusServiceUnavailable
 	case CodeInternalServerError:
 		return http.StatusInternalServerError

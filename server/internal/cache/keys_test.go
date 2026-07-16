@@ -7,8 +7,8 @@ import (
 
 func TestArticleKeysUseTopicAwareSchemaVersion(t *testing.T) {
 	keys := []string{
-		ArticleDetailKey("welcome"),
-		ArticleListKey("", 20, ArticleListFilterHash("notes", "go", "", "published")),
+		ArticleDetailKey("article-slug"),
+		ArticleListKey("", 20, ArticleListFilterHash("nodes", "design", "", "published")),
 		ArticleListPattern(),
 	}
 	for _, key := range keys {

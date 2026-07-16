@@ -29,11 +29,10 @@ const (
 	CodeUnsupportedFileType  = 40002
 	CodeOperationTooFrequent = 40003
 
-	CodeInternalServerError    = 50000
-	CodeDatabaseUnavailable    = 50001
-	CodeCacheUnavailable       = 50002
-	CodeTaskServiceUnavailable = 50003
-	CodeStorageUnavailable     = 50004
+	CodeInternalServerError = 50000
+	CodeDatabaseUnavailable = 50001
+	CodeCacheUnavailable    = 50002
+	CodeStorageUnavailable  = 50004
 )
 
 var messages = map[int]string{
@@ -62,7 +61,6 @@ var messages = map[int]string{
 	CodeInternalServerError:    "internal server error",
 	CodeDatabaseUnavailable:    "database unavailable",
 	CodeCacheUnavailable:       "cache unavailable",
-	CodeTaskServiceUnavailable: "task service unavailable",
 	CodeStorageUnavailable:     "storage unavailable",
 }
 

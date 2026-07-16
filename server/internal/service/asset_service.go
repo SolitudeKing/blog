@@ -101,11 +101,8 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	head := make([]byte, 512)
 	n, _ := source.Read(head)
 	mimeType := http.DetectContentType(head[:n])
-	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
-	if ext == ".svg" {
-		mimeType = "image/svg+xml"
-	}
-	if !assetMimeAllowed(mimeType) {
+	ext, allowed := assetExtensionForMIME(mimeType)
+	if !allowed {
 		return AssetItem{}, apperrors.New(apperrors.CodeUnsupportedFileType)
 	}
 	if seeker, ok := source.(io.Seeker); ok {
@@ -131,6 +128,12 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	if err != nil {
 		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
 	}
+	keepFile := false
+	defer func() {
+		if !keepFile {
+			_ = removeFile(fullPath)
+		}
+	}()
 	hash := sha256.New()
 	written, copyErr := io.Copy(io.MultiWriter(target, hash), source)
 	closeErr := target.Close()
@@ -164,6 +167,7 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 		if err := s.db.Create(&row).Error; err != nil {
 			return AssetItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		keepFile = true
 		return assetFromModel(row), nil
 	}
 
@@ -171,6 +175,7 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	defer s.mu.Unlock()
 	item.ID = uint64(len(s.items) + 1)
 	s.items = append(s.items, item)
+	keepFile = true
 	return item, nil
 }
 
@@ -391,12 +396,21 @@ func assetModelFromItem(item AssetItem) model.Asset {
 }
 
 func assetMimeAllowed(mimeType string) bool {
-	switch mimeType {
-	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml":
-		return true
-	default:
-		return false
+	_, allowed := assetExtensionForMIME(mimeType)
+	return allowed
+}
+
+// assetExtensionForMIME 由实际文件内容决定落盘扩展名，不能信任上传文件名。
+// 这同时避免图片伪装成 .html/.svg 后被同源静态服务按可执行类型返回。
+func assetExtensionForMIME(mimeType string) (string, bool) {
+	extensions := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/gif":  ".gif",
+		"image/webp": ".webp",
 	}
+	ext, allowed := extensions[mimeType]
+	return ext, allowed
 }
 
 func imageDimensions(path string, mimeType string) (uint, uint) {

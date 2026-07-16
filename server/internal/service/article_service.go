@@ -92,30 +92,10 @@ type ArticleCreateRequest struct {
 type ArticleUpdateRequest = ArticleCreateRequest
 
 func NewArticleService(db *gorm.DB, redisClient *redis.Client) *ArticleService {
-	now := time.Now().UTC()
 	return &ArticleService{
 		db:    db,
 		redis: redisClient,
-		items: []ArticleDetail{
-			{
-				ArticleItem: ArticleItem{
-					ID:          1,
-					Title:       "Welcome to Solitude Blog",
-					Slug:        "welcome",
-					Summary:     "The first article from the new blog scaffold.",
-					Status:      "published",
-					TopicID:     1,
-					Topic:       TopicReference{ID: 1, Name: "Notes", Label: "Notes", Slug: "notes"},
-					Tags:        []string{"go", "vue"},
-					ViewCount:   0,
-					PublishedAt: now,
-					CreatedAt:   now,
-					UpdatedAt:   now,
-				},
-				ContentMD: "# Welcome\n\nThis is the new blog API scaffold.",
-				TagIDs:    []uint64{1, 2},
-			},
-		},
+		items: []ArticleDetail{},
 	}
 }
 
@@ -193,9 +173,12 @@ func (s *ArticleService) Info(id string) (ArticleDetail, error) {
 	return ArticleDetail{}, apperrors.New(apperrors.CodeResourceNotFound)
 }
 
-func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
-	if req.Title == "" || req.Slug == "" {
+func (s *ArticleService) Create(req ArticleCreateRequest, actorID uint64) (ArticleItem, error) {
+	if req.Title == "" || req.Slug == "" || req.TopicID == 0 {
 		return ArticleItem{}, apperrors.New(apperrors.CodeMissingRequiredField)
+	}
+	if actorID == 0 {
+		return ArticleItem{}, apperrors.New(apperrors.CodeUnauthorized)
 	}
 	status, err := normalizeArticleStatus(req.Status)
 	if err != nil {
@@ -203,64 +186,75 @@ func (s *ArticleService) Create(req ArticleCreateRequest) (ArticleItem, error) {
 	}
 
 	if s.db != nil {
-		topicID, err := s.resolveTopicID(req.TopicID)
-		if err != nil {
-			return ArticleItem{}, err
-		}
-		var count int64
-		if err := s.db.Model(&model.Article{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
-			return ArticleItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		if count > 0 {
-			return ArticleItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
-		}
+		var created ArticleDetail
+		// 文章、标签关联与初始版本必须同时成功，避免接口报错后留下半成品文章。
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			topicID, err := resolveTopicID(tx, req.TopicID)
+			if err != nil {
+				return err
+			}
+			var count int64
+			if err := tx.Unscoped().Model(&model.Article{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if count > 0 {
+				return apperrors.New(apperrors.CodeDuplicateSlug)
+			}
+			tags, err := loadArticleTags(tx, req.TagIDs)
+			if err != nil {
+				return err
+			}
 
-		article := model.Article{
-			Title:     req.Title,
-			Slug:      req.Slug,
-			Summary:   req.Summary,
-			ContentMD: req.ContentMD,
-			Status:    status,
-			TopicID:   topicID,
-			AuthorID:  1,
-		}
-		if status == "published" {
-			now := time.Now().UTC()
-			article.PublishedAt = &now
-		}
-		if err := s.db.Create(&article).Error; err != nil {
-			return ArticleItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		if len(req.TagIDs) > 0 {
-			var tags []model.Tag
-			if err := s.db.Find(&tags, req.TagIDs).Error; err != nil {
-				return ArticleItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+			article := model.Article{
+				Title:     req.Title,
+				Slug:      req.Slug,
+				Summary:   req.Summary,
+				ContentMD: req.ContentMD,
+				Status:    status,
+				TopicID:   topicID,
+				AuthorID:  actorID,
 			}
-			if err := s.db.Model(&article).Association("Tags").Replace(tags); err != nil {
-				return ArticleItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+			if status == "published" {
+				now := time.Now().UTC()
+				article.PublishedAt = &now
 			}
-		}
-		if err := s.createVersion(article); err != nil {
-			return ArticleItem{}, err
-		}
-		created, err := s.Info(strconv.FormatUint(article.ID, 10))
+			if err := tx.Create(&article).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if err := tx.Model(&article).Association("Tags").Replace(tags); err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if err := s.createVersion(tx, article, actorID); err != nil {
+				return err
+			}
+
+			var loaded model.Article
+			if err := tx.Preload("Topic").Preload("Tags").First(&loaded, article.ID).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			created = detailFromModel(loaded)
+			return nil
+		})
 		if err != nil {
-			return ArticleItem{}, err
+			return ArticleItem{}, normalizeArticleWriteError(err)
 		}
-		s.invalidateArticleCaches(article.Slug)
+		s.invalidateArticleCaches(created.Slug)
 		return created.ArticleItem, nil
 	}
 
 	return s.createInMemory(req, status)
 }
 
-func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDetail, error) {
+func (s *ArticleService) Update(id string, req ArticleUpdateRequest, actorID uint64) (ArticleDetail, error) {
 	parsed, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return ArticleDetail{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
-	if req.Title == "" || req.Slug == "" {
+	if req.Title == "" || req.Slug == "" || req.TopicID == 0 {
 		return ArticleDetail{}, apperrors.New(apperrors.CodeMissingRequiredField)
+	}
+	if actorID == 0 {
+		return ArticleDetail{}, apperrors.New(apperrors.CodeUnauthorized)
 	}
 	status, err := normalizeArticleStatus(req.Status)
 	if err != nil {
@@ -268,89 +262,85 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest) (ArticleDet
 	}
 
 	if s.db != nil {
-		topicID, err := s.resolveTopicID(req.TopicID)
-		if err != nil {
-			return ArticleDetail{}, err
-		}
-		var article model.Article
-		err = s.db.Preload("Tags").First(&article, parsed).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeResourceNotFound)
-		}
-		if err != nil {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		oldSlug := article.Slug
-
-		var slugCount int64
-		if err := s.db.Model(&model.Article{}).
-			Where("slug = ? AND id <> ?", req.Slug, parsed).
-			Count(&slugCount).Error; err != nil {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		if slugCount > 0 {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeDuplicateSlug)
-		}
-
-		article.Title = req.Title
-		article.Slug = req.Slug
-		article.Summary = req.Summary
-		article.ContentMD = req.ContentMD
-		article.Status = status
-		article.TopicID = topicID
-		if status == "published" && article.PublishedAt == nil {
-			now := time.Now().UTC()
-			article.PublishedAt = &now
-		}
-
-		if err := s.db.Save(&article).Error; err != nil {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		var tags []model.Tag
-		if len(req.TagIDs) > 0 {
-			if err := s.db.Find(&tags, req.TagIDs).Error; err != nil {
-				return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		var detail ArticleDetail
+		var oldSlug string
+		// 正文、专题、标签与版本记录属于一次编辑操作，统一在事务中提交。
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			topicID, err := resolveTopicID(tx, req.TopicID)
+			if err != nil {
+				return err
 			}
-		}
-		if err := s.db.Model(&article).Association("Tags").Replace(tags); err != nil {
-			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		if err := s.createVersion(article); err != nil {
-			return ArticleDetail{}, err
-		}
-		detail, err := s.Info(id)
+			var article model.Article
+			err = tx.First(&article, parsed).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.New(apperrors.CodeResourceNotFound)
+			}
+			if err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			oldSlug = article.Slug
+
+			var slugCount int64
+			if err := tx.Unscoped().Model(&model.Article{}).
+				Where("slug = ? AND id <> ?", req.Slug, parsed).
+				Count(&slugCount).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if slugCount > 0 {
+				return apperrors.New(apperrors.CodeDuplicateSlug)
+			}
+			tags, err := loadArticleTags(tx, req.TagIDs)
+			if err != nil {
+				return err
+			}
+
+			article.Title = req.Title
+			article.Slug = req.Slug
+			article.Summary = req.Summary
+			article.ContentMD = req.ContentMD
+			article.Status = status
+			article.TopicID = topicID
+			if status == "published" && article.PublishedAt == nil {
+				now := time.Now().UTC()
+				article.PublishedAt = &now
+			}
+			if err := tx.Save(&article).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if err := tx.Model(&article).Association("Tags").Replace(tags); err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if err := s.createVersion(tx, article, actorID); err != nil {
+				return err
+			}
+
+			var loaded model.Article
+			if err := tx.Preload("Topic").Preload("Tags").First(&loaded, article.ID).Error; err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			detail = detailFromModel(loaded)
+			return nil
+		})
 		if err != nil {
-			return ArticleDetail{}, err
+			return ArticleDetail{}, normalizeArticleWriteError(err)
 		}
-		s.invalidateArticleCaches(oldSlug, article.Slug)
+		s.invalidateArticleCaches(oldSlug, detail.Slug)
 		return detail, nil
 	}
 
 	return s.updateInMemory(parsed, req, status)
 }
 
-func (s *ArticleService) resolveTopicID(topicID uint64) (uint64, error) {
-	if topicID > 0 {
-		var topic model.Topic
-		err := s.db.Select("id").First(&topic, topicID).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, apperrors.New(apperrors.CodeResourceNotFound)
-		}
-		if err != nil {
-			return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		return topic.ID, nil
+func resolveTopicID(db *gorm.DB, topicID uint64) (uint64, error) {
+	if topicID == 0 {
+		return 0, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
 	var topic model.Topic
-	err := s.db.Where("slug = ?", "notes").First(&topic).Error
-	if err == nil {
-		return topic.ID, nil
+	err := db.Select("id").First(&topic, topicID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, apperrors.New(apperrors.CodeResourceNotFound)
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
-	}
-	topic = model.Topic{Name: "Notes", Label: "Notes", Slug: "notes", SortOrder: 1}
-	if err := s.db.Create(&topic).Error; err != nil {
+	if err != nil {
 		return 0, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 	return topic.ID, nil
@@ -363,25 +353,34 @@ func (s *ArticleService) Delete(id string) error {
 	}
 
 	if s.db != nil {
-		var article model.Article
-		err := s.db.First(&article, parsed).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperrors.New(apperrors.CodeResourceNotFound)
-		}
+		var slug string
+		// 标签关联与文章软删除必须保持一致，任一步失败都回滚。
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			var article model.Article
+			err := tx.First(&article, parsed).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.New(apperrors.CodeResourceNotFound)
+			}
+			if err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			slug = article.Slug
+			if err := tx.Model(&article).Association("Tags").Clear(); err != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			result := tx.Delete(&article)
+			if result.Error != nil {
+				return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			}
+			if result.RowsAffected == 0 {
+				return apperrors.New(apperrors.CodeResourceNotFound)
+			}
+			return nil
+		})
 		if err != nil {
-			return apperrors.New(apperrors.CodeDatabaseUnavailable)
+			return normalizeArticleWriteError(err)
 		}
-		if err := s.db.Model(&article).Association("Tags").Clear(); err != nil {
-			return apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		result := s.db.Delete(&article)
-		if result.Error != nil {
-			return apperrors.New(apperrors.CodeDatabaseUnavailable)
-		}
-		if result.RowsAffected == 0 {
-			return apperrors.New(apperrors.CodeResourceNotFound)
-		}
-		s.invalidateArticleCaches(article.Slug)
+		s.invalidateArticleCaches(slug)
 		return nil
 	}
 
@@ -430,8 +429,8 @@ func (s *ArticleService) VersionList(id string) ([]ArticleVersionItem, error) {
 	return items, nil
 }
 
-func (s *ArticleService) createVersion(article model.Article) error {
-	if s.db == nil || article.ID == 0 {
+func (s *ArticleService) createVersion(db *gorm.DB, article model.Article, actorID uint64) error {
+	if db == nil || article.ID == 0 {
 		return nil
 	}
 	version := model.ArticleVersion{
@@ -440,12 +439,50 @@ func (s *ArticleService) createVersion(article model.Article) error {
 		Summary:   article.Summary,
 		ContentMD: article.ContentMD,
 		Status:    article.Status,
-		CreatedBy: article.AuthorID,
+		CreatedBy: actorID,
 	}
-	if err := s.db.Create(&version).Error; err != nil {
+	if err := db.Create(&version).Error; err != nil {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 	return nil
+}
+
+// loadArticleTags 对标签 ID 去重并校验完整性，防止请求中的无效 ID 被静默忽略。
+func loadArticleTags(db *gorm.DB, requestedIDs []uint64) ([]model.Tag, error) {
+	ids := uniqueTagIDs(requestedIDs)
+	if len(ids) == 0 {
+		return []model.Tag{}, nil
+	}
+
+	var tags []model.Tag
+	if err := db.Where("id IN ?", ids).Find(&tags).Error; err != nil {
+		return nil, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+	if len(tags) != len(ids) {
+		return nil, apperrors.New(apperrors.CodeResourceNotFound)
+	}
+	return tags, nil
+}
+
+func uniqueTagIDs(ids []uint64) []uint64 {
+	unique := make([]uint64, 0, len(ids))
+	seen := make(map[uint64]struct{}, len(ids))
+	for _, id := range ids {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	return unique
+}
+
+func normalizeArticleWriteError(err error) error {
+	var appErr apperrors.AppError
+	if errors.As(err, &appErr) {
+		return appErr
+	}
+	return apperrors.New(apperrors.CodeDatabaseUnavailable)
 }
 
 func (s *ArticleService) list(query ArticleListQuery, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {
@@ -619,6 +656,7 @@ func (s *ArticleService) createInMemory(req ArticleCreateRequest, status string)
 			UpdatedAt:   now,
 		},
 		ContentMD: req.ContentMD,
+		TagIDs:    uniqueTagIDs(req.TagIDs),
 	}
 	s.items = append(s.items, item)
 	return item.ArticleItem, nil
@@ -643,6 +681,7 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 			item.Status = status
 			item.TopicID = inMemoryTopicID(req.TopicID)
 			item.Topic = inMemoryTopicReference(req.TopicID)
+			item.TagIDs = uniqueTagIDs(req.TagIDs)
 			item.UpdatedAt = now
 			if status == "published" && item.PublishedAt.IsZero() {
 				item.PublishedAt = now
@@ -778,7 +817,13 @@ func inMemoryTopicID(topicID uint64) uint64 {
 }
 
 func inMemoryTopicReference(topicID uint64) TopicReference {
-	return TopicReference{ID: inMemoryTopicID(topicID), Name: "Notes", Label: "Notes", Slug: "notes"}
+	id := inMemoryTopicID(topicID)
+	initialTopics := model.DefaultTopics()
+	if id > 0 && id <= uint64(len(initialTopics)) {
+		topic := initialTopics[id-1]
+		return TopicReference{ID: id, Name: topic.Name, Label: topic.Label, Slug: topic.Slug}
+	}
+	return TopicReference{ID: id}
 }
 
 func normalizeArticleStatus(status string) (string, error) {

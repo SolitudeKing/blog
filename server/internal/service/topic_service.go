@@ -48,20 +48,24 @@ type TopicSaveRequest struct {
 
 func NewTopicService(db *gorm.DB, redisClient *redis.Client) *TopicService {
 	now := time.Now().UTC()
+	initialTopics := model.DefaultTopics()
+	items := make([]TopicItem, 0, len(initialTopics))
+	for index, topic := range initialTopics {
+		items = append(items, TopicItem{
+			ID:          uint64(index + 1),
+			Name:        topic.Name,
+			Label:       topic.Label,
+			Slug:        topic.Slug,
+			Description: topic.Description,
+			SortOrder:   topic.SortOrder,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		})
+	}
 	return &TopicService{
 		db:    db,
 		redis: redisClient,
-		items: []TopicItem{
-			{
-				ID:        1,
-				Name:      "Notes",
-				Label:     "Notes",
-				Slug:      "notes",
-				SortOrder: 1,
-				CreatedAt: now,
-				UpdatedAt: now,
-			},
-		},
+		items: items,
 	}
 }
 
@@ -159,6 +163,9 @@ func (s *TopicService) Update(id string, req TopicSaveRequest) (TopicItem, error
 		if err != nil {
 			return TopicItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		if err := protectFormalTopicIdentity(row.Slug, req); err != nil {
+			return TopicItem{}, err
+		}
 		var count int64
 		if err := s.db.Unscoped().Model(&model.Topic{}).
 			Where("slug = ? AND id <> ?", req.Slug, parsed).
@@ -190,6 +197,9 @@ func (s *TopicService) Update(id string, req TopicSaveRequest) (TopicItem, error
 	}
 	for index, item := range s.items {
 		if item.ID == parsed {
+			if err := protectFormalTopicIdentity(item.Slug, req); err != nil {
+				return TopicItem{}, err
+			}
 			item.Name = req.Name
 			item.Label = req.Label
 			item.Slug = req.Slug
@@ -227,6 +237,17 @@ func (s *TopicService) Delete(id string) error {
 		return apperrors.New(apperrors.CodeInvalidParameter)
 	}
 	if s.db != nil {
+		var topic model.Topic
+		err := s.db.First(&topic, parsed).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(apperrors.CodeResourceNotFound)
+		}
+		if err != nil {
+			return apperrors.New(apperrors.CodeDatabaseUnavailable)
+		}
+		if _, protected := model.DefaultTopicBySlug(topic.Slug); protected {
+			return apperrors.New(apperrors.CodeResourceConflict)
+		}
 		var count int64
 		if err := s.db.Model(&model.Article{}).Where("topic_id = ?", parsed).Count(&count).Error; err != nil {
 			return apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -234,7 +255,7 @@ func (s *TopicService) Delete(id string) error {
 		if count > 0 {
 			return apperrors.New(apperrors.CodeReferencedResourceUsed)
 		}
-		result := s.db.Delete(&model.Topic{}, parsed)
+		result := s.db.Delete(&topic)
 		if result.Error != nil {
 			return apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
@@ -248,11 +269,27 @@ func (s *TopicService) Delete(id string) error {
 	defer s.mu.Unlock()
 	for index, item := range s.items {
 		if item.ID == parsed {
+			if _, protected := model.DefaultTopicBySlug(item.Slug); protected {
+				return apperrors.New(apperrors.CodeResourceConflict)
+			}
 			s.items = append(s.items[:index], s.items[index+1:]...)
 			return nil
 		}
 	}
 	return apperrors.New(apperrors.CodeResourceNotFound)
+}
+
+// protectFormalTopicIdentity 允许维护展示名称、说明和排序，但固定 label/slug
+// 不能经由后台漂移，否则下次启动会补建重复专题并切断公开链接。
+func protectFormalTopicIdentity(currentSlug string, req TopicSaveRequest) error {
+	formal, protected := model.DefaultTopicBySlug(currentSlug)
+	if !protected {
+		return nil
+	}
+	if req.Slug != formal.Slug || req.Label != formal.Label {
+		return apperrors.New(apperrors.CodeResourceConflict)
+	}
+	return nil
 }
 
 func normalizeTopicSaveRequest(req TopicSaveRequest) (TopicSaveRequest, error) {

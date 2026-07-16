@@ -45,9 +45,8 @@ func Open(ctx context.Context, cfg config.Config) (Resources, error) {
 }
 
 func openMySQL(ctx context.Context, cfg config.Config) (*gorm.DB, error) {
-	if cfg.MySQLDSN == "" {
-		slog.Warn("mysql dsn is empty, database-backed features are disabled")
-		return nil, nil
+	if strings.TrimSpace(cfg.MySQLDSN) == "" {
+		return nil, errors.New("MYSQL_DSN is required")
 	}
 	if err := ensureDatabase(ctx, cfg.MySQLDSN); err != nil {
 		return nil, err
@@ -135,9 +134,9 @@ func migrate(db *gorm.DB) error {
 		return err
 	}
 
-	// Existing installations need topic_id populated before AutoMigrate adds the
-	// Article -> Topic foreign key. Add only the column first, then copy legacy
-	// taxonomy data without dropping categories/category_id.
+	// 当前系统早期版本曾使用 category/category_id。升级时必须先补齐 topic_id，
+	// 再由 AutoMigrate 建立 Article -> Topic 外键，避免迁移过程中出现悬空引用。
+	// 这只是当前 Go 系统内部的结构升级兼容，不依赖或保留旧 Flask 运行代码。
 	if db.Migrator().HasTable(&model.Article{}) {
 		if !db.Migrator().HasColumn(&model.Article{}, "TopicID") {
 			if err := db.Migrator().AddColumn(&model.Article{}, "TopicID"); err != nil {
@@ -171,8 +170,8 @@ func (legacyArticleRow) TableName() string {
 	return "articles"
 }
 
-// migrateLegacyCategories is intentionally idempotent. It keeps the legacy
-// table and column in place so an upgrade can be rolled back or audited.
+// migrateLegacyCategories 幂等迁移当前系统早期的 category 数据，并暂留旧表和列，
+// 便于升级失败时回滚或审计；它不代表继续兼容旧 Flask 博客的运行逻辑。
 func migrateLegacyCategories(db *gorm.DB) error {
 	if !db.Migrator().HasTable("categories") {
 		return ensureArticleTopics(db, nil)
@@ -184,6 +183,11 @@ func migrateLegacyCategories(db *gorm.DB) error {
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		// 先把旧的默认 Notes 专题原地迁移为 NODES。categories 表会长期保留用于
+		// 升级审计，因此后续每次启动都必须把它映射到 NODES，而不是重新创建 Notes。
+		if err := seedDefaultTopics(tx); err != nil {
+			return err
+		}
 		mapping := make(map[uint64]uint64, len(categories))
 		for _, category := range categories {
 			topicID, err := migrateLegacyCategory(tx, category)
@@ -197,6 +201,14 @@ func migrateLegacyCategories(db *gorm.DB) error {
 }
 
 func migrateLegacyCategory(db *gorm.DB, category legacyCategoryRow) (uint64, error) {
+	if isExactDefaultNotesCategory(category) {
+		var nodes model.Topic
+		if err := db.Unscoped().Where("slug = ?", model.TopicSlugNodes).First(&nodes).Error; err != nil {
+			return 0, err
+		}
+		return nodes.ID, nil
+	}
+
 	var existing model.Topic
 	err := db.Unscoped().Where("slug = ?", category.Slug).First(&existing).Error
 	if err == nil {
@@ -233,6 +245,16 @@ func migrateLegacyCategory(db *gorm.DB, category legacyCategoryRow) (uint64, err
 	return topic.ID, nil
 }
 
+// isExactDefaultNotesCategory 只识别早期脚手架创建的完整默认行。
+// 同名但描述、排序或删除状态不同的用户专题仍按普通旧专题迁移。
+func isExactDefaultNotesCategory(category legacyCategoryRow) bool {
+	return category.Name == "Notes" &&
+		category.Slug == "notes" &&
+		category.Description == "" &&
+		category.SortOrder == 1 &&
+		!category.DeletedAt.Valid
+}
+
 func ensureArticleTopics(db *gorm.DB, legacyMapping map[uint64]uint64) error {
 	if !db.Migrator().HasTable(&model.Article{}) || !db.Migrator().HasColumn(&model.Article{}, "TopicID") {
 		return nil
@@ -246,16 +268,16 @@ func ensureArticleTopics(db *gorm.DB, legacyMapping map[uint64]uint64) error {
 			}
 		}
 	}
-	if err := seedDefaultTopic(db); err != nil {
+	if err := seedDefaultTopics(db); err != nil {
 		return err
 	}
-	var notes model.Topic
-	if err := db.Where("slug = ?", "notes").First(&notes).Error; err != nil {
+	var nodes model.Topic
+	if err := db.Where("slug = ?", model.TopicSlugNodes).First(&nodes).Error; err != nil {
 		return err
 	}
 	return db.Table("articles").
 		Where("topic_id IS NULL OR topic_id = 0").
-		Update("topic_id", notes.ID).Error
+		Update("topic_id", nodes.ID).Error
 }
 
 func seedAdmin(db *gorm.DB, cfg config.Config) error {
@@ -281,10 +303,7 @@ func seedAdmin(db *gorm.DB, cfg config.Config) error {
 		}
 	}
 
-	if err := seedDefaultTopic(db); err != nil {
-		return err
-	}
-	if err := seedDefaultTags(db); err != nil {
+	if err := seedDefaultTopics(db); err != nil {
 		return err
 	}
 	if err := seedDefaultSiteSetting(db); err != nil {
@@ -294,39 +313,84 @@ func seedAdmin(db *gorm.DB, cfg config.Config) error {
 	return nil
 }
 
-func seedDefaultTopic(db *gorm.DB) error {
-	var topic model.Topic
-	err := db.Unscoped().Where("slug = ?", "notes").First(&topic).Error
-	if err == nil {
-		if topic.DeletedAt.Valid {
-			return db.Unscoped().Model(&topic).Update("deleted_at", nil).Error
-		}
-		return nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+// seedDefaultTopics 先迁移旧脚手架中的 Notes 专题，再补齐缺失的正式专题。
+// 已存在的正式专题可能已被管理员维护，因此启动时只恢复软删除状态，不覆盖其他字段。
+func seedDefaultTopics(db *gorm.DB) error {
+	if err := migrateExactNotesTopic(db); err != nil {
 		return err
 	}
-	return db.Create(&model.Topic{Name: "Notes", Label: "Notes", Slug: "notes", SortOrder: 1}).Error
-}
 
-func seedDefaultTags(db *gorm.DB) error {
-	defaultTags := []model.Tag{
-		{Name: "Go", Slug: "go", Color: "#5f8d62"},
-		{Name: "Vue", Slug: "vue", Color: "#557ea8"},
-	}
-	for _, tag := range defaultTags {
-		var count int64
-		if err := db.Model(&model.Tag{}).Where("slug = ?", tag.Slug).Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
+	for _, initial := range model.DefaultTopics() {
+		var topic model.Topic
+		err := db.Unscoped().Where("slug = ?", initial.Slug).First(&topic).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := db.Create(&initial).Error; err != nil {
+				return err
+			}
 			continue
 		}
-		if err := db.Create(&tag).Error; err != nil {
+		if err != nil {
 			return err
+		}
+		if updates := defaultTopicRestoreUpdates(topic); len(updates) > 0 {
+			if err := db.Unscoped().Model(&topic).Updates(updates).Error; err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func defaultTopicRestoreUpdates(topic model.Topic) map[string]any {
+	if !topic.DeletedAt.Valid {
+		return nil
+	}
+	return map[string]any{"deleted_at": nil}
+}
+
+// migrateExactNotesTopic 只识别旧脚手架的完整默认值，并原地更新以保留专题 ID 与文章关联。
+func migrateExactNotesTopic(db *gorm.DB) error {
+	var legacy model.Topic
+	result := db.Unscoped().Where("slug = ?", "notes").Limit(1).Find(&legacy)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil
+	}
+	if !isExactDefaultNotesTopic(legacy) {
+		return nil
+	}
+
+	var existing model.Topic
+	err := db.Unscoped().Where("slug = ?", model.TopicSlugNodes).First(&existing).Error
+	if err == nil && existing.ID != legacy.ID {
+		return errors.New("cannot migrate Notes topic because slug nodes already exists")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	nodes := model.DefaultTopics()[0]
+	return db.Unscoped().Model(&legacy).Updates(map[string]any{
+		"name":        nodes.Name,
+		"label":       nodes.Label,
+		"slug":        nodes.Slug,
+		"description": nodes.Description,
+		"sort_order":  nodes.SortOrder,
+		"deleted_at":  nil,
+	}).Error
+}
+
+// isExactDefaultNotesTopic 避免仅凭名称和 slug 覆盖管理员维护过的描述、封面或排序。
+// 软删除状态不参与指纹，完整默认专题即使曾被删除也应迁移并恢复为正式 NODES。
+func isExactDefaultNotesTopic(topic model.Topic) bool {
+	return topic.Name == "Notes" &&
+		topic.Label == "Notes" &&
+		topic.Slug == "notes" &&
+		topic.Description == "" &&
+		topic.CoverURL == "" &&
+		topic.SortOrder == 1
 }
 
 func seedDefaultSiteSetting(db *gorm.DB) error {

@@ -54,7 +54,7 @@ func (h *ArticleHandler) Create(c *gin.Context) {
 		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
 		return
 	}
-	item, err := h.article.Create(req)
+	item, err := h.article.Create(req, c.GetUint64("user_id"))
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *ArticleHandler) Update(c *gin.Context) {
 		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
 		return
 	}
-	item, err := h.article.Update(c.Param("id"), req)
+	item, err := h.article.Update(c.Param("id"), req, c.GetUint64("user_id"))
 	if err != nil {
 		response.Error(c, err)
 		return
