@@ -61,6 +61,20 @@ npm run dev
 X-API-Version: v1
 ```
 
+### 访问上传后的静态资源
+
+`STORAGE_DRIVER=local` 时，本机开发无需启动 Nginx 即可访问上传文件：
+
+| 入口 | URL 形式 | 适用场景 |
+| --- | --- | --- |
+| Vite dev server（推荐） | `http://localhost:5173/uploads/...` | 前端页面 `<img>`、fetch、`<a href>` |
+| API 进程直打（dev 限定） | `http://localhost:8080/uploads/...` | Postman、浏览器调试、跨域脚本 |
+
+- 后端在 `internal/router/router.go` 已用 `r.Static("/uploads", cfg.StorageLocalRoot)` 直接挂载；dev 模式下 `CorsForDev` 中间件会自动放行所有 origin
+- Vite proxy（`web/vite.config.ts`）会把 `/uploads` 转发到 `http://localhost:8080`，前端无需特殊配置
+- 文件实际写入位置：`./server/storage/uploads/YYYY/MM/<rand>.<ext>`（与 `STORAGE_LOCAL_ROOT` 同步）
+- 上传后图片如果显示损坏，请确认 Commit `fix(upload): 修复 sniff 后 reader 未重置` 已应用（修复前 512 字节 magic header 丢失）
+
 ## 验证
 
 ```bash
