@@ -29,9 +29,8 @@ MySQL 是业务数据的唯一可信来源，Redis 用于公开文章、站点�
 ## 使用 Docker Compose 启动
 
 1. 复制 `.env.example` 为 `.env`。
-2. 填写 MySQL、Redis、JWT 和管理员必填凭据。
-3. 保证 `MYSQL_DSN` 中的用户名、密码与 `MYSQL_USER`、`MYSQL_PASSWORD` 一致。
-4. 启动服务：
+2. 填写 MySQL、Redis、JWT 和管理员必填凭据。MySQL 与 Redis 只需填写 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD` 和 `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD` 等原子变量，Go 配置层会组合连接参数。
+3. 启动服务：
 
 ```bash
 docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
@@ -39,6 +38,7 @@ sh deploy/scripts/healthcheck.sh
 ```
 
 默认只有 Nginx 的 `${WEB_PORT:-80}` 面向外部监听。MySQL、Redis 和 API 的调试端口仅绑定 `127.0.0.1`。仓库内 Nginx 配置不终止 TLS，生产环境应由边缘代理或平台负责 HTTPS。
+Compose 会为 API 容器覆盖数据库和缓存地址，固定通过 `mysql:3306`、`redis:6379` 访问容器网络；根 `.env` 中的 `127.0.0.1` 与映射端口用于宿主机进程和本机调试。
 
 ## 本机开发
 
@@ -48,7 +48,7 @@ sh deploy/scripts/healthcheck.sh
 docker compose --env-file .env -f deploy/docker-compose.yml up -d mysql redis
 ```
 
-如果 API 在宿主机运行，需要在本机环境中将连接地址改为 `127.0.0.1`，不要直接沿用容器网络中的 `mysql`、`redis` 主机名。
+如果 API 在宿主机运行，使用 `MYSQL_HOST=127.0.0.1`、`REDIS_HOST=127.0.0.1` 以及 Compose 实际映射到宿主机的 `MYSQL_PORT`、`REDIS_PORT`，不要使用仅能在容器网络解析的 `mysql`、`redis` 主机名。
 
 ```bash
 cd server

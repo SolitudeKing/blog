@@ -12,17 +12,25 @@ cp .env.example .env
 生产部署还必须将 `APP_ENV` 设为 `production`，并把 `SITE_BASE_URL` 改为真实 HTTPS 站点地址。
 `.env.example` 的 `SITE_BASE_URL=http://localhost` 对应完整 Compose 的 Nginx 入口；只有在宿主机运行 Vite 开发服务器时才改为 `http://localhost:5173`。
 
-`MYSQL_DSN` 包含数据库账号与密码，必须与 `MYSQL_USER`、`MYSQL_PASSWORD` 同步：
+数据库与缓存使用原子变量，Go 配置层会据此组合完整的 MySQL DSN 和 Redis 地址，不需要在 `.env` 中人工拼接或同步组合字段：
 
 ```env
-MYSQL_DSN=blog:<MYSQL_PASSWORD>@tcp(mysql:3306)/blog?charset=utf8mb4&parseTime=True&loc=UTC
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
 MYSQL_DATABASE=blog
 MYSQL_USER=blog
-MYSQL_PASSWORD=<同一密码>
-REDIS_ADDR=redis:6379
+MYSQL_PASSWORD=<强密码>
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
 REDIS_PASSWORD=<强密码>
-STORAGE_LOCAL_ROOT=/app/storage/uploads
+STORAGE_LOCAL_ROOT=./storage/uploads
 ```
+
+完整 Compose 启动时，API 容器会覆盖为 `MYSQL_HOST=mysql`、`MYSQL_PORT=3306`、`REDIS_HOST=redis`、`REDIS_PORT=6379`，通过容器网络连接依赖。API 在宿主机运行时则使用 `127.0.0.1` 和 Compose 映射到宿主机的 `MYSQL_PORT`、`REDIS_PORT`。
+
+当前部署不包含 Celery 或其他异步任务服务，不要在 `.env` 中保留 `CELERY_BROKER_URL`、`CELERY_RESULT_BACKEND`。
+
+从旧配置升级时，必须先将 `MYSQL_DSN`、`REDIS_ADDR` 拆成上述原子变量并移除旧变量。Go 加载器暂时兼容只提供旧变量的非 Compose 环境，但新旧变量同时存在会拒绝启动；当前 Compose 部署只接受原子变量。
 
 不要提交实际 `.env`。占位符不能直接用于生产。
 
