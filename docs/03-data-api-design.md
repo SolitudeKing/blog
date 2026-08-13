@@ -17,7 +17,6 @@ erDiagram
   topics ||--o{ articles : contains
   articles ||--o{ article_tags : has
   tags ||--o{ article_tags : belongs
-  assets ||--o{ articles : cover
   articles ||--o{ article_versions : records
   site_settings ||--|| users : maintained_by
   notices ||--|| users : maintained_by
@@ -39,7 +38,7 @@ erDiagram
     string status
     bigint topic_id
     bigint author_id
-    bigint cover_asset_id
+    string cover_url
   }
 
   topics {
@@ -101,7 +100,7 @@ erDiagram
 | status | varchar(32) | `draft` / `published` / `private` / `archived` |
 | topic_id | bigint unsigned | 专题 ID |
 | author_id | bigint unsigned | 作者 ID |
-| cover_asset_id | bigint unsigned | 封面图 ID，可空 |
+| cover_url | varchar(500) | 文章预览图 URL，可空；可使用媒体库生成的 `/uploads/...` 地址 |
 | view_count | bigint unsigned | 阅读量 |
 | word_count | int unsigned | 字数 |
 | reading_minutes | int unsigned | 预计阅读分钟 |
@@ -214,7 +213,9 @@ erDiagram
 | id | bigint unsigned | 主键；当前站点配置固定为 `1` |
 | site_name | varchar(120) | 站点名称，非空 |
 | author | varchar(80) | 作者名称，非空 |
+| author_avatar_url | varchar(500) | 作者头像 URL，可空；为空时前台使用默认 SVG |
 | essay | varchar(500) | 站点签名 |
+| icp_number | varchar(64) | 可选的网站 ICP 备案号，前台页脚展示 |
 | theme | varchar(32) | 全局主题 ID，非空 |
 | mode | varchar(32) | 访客默认明暗模式，非空 |
 | theme_elements_json | json | 按主题 ID 保存的主题元素对象 |
@@ -443,9 +444,10 @@ GET setting/lobby
 - 站点名称。
 - 作者。
 - 签名。
-- 头像。
+- 作者头像 `author_avatar_url`；为空时前台使用默认 SVG。
 - 社交链接。
 - SEO 默认配置。
+- 可选网站 ICP 备案号 `icp_number`；前台页脚仅在其非空时展示，并链接至工信部备案管理系统。
 - 全局主题 `theme`：`mist-sea-salt` 或 `mist-forest`。
 - 访客默认模式 `mode`：`light` 或 `dark`。
 - 完整主题元素映射 `theme_elements`，键为受支持的主题 ID；前台根据响应中的 `theme` 读取对应元素组。
