@@ -10,7 +10,11 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("api server configuration failed", "error", err)
+		os.Exit(1)
+	}
 	app, resources, err := bootstrap.NewApp(context.Background(), cfg)
 	if err != nil {
 		slog.Error("api server bootstrap failed", "error", err)

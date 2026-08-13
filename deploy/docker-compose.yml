@@ -57,16 +57,28 @@ services:
       dockerfile: Dockerfile
     container_name: solitude-blog-api
     restart: unless-stopped
-    env_file:
-      - ../.env
     environment:
       # 容器内 API 固定监听 8080；APP_PORT 只作为宿主机调试端口。
+      APP_ENV: ${APP_ENV:-development}
       APP_PORT: 8080
-      MYSQL_DSN: ${MYSQL_DSN:?MYSQL_DSN must be set}
+      APP_API_VERSION: ${APP_API_VERSION:-v1}
+      SITE_BASE_URL: ${SITE_BASE_URL:-http://localhost}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      MYSQL_USER: ${MYSQL_USER:-blog}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-30}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-14}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      ADMIN_NICKNAME: ${ADMIN_NICKNAME:-Solitude King}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_ROOT: /app/storage/uploads
     depends_on:
       mysql:
