@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -17,8 +19,10 @@ import (
 )
 
 const (
-	defaultSiteSettingID uint64 = 1
-	siteSettingCacheTTL         = 10 * time.Minute
+	defaultSiteSettingID    uint64 = 1
+	siteSettingCacheTTL            = 10 * time.Minute
+	maxICPNumberRunes              = 64
+	maxAuthorAvatarURLRunes        = 500
 )
 
 type SettingService struct {
@@ -29,23 +33,27 @@ type SettingService struct {
 }
 
 type LobbySetting struct {
-	SiteName      string                     `json:"site_name"`
-	Author        string                     `json:"author"`
-	Essay         string                     `json:"essay"`
-	Theme         string                     `json:"theme"`
-	Mode          string                     `json:"mode"`
-	SocialLinks   map[string]string          `json:"social_links"`
-	ThemeElements appearance.ThemeElementMap `json:"theme_elements"`
+	SiteName        string                     `json:"site_name"`
+	Author          string                     `json:"author"`
+	AuthorAvatarURL string                     `json:"author_avatar_url"`
+	Essay           string                     `json:"essay"`
+	ICPNumber       string                     `json:"icp_number"`
+	Theme           string                     `json:"theme"`
+	Mode            string                     `json:"mode"`
+	SocialLinks     map[string]string          `json:"social_links"`
+	ThemeElements   appearance.ThemeElementMap `json:"theme_elements"`
 }
 
 type SettingSaveRequest struct {
-	SiteName      string                      `json:"site_name"`
-	Author        string                      `json:"author"`
-	Essay         string                      `json:"essay"`
-	Theme         string                      `json:"theme"`
-	Mode          string                      `json:"mode"`
-	SocialLinks   map[string]string           `json:"social_links"`
-	ThemeElements *appearance.ThemeElementMap `json:"theme_elements"`
+	SiteName        string                      `json:"site_name"`
+	Author          string                      `json:"author"`
+	AuthorAvatarURL string                      `json:"author_avatar_url"`
+	Essay           string                      `json:"essay"`
+	ICPNumber       string                      `json:"icp_number"`
+	Theme           string                      `json:"theme"`
+	Mode            string                      `json:"mode"`
+	SocialLinks     map[string]string           `json:"social_links"`
+	ThemeElements   *appearance.ThemeElementMap `json:"theme_elements"`
 }
 
 func NewSettingService(db *gorm.DB, redisClient *redis.Client) *SettingService {
@@ -91,7 +99,9 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		}
 		row.SiteName = normalized.SiteName
 		row.Author = normalized.Author
+		row.AuthorAvatarURL = normalized.AuthorAvatarURL
 		row.Essay = normalized.Essay
+		row.ICPNumber = normalized.ICPNumber
 		row.Theme = normalized.Theme
 		row.Mode = normalized.Mode
 		row.SocialLinksJSON = mustMarshalSocialLinks(normalized.SocialLinks)
@@ -164,7 +174,9 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 		ID:                defaultSiteSettingID,
 		SiteName:          defaults.SiteName,
 		Author:            defaults.Author,
+		AuthorAvatarURL:   defaults.AuthorAvatarURL,
 		Essay:             defaults.Essay,
+		ICPNumber:         defaults.ICPNumber,
 		Theme:             defaults.Theme,
 		Mode:              defaults.Mode,
 		SocialLinksJSON:   mustMarshalSocialLinks(defaults.SocialLinks),
@@ -183,6 +195,14 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 	if !appearance.IsValidTheme(req.Theme) || !appearance.IsValidMode(req.Mode) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
+	icpNumber := strings.TrimSpace(req.ICPNumber)
+	if utf8.RuneCountInString(icpNumber) > maxICPNumberRunes {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	authorAvatarURL := strings.TrimSpace(req.AuthorAvatarURL)
+	if utf8.RuneCountInString(authorAvatarURL) > maxAuthorAvatarURLRunes {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
 	if req.ThemeElements != nil && !appearance.IsValidThemeElements(*req.ThemeElements) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
@@ -197,13 +217,15 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 		}
 	}
 	return cloneSetting(LobbySetting{
-		SiteName:      req.SiteName,
-		Author:        req.Author,
-		Essay:         req.Essay,
-		Theme:         req.Theme,
-		Mode:          req.Mode,
-		SocialLinks:   req.SocialLinks,
-		ThemeElements: themeElements,
+		SiteName:        req.SiteName,
+		Author:          req.Author,
+		AuthorAvatarURL: authorAvatarURL,
+		Essay:           req.Essay,
+		ICPNumber:       icpNumber,
+		Theme:           req.Theme,
+		Mode:            req.Mode,
+		SocialLinks:     req.SocialLinks,
+		ThemeElements:   themeElements,
 	}), nil
 }
 
@@ -217,24 +239,28 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 		_ = json.Unmarshal([]byte(row.ThemeElementsJSON), &themeElements)
 	}
 	return LobbySetting{
-		SiteName:      row.SiteName,
-		Author:        row.Author,
-		Essay:         row.Essay,
-		Theme:         appearance.NormalizeTheme(row.Theme),
-		Mode:          appearance.NormalizeMode(row.Mode),
-		SocialLinks:   links,
-		ThemeElements: appearance.NormalizeThemeElements(themeElements),
+		SiteName:        row.SiteName,
+		Author:          row.Author,
+		AuthorAvatarURL: row.AuthorAvatarURL,
+		Essay:           row.Essay,
+		ICPNumber:       row.ICPNumber,
+		Theme:           appearance.NormalizeTheme(row.Theme),
+		Mode:            appearance.NormalizeMode(row.Mode),
+		SocialLinks:     links,
+		ThemeElements:   appearance.NormalizeThemeElements(themeElements),
 	}
 }
 
 func defaultLobbySetting() LobbySetting {
 	return LobbySetting{
-		SiteName:      "Solitude Blog",
-		Author:        "Solitude King",
-		Essay:         "Keep writing, keep shipping.",
-		Theme:         appearance.DefaultTheme,
-		Mode:          appearance.DefaultMode,
-		ThemeElements: appearance.DefaultThemeElements(),
+		SiteName:        "Solitude Blog",
+		Author:          "Solitude King",
+		AuthorAvatarURL: "",
+		Essay:           "Keep writing, keep shipping.",
+		ICPNumber:       "",
+		Theme:           appearance.DefaultTheme,
+		Mode:            appearance.DefaultMode,
+		ThemeElements:   appearance.DefaultThemeElements(),
 		SocialLinks: map[string]string{
 			"gitee":    "",
 			"bilibili": "",

@@ -200,11 +200,38 @@
   color: var(--text-muted);
 }
 
+.public-footer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-8);
+}
+
 .public-footer__copyright {
-  margin: var(--space-8) 0 0;
+  margin: 0;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.7;
+}
+
+.public-footer__icp {
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 48%, transparent);
+  text-underline-offset: 3px;
+
+  &:hover {
+    color: var(--accent-active);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
 }
 
 // =================== Public back to top ===================

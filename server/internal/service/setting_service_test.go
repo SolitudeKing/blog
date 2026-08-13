@@ -35,6 +35,54 @@ func TestNormalizeSettingAcceptsSupportedAppearance(t *testing.T) {
 	}
 }
 
+func TestNormalizeSettingNormalizesAndValidatesICPNumber(t *testing.T) {
+	t.Parallel()
+
+	request := SettingSaveRequest{
+		SiteName:  "Blog",
+		Author:    "Author",
+		ICPNumber: "  京ICP备12345678号  ",
+		Theme:     appearance.ThemeMistSeaSalt,
+		Mode:      appearance.ModeLight,
+	}
+	setting, err := normalizeSetting(request, nil)
+	if err != nil {
+		t.Fatalf("normalizeSetting returned error: %v", err)
+	}
+	if setting.ICPNumber != "京ICP备12345678号" {
+		t.Fatalf("icp number = %q", setting.ICPNumber)
+	}
+
+	request.ICPNumber = strings.Repeat("备", maxICPNumberRunes+1)
+	if _, err := normalizeSetting(request, nil); err == nil {
+		t.Fatal("normalizeSetting accepted an overly long icp number")
+	}
+}
+
+func TestNormalizeSettingNormalizesAndValidatesAuthorAvatarURL(t *testing.T) {
+	t.Parallel()
+
+	request := SettingSaveRequest{
+		SiteName:        "Blog",
+		Author:          "Author",
+		AuthorAvatarURL: "  /uploads/avatar.webp  ",
+		Theme:           appearance.ThemeMistSeaSalt,
+		Mode:            appearance.ModeLight,
+	}
+	setting, err := normalizeSetting(request, nil)
+	if err != nil {
+		t.Fatalf("normalizeSetting returned error: %v", err)
+	}
+	if setting.AuthorAvatarURL != "/uploads/avatar.webp" {
+		t.Fatalf("author avatar url = %q", setting.AuthorAvatarURL)
+	}
+
+	request.AuthorAvatarURL = strings.Repeat("a", maxAuthorAvatarURLRunes+1)
+	if _, err := normalizeSetting(request, nil); err == nil {
+		t.Fatal("normalizeSetting accepted an overly long author avatar URL")
+	}
+}
+
 func TestNormalizeSettingRejectsInvalidAppearance(t *testing.T) {
 	t.Parallel()
 

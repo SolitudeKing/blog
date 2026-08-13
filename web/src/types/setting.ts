@@ -11,7 +11,9 @@ export type ThemeElementMap = Record<ThemeName, ThemeElements>
 export interface LobbySetting {
   site_name: string
   author: string
+  author_avatar_url: string
   essay: string
+  icp_number: string
   theme: ThemeName
   mode: ModeName
   theme_elements: ThemeElementMap
@@ -21,7 +23,9 @@ export interface LobbySetting {
 export interface SettingPayload {
   site_name: string
   author: string
+  author_avatar_url: string
   essay: string
+  icp_number: string
   theme: ThemeName
   mode: ModeName
   theme_elements: ThemeElementMap

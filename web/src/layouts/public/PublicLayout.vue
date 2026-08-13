@@ -12,9 +12,7 @@
           <section class="public-footer__identity" aria-labelledby="footer-brand-name">
             <RouterLink class="public-footer__brand" to="/" :aria-label="`${siteName}，返回首页`">
               <span class="public-footer__brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M3 8.5c3-3 6 3 9 0s6 3 9 0M3 15.5c3-3 6 3 9 0s6 3 9 0" />
-                </svg>
+                <SvgIcon name="brand-waves" />
               </span>
               <span class="public-footer__brand-copy">
                 <strong id="footer-brand-name">{{ siteName }}</strong>
@@ -25,7 +23,7 @@
           </section>
 
           <section aria-labelledby="footer-roam-title">
-            <h2 id="footer-roam-title" class="public-footer__title">漫游</h2>
+            <div id="footer-roam-title" class="public-footer__title" role="heading" aria-level="2">漫游</div>
             <nav class="public-footer__links" aria-label="页脚导航">
               <RouterLink v-for="item in footerNavigation" :key="item.to" :to="item.to">
                 {{ item.label }}
@@ -34,7 +32,7 @@
           </section>
 
           <section aria-labelledby="footer-social-title">
-            <h2 id="footer-social-title" class="public-footer__title">社交</h2>
+            <div id="footer-social-title" class="public-footer__title" role="heading" aria-level="2">社交</div>
             <nav class="public-footer__links" aria-label="社交链接">
               <a
                 v-for="item in socialItems"
@@ -51,9 +49,20 @@
           </section>
         </div>
 
-        <p class="public-footer__copyright">
-          © 2020–{{ year }} {{ author }} · {{ siteName }}
-        </p>
+        <div class="public-footer__meta">
+          <p class="public-footer__copyright">
+            © 2020–{{ year }} {{ author }} · {{ siteName }}
+          </p>
+          <a
+            v-if="icpNumber"
+            class="public-footer__icp"
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ icpNumber }}
+          </a>
+        </div>
       </div>
     </footer>
 
@@ -66,9 +75,7 @@
       :tabindex="backtopVisible ? 0 : -1"
       @click="backToTop"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m6 14 6-6 6 6" />
-      </svg>
+      <SvgIcon name="chevron-up" />
     </button>
   </div>
 </template>
@@ -77,6 +84,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BlogNavbar from '@/components/blog/BlogNavbar.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { useSettingStore } from '@/stores/setting'
 import { createSocialLinkEntries } from '@/utils/socialLinks'
 
@@ -101,6 +109,7 @@ const essay = computed(
     '关于设计、代码与缓慢生活的长期笔记。保持好奇，也保持边界。',
 )
 const socialItems = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
+const icpNumber = computed(() => setting.lobby?.icp_number?.trim() || '')
 const year = new Date().getFullYear()
 
 function focusMain() {

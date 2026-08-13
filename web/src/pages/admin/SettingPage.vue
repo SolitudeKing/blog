@@ -3,7 +3,7 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Settings</p>
-        <h1>站点设置</h1>
+        <div role="heading" aria-level="1">站点设置</div>
       </div>
       <BaseButton variant="secondary" :loading="loading" @click="loadSetting">刷新</BaseButton>
     </header>
@@ -11,14 +11,27 @@
       <form class="settings-form" :aria-busy="saving" @submit.prevent="saveSetting">
         <div class="settings-form__main">
           <section class="settings-panel">
-            <h2>基础信息</h2>
+            <div role="heading" aria-level="2">基础信息</div>
             <BaseInput v-model="form.site_name" label="站点名称" />
             <BaseInput v-model="form.author" label="作者" />
+            <BaseInput
+              v-model="form.author_avatar_url"
+              type="url"
+              label="作者头像 URL"
+              hint="可填写 /uploads/... 相对路径或 https://... 绝对地址；留空时使用默认头像。"
+              :maxlength="500"
+            />
             <BaseTextarea v-model="form.essay" label="站点签名" :rows="4" />
+            <BaseInput
+              v-model="form.icp_number"
+              label="网站备案号"
+              hint="可选；保存后将在前台页脚展示，并链接至工信部备案管理系统。"
+              :maxlength="64"
+            />
           </section>
 
           <section class="settings-panel">
-            <h2>社交链接</h2>
+            <div role="heading" aria-level="2">社交链接</div>
             <BaseInput
               v-for="item in socialItems"
               :key="item.key"
@@ -29,7 +42,7 @@
         </div>
 
         <section class="settings-panel settings-panel--appearance">
-        <h2>主题外观</h2>
+        <div role="heading" aria-level="2">主题外观</div>
         <p id="site-theme-hint" class="settings-panel__description">
           主题色由后台统一发布；访客只能在前台切换明暗模式。
         </p>
@@ -108,7 +121,7 @@
           aria-labelledby="settings-theme-preview-title"
         >
           <p class="settings-theme-preview__eyebrow">Theme preview</p>
-          <h3 id="settings-theme-preview-title">{{ selectedTheme.label }}</h3>
+          <div id="settings-theme-preview-title" role="heading" aria-level="3">{{ selectedTheme.label }}</div>
           <p>{{ selectedTheme.preview }}</p>
           <dl class="settings-theme-preview__elements">
             <div>
@@ -166,7 +179,9 @@ const settingStore = useSettingStore()
 const form = reactive<SettingPayload>({
   site_name: '',
   author: '',
+  author_avatar_url: '',
   essay: '',
+  icp_number: '',
   theme: 'mist-sea-salt',
   mode: 'light',
   theme_elements: createDefaultThemeElementMap(),
@@ -192,7 +207,9 @@ onMounted(() => {
 function assignSetting(setting: LobbySetting) {
   form.site_name = setting.site_name
   form.author = setting.author
+  form.author_avatar_url = setting.author_avatar_url
   form.essay = setting.essay
+  form.icp_number = setting.icp_number
   form.theme = setting.theme
   form.mode = setting.mode
   form.theme_elements = normalizeThemeElementMap(setting.theme_elements)
