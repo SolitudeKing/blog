@@ -290,7 +290,7 @@ X-API-Version: v1
 POST auth/login
 GET user/info
 GET setting/lobby
-GET article/list?cursor=&limit=20
+GET article/list?page=&page_size=20
 GET article/detail/my-post
 ```
 
@@ -327,37 +327,35 @@ GET article/detail/my-post
 - `code` 为业务状态码，`0` 表示成功。
 - `message` 为稳定、简短、可读的英文信息，不作为前端逻辑判断依据。
 - `data` 成功时为对象、数组或具体值；错误时固定为 `null`。
-- 游标分页列表额外返回与 `data` 同级的 `page` 字段。
-- 非分页接口（包括 `topic/list`、`tag/list`）不返回 `page` 字段。
+- 增长型列表在 `data` 之外额外返回 `count` / `page` / `page_size` / `has_more` 四个分页字段，**与 `data` 同级**。
+- 非分页接口（包括 `topic/list`、`tag/list`）不返回上述四个分页字段。
 
 分页响应：
 
-增长型列表固定使用游标分页。列表数据固定放在 `data` 数组中，分页信息固定放在与 `data` 同级的 `page` 字段中；专题和标签完整字典列表是明确例外。
+增长型列表使用页码分页。列表数据固定放在 `data` 数组中，四个分页字段固定放在与 `data` 同级；专题和标签完整字典列表是明确例外。
 
 ```json
 {
   "code": 0,
   "message": "ok",
   "data": [],
-  "page": {
-    "cursor": "",
-    "next_cursor": "cursor-value",
-    "limit": 20,
-    "has_more": true
-  }
+  "count": 20,
+  "page": 1,
+  "page_size": 20,
+  "has_more": true
 }
 ```
 
-游标分页规则：
+页码分页规则：
 
-- 请求参数统一使用 `cursor` 和 `limit`。
-- `cursor` 为空表示第一页。
-- `limit` 默认 `20`，最大 `100`。
-- `next_cursor` 为空且 `has_more=false` 表示没有下一页。
-- `cursor` 是服务端生成的不透明字符串，前端只保存和回传，不解析其中内容。
-- 不返回 `total`、`page`、`pageSize`、`totalPages`，避免大表计数拖慢列表接口。
-- 排序必须稳定，推荐使用 `created_at DESC, id DESC` 或业务明确指定的组合键生成游标。
-- 游标失效或格式错误时返回 HTTP `400`，业务码 `20003`。
+- 请求参数统一使用 `page` 和 `page_size`。
+- `page` 默认 `1`，小于等于 `0` 时钳到 `1`；超过服务端已加载到的最大页时返回空数据。
+- `page_size` 默认 `20`，最大 `100`。
+- `has_more=true` 表示还有下一页；`has_more=false` 时已到末页。
+- `count` 为当前页条目数（等于 `len(data)`），**不是**总条数。
+- **不返回** `total` / `totalPages` / `next_cursor`，避免大表 COUNT 拖慢列表接口。
+- 排序必须稳定，推荐使用 `created_at DESC, id DESC` 或业务明确指定的组合键。
+- `page` / `page_size` 非法或越界时返回 HTTP `400`，业务码 `20003`。
 
 ### HTTP 状态码
 
@@ -367,7 +365,7 @@ HTTP 状态码表达协议层语义，业务码表达业务层语义。错误响
 | --- | --- |
 | 200 | 请求成功，包含查询、更新、删除、业务动作成功 |
 | 201 | 创建成功，例如上传资源或创建文章 |
-| 400 | 参数格式错误、缺少版本头、游标非法、JSON 解析失败 |
+| 400 | 参数格式错误、缺少版本头、page 参数非法、JSON 解析失败 |
 | 401 | 未登录、token 无效、token 过期 |
 | 403 | 已登录但权限不足 |
 | 404 | 资源不存在或路由不存在 |
@@ -404,7 +402,7 @@ HTTP 状态码表达协议层语义，业务码表达业务层语义。错误响
 | 20000 | invalid request |
 | 20001 | missing required field |
 | 20002 | invalid parameter |
-| 20003 | invalid cursor |
+| 20003 | invalid page |
 | 20004 | unsupported api version |
 | 20005 | malformed json body |
 | 30000 | resource not found |
@@ -457,7 +455,7 @@ GET setting/lobby
 ### 首页文章列表
 
 ```text
-GET article/list?cursor=&limit=20&topic=distributed-systems&tag=go&keyword=gin
+GET article/list?page=&page_size=20&topic=distributed-systems&tag=go&keyword=gin
 ```
 
 只返回 `published` 状态文章。
@@ -481,17 +479,17 @@ GET article/detail/{slug}
 ### 归档
 
 ```text
-GET article/list?cursor=&limit=50
+GET article/list?page=&page_size=50
 ```
 
-当前没有独立的 `archive/list` 接口。归档页复用公开文章游标列表，并在前端按 `published_at` 的年份、月份分组；需要更多数据时继续使用 `next_cursor` 加载。
+当前没有独立的 `archive/list` 接口。归档页复用公开文章分页列表，并在前端按 `published_at` 的年份、月份分组；需要更多数据时继续翻页。
 
 ### 专题与标签
 
 ```text
 GET topic/list
 GET tag/list
-GET article/list?cursor=&limit=20&topic={topic_slug}&tag={tag_slug}
+GET article/list?page=&page_size=20&topic={topic_slug}&tag={tag_slug}
 ```
 
 专题列表响应额外返回按已发布文章计算的 `article_count`，并按 `sort_order ASC, created_at DESC, id DESC` 稳定排序；专题筛选复用文章列表接口且只返回 `published` 状态文章。
@@ -505,7 +503,7 @@ GET notice/active
 ### 搜索
 
 ```text
-GET search/article?keyword=redis&cursor=&limit=20
+GET search/article?keyword=redis&page=&page_size=20
 ```
 
 搜索范围包含文章标题、摘要、专题名称/Label 与标签名称；只返回 `published` 状态文章。
@@ -532,7 +530,7 @@ GET dashboard/summary
 ### 文章管理
 
 ```text
-GET    article/manage-list?cursor=&limit=20&status=&topic=&tag=&keyword=
+GET    article/manage-list?page=&page_size=20&status=&topic=&tag=&keyword=
 POST   article/create
 GET    article/info/{id}
 PUT    article/update/{id}
@@ -574,17 +572,17 @@ DELETE tag/delete/{id}
 ### 媒体库
 
 ```text
-GET    asset/list?cursor=&limit=40&keyword=&mime=
+GET    asset/list?page=&page_size=40&keyword=&mime=
 POST   asset/upload
 PUT    asset/update/{id}
 DELETE asset/delete/{id}
-GET    asset/reference-list/{id}?cursor=&limit=20
+GET    asset/reference-list/{id}?page=&page_size=20
 ```
 
 ### 公告
 
 ```text
-GET    notice/manage-list?cursor=&limit=20
+GET    notice/manage-list?page=&page_size=20
 POST   notice/create
 PUT    notice/update/{id}
 DELETE notice/delete/{id}
