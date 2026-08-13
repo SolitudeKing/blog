@@ -13,13 +13,25 @@
         <BaseInput v-model="form.title" label="标题" />
         <BaseInput v-model="form.slug" label="Slug" />
         <BaseTextarea v-model="form.summary" label="摘要" :rows="4" />
-        <BaseInput
-          v-model="form.cover_url"
-          type="url"
-          label="文章预览图 URL"
-          hint="可填写媒体库中的 /uploads/... 路径或 https://... 图片地址；留空时首页使用默认预览图。"
-          :maxlength="500"
-        />
+        <div class="article-cover">
+          <div class="article-cover__field">
+            <BaseInput
+              v-model="form.cover_url"
+              type="text"
+              inputmode="url"
+              label="文章预览图 URL"
+              hint="可填写媒体库中的 /uploads/... 路径或 https://... 图片地址；点击右侧上传按钮直接上传。留空时首页使用默认预览图。"
+              :maxlength="500"
+            />
+            <UploadButton class="article-cover__upload" @upload="onCoverUpload" />
+          </div>
+          <div v-if="form.cover_url" class="article-cover__preview">
+            <img :src="form.cover_url" :alt="form.title || 'cover preview'" />
+            <button class="text-link text-link--danger" type="button" @click="form.cover_url = ''">
+              清除预览图
+            </button>
+          </div>
+        </div>
         <BaseTextarea v-model="form.content_md" label="Markdown 正文" :rows="18" />
       </div>
 
@@ -90,10 +102,12 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import UploadButton from '@/components/media/UploadButton.vue'
 import { createArticle, getArticleVersions, getManagedArticleInfo, updateArticle } from '@/api/modules/article'
 import { getTagList, getTopicList } from '@/api/modules/taxonomy'
 import { useToast } from '@/composables/useToast'
 import type { ArticleSavePayload, ArticleVersionItem } from '@/types/article'
+import type { AssetItem } from '@/types/asset'
 import type { TagItem, TopicItem } from '@/types/taxonomy'
 
 const route = useRoute()
@@ -339,6 +353,12 @@ function applyVersion(version: ArticleVersionItem) {
 
 function formatTime(value: string) {
   return new Date(value).toLocaleString()
+}
+
+function onCoverUpload(asset: AssetItem) {
+  // local 驱动下 asset.url 已是 Nginx 可解析的 /uploads/... 相对路径；
+  // s3 驱动下为 STORAGE_S3_PUBLIC_URL/<key>。两种形态都直接写入即可。
+  form.cover_url = asset.url
 }
 
 function toSlug(value: string) {
