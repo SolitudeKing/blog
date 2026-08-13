@@ -8,12 +8,12 @@ import (
 func TestArticleKeysUseTopicAwareSchemaVersion(t *testing.T) {
 	keys := []string{
 		ArticleDetailKey("article-slug"),
-		ArticleListKey("", 20, ArticleListFilterHash("nodes", "design", "", "published")),
+		ArticleListKey(1, 20, ArticleListFilterHash("nodes", "design", "", "published")),
 		ArticleListPattern(),
 	}
 	for _, key := range keys {
-		if !strings.HasPrefix(key, "blog:v2:article:") {
-			t.Fatalf("article cache key %q does not use v2 schema", key)
+		if !strings.HasPrefix(key, "blog:v3:article:") {
+			t.Fatalf("article cache key %q does not use v3 schema", key)
 		}
 	}
 	if key := SiteSettingsKey(); !strings.HasPrefix(key, "blog:v1:") {

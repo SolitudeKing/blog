@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,12 +30,12 @@ type ArticleService struct {
 }
 
 type ArticleListQuery struct {
-	Cursor  string
-	Limit   int
-	Topic   string
-	Tag     string
-	Keyword string
-	Status  string
+	Page     int
+	PageSize int
+	Topic    string
+	Tag      string
+	Keyword  string
+	Status   string
 }
 
 type TopicReference struct {
@@ -77,8 +78,8 @@ type ArticleVersionItem struct {
 }
 
 type cachedArticleList struct {
-	Items []ArticleItem         `json:"items"`
-	Page  pagination.CursorPage `json:"page"`
+	Items []ArticleItem       `json:"items"`
+	Page  pagination.ListPage `json:"page"`
 }
 
 type ArticleCreateRequest struct {
@@ -102,19 +103,19 @@ func NewArticleService(db *gorm.DB, redisClient *redis.Client) *ArticleService {
 	}
 }
 
-func (s *ArticleService) PublicList(query ArticleListQuery) ([]ArticleItem, pagination.CursorPage, error) {
+func (s *ArticleService) PublicList(query ArticleListQuery) ([]ArticleItem, pagination.ListPage, error) {
 	if cached, ok := s.getCachedPublicList(query); ok {
 		return cached.Items, cached.Page, nil
 	}
 	items, page, err := s.list(query, true)
 	if err != nil {
-		return nil, pagination.CursorPage{}, err
+		return nil, pagination.ListPage{}, err
 	}
 	s.setCachedPublicList(query, cachedArticleList{Items: items, Page: page})
 	return items, page, nil
 }
 
-func (s *ArticleService) ManageList(query ArticleListQuery) ([]ArticleItem, pagination.CursorPage, error) {
+func (s *ArticleService) ManageList(query ArticleListQuery) ([]ArticleItem, pagination.ListPage, error) {
 	return s.list(query, false)
 }
 
@@ -500,15 +501,16 @@ func normalizeArticleWriteError(err error) error {
 	return apperrors.New(apperrors.CodeDatabaseUnavailable)
 }
 
-func (s *ArticleService) list(query ArticleListQuery, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {
-	limit := pagination.NormalizeLimit(query.Limit)
+func (s *ArticleService) list(query ArticleListQuery, onlyPublished bool) ([]ArticleItem, pagination.ListPage, error) {
+	page := pagination.NormalizePage(query.Page)
+	pageSize := pagination.NormalizePageSize(query.PageSize)
 	if s.db != nil {
-		return s.listFromDB(query, limit, onlyPublished)
+		return s.listFromDB(query, page, pageSize, onlyPublished)
 	}
-	return s.listInMemory(query, limit, onlyPublished)
+	return s.listInMemory(query, page, pageSize, onlyPublished)
 }
 
-func (s *ArticleService) listFromDB(query ArticleListQuery, limit int, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {
+func (s *ArticleService) listFromDB(query ArticleListQuery, page, pageSize int, onlyPublished bool) ([]ArticleItem, pagination.ListPage, error) {
 	dbQuery := s.db.Model(&model.Article{}).Preload("Topic").Preload("Tags")
 	if onlyPublished {
 		dbQuery = dbQuery.Where("status = ?", "published")
@@ -527,57 +529,34 @@ func (s *ArticleService) listFromDB(query ArticleListQuery, limit int, onlyPubli
 			Joins("JOIN tags ON tags.id = article_tags.tag_id").
 			Where("tags.slug = ?", query.Tag)
 	}
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
-		}
-		dbQuery = dbQuery.Where(
-			"articles.created_at < ? OR (articles.created_at = ? AND articles.id < ?)",
-			cursor.CreatedAt,
-			cursor.CreatedAt,
-			cursor.ID,
-		)
-	}
 
+	offset := (page - 1) * pageSize
 	var rows []model.Article
 	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").
-		Limit(limit + 1).
+		Limit(pageSize + 1).
+		Offset(offset).
 		Find(&rows).Error
 	if err != nil {
-		return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 
-	hasMore := len(rows) > limit
+	hasMore := len(rows) > pageSize
 	if hasMore {
-		rows = rows[:limit]
+		rows = rows[:pageSize]
 	}
 	items := make([]ArticleItem, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, itemFromModel(row))
 	}
 
-	nextCursor := ""
-	if hasMore && len(rows) > 0 {
-		last := rows[len(rows)-1]
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{
-			CreatedAt: last.CreatedAt,
-			ID:        last.ID,
-		})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-
-	return items, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items, pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 
-func (s *ArticleService) listInMemory(query ArticleListQuery, limit int, onlyPublished bool) ([]ArticleItem, pagination.CursorPage, error) {
+func (s *ArticleService) listInMemory(query ArticleListQuery, page, pageSize int, onlyPublished bool) ([]ArticleItem, pagination.ListPage, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -602,41 +581,28 @@ func (s *ArticleService) listInMemory(query ArticleListQuery, limit int, onlyPub
 		items = append(items, item)
 	}
 
-	start := 0
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
+	// 内存模式按 (created_at DESC, id DESC) 排序后切片
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
+			return items[i].ID > items[j].ID
 		}
-		for index, item := range items {
-			if item.CreatedAt.Equal(cursor.CreatedAt) && item.ID == cursor.ID {
-				start = index + 1
-				break
-			}
-		}
-	}
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
 
-	end := start + limit
+	offset := (page - 1) * pageSize
+	if offset >= len(items) {
+		return []ArticleItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+	}
+	end := offset + pageSize
 	hasMore := end < len(items)
 	if end > len(items) {
 		end = len(items)
 	}
-	pageItems := items[start:end]
-	nextCursor := ""
-	if hasMore && len(pageItems) > 0 {
-		last := pageItems[len(pageItems)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{CreatedAt: last.CreatedAt, ID: last.ID})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
 
-	return pageItems, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items[offset:end], pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 
@@ -785,7 +751,11 @@ func (s *ArticleService) invalidateArticleCaches(slugs ...string) {
 
 func publicListCacheKey(query ArticleListQuery) string {
 	filterHash := cache.ArticleListFilterHash(query.Topic, query.Tag, query.Keyword, query.Status)
-	return cache.ArticleListKey(query.Cursor, pagination.NormalizeLimit(query.Limit), filterHash)
+	return cache.ArticleListKey(
+		pagination.NormalizePage(query.Page),
+		pagination.NormalizePageSize(query.PageSize),
+		filterHash,
+	)
 }
 
 func detailFromModel(article model.Article) ArticleDetail {

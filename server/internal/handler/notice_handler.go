@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apperrors "solitude-blog/server/internal/errors"
-	"solitude-blog/server/internal/pagination"
 	"solitude-blog/server/internal/response"
 	"solitude-blog/server/internal/service"
 )
@@ -75,11 +74,12 @@ func (h *NoticeHandler) Delete(c *gin.Context) {
 }
 
 func noticeListQuery(c *gin.Context) service.NoticeListQuery {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, _ := strconv.Atoi(c.Query("page"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
 	query := service.NoticeListQuery{
-		Cursor:  c.Query("cursor"),
-		Limit:   pagination.NormalizeLimit(limit),
-		Keyword: c.Query("keyword"),
+		Page:     page,
+		PageSize: pageSize,
+		Keyword:  c.Query("keyword"),
 	}
 	if enabled := c.Query("enabled"); enabled != "" {
 		parsed, err := strconv.ParseBool(enabled)

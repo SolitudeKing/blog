@@ -17,9 +17,9 @@ type SearchService struct {
 }
 
 type ArticleSearchQuery struct {
-	Cursor  string
-	Limit   int
-	Keyword string
+	Page     int
+	PageSize int
+	Keyword  string
 }
 
 type ArticleSearchItem struct {
@@ -32,14 +32,18 @@ func NewSearchService(db *gorm.DB) *SearchService {
 	return &SearchService{db: db}
 }
 
-func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) ([]ArticleSearchItem, pagination.CursorPage, error) {
-	limit := pagination.NormalizeLimit(query.Limit)
+func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) ([]ArticleSearchItem, pagination.ListPage, error) {
+	page := pagination.NormalizePage(query.Page)
+	pageSize := pagination.NormalizePageSize(query.PageSize)
 	keyword := strings.TrimSpace(query.Keyword)
+	empty := func() ([]ArticleSearchItem, pagination.ListPage, error) {
+		return []ArticleSearchItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+	}
 	if keyword == "" {
-		return []ArticleSearchItem{}, pagination.CursorPage{Cursor: query.Cursor, Limit: limit}, nil
+		return empty()
 	}
 	if s.db == nil {
-		return []ArticleSearchItem{}, pagination.CursorPage{Cursor: query.Cursor, Limit: limit}, nil
+		return empty()
 	}
 
 	dbQuery := s.db.WithContext(ctx).Model(&model.Article{}).Preload("Topic").Preload("Tags").
@@ -67,28 +71,20 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 		like,
 		like,
 	)
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
-		}
-		dbQuery = dbQuery.Where(
-			"articles.created_at < ? OR (articles.created_at = ? AND articles.id < ?)",
-			cursor.CreatedAt,
-			cursor.CreatedAt,
-			cursor.ID,
-		)
-	}
 
+	offset := (page - 1) * pageSize
 	var rows []model.Article
-	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").Limit(limit + 1).Find(&rows).Error
+	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").
+		Limit(pageSize + 1).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
-		return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 
-	hasMore := len(rows) > limit
+	hasMore := len(rows) > pageSize
 	if hasMore {
-		rows = rows[:limit]
+		rows = rows[:pageSize]
 	}
 	items := make([]ArticleSearchItem, 0, len(rows))
 	for _, row := range rows {
@@ -99,21 +95,10 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 		})
 	}
 
-	nextCursor := ""
-	if hasMore && len(rows) > 0 {
-		last := rows[len(rows)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{CreatedAt: last.CreatedAt, ID: last.ID})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-
-	return items, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items, pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 

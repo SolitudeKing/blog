@@ -38,10 +38,10 @@ type AssetService struct {
 }
 
 type AssetListQuery struct {
-	Cursor  string
-	Limit   int
-	Keyword string
-	Mime    string
+	Page     int
+	PageSize int
+	Keyword  string
+	Mime     string
 }
 
 type AssetItem struct {
@@ -79,12 +79,13 @@ func NewAssetService(db *gorm.DB, store storage.ObjectStorage) *AssetService {
 	return &AssetService{db: db, store: store}
 }
 
-func (s *AssetService) List(query AssetListQuery) ([]AssetItem, pagination.CursorPage, error) {
-	limit := pagination.NormalizeLimit(query.Limit)
+func (s *AssetService) List(query AssetListQuery) ([]AssetItem, pagination.ListPage, error) {
+	page := pagination.NormalizePage(query.Page)
+	pageSize := pagination.NormalizePageSize(query.PageSize)
 	if s.db != nil {
-		return s.listFromDB(query, limit)
+		return s.listFromDB(query, page, pageSize)
 	}
-	return s.listInMemory(query, limit)
+	return s.listInMemory(query, page, pageSize)
 }
 
 func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName string) (AssetItem, error) {
@@ -260,18 +261,20 @@ func (s *AssetService) Delete(id string) error {
 	return apperrors.New(apperrors.CodeResourceNotFound)
 }
 
-func (s *AssetService) ReferenceList(id string, limit int) ([]AssetReferenceItem, pagination.CursorPage, error) {
+func (s *AssetService) ReferenceList(id string, page int, pageSize int) ([]AssetReferenceItem, pagination.ListPage, error) {
 	if _, err := strconv.ParseUint(id, 10, 64); err != nil {
-		return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidParameter)
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
-	pageLimit := pagination.NormalizeLimit(limit)
-	return []AssetReferenceItem{}, pagination.CursorPage{
-		Limit:   pageLimit,
-		HasMore: false,
+	normalizedPage := pagination.NormalizePage(page)
+	normalizedSize := pagination.NormalizePageSize(pageSize)
+	return []AssetReferenceItem{}, pagination.ListPage{
+		Page:     normalizedPage,
+		PageSize: normalizedSize,
+		HasMore:  false,
 	}, nil
 }
 
-func (s *AssetService) listFromDB(query AssetListQuery, limit int) ([]AssetItem, pagination.CursorPage, error) {
+func (s *AssetService) listFromDB(query AssetListQuery, page, pageSize int) ([]AssetItem, pagination.ListPage, error) {
 	dbQuery := s.db.Model(&model.Asset{})
 	if query.Keyword != "" {
 		dbQuery = dbQuery.Where("display_name LIKE ? OR alt_text LIKE ?", "%"+query.Keyword+"%", "%"+query.Keyword+"%")
@@ -279,45 +282,32 @@ func (s *AssetService) listFromDB(query AssetListQuery, limit int) ([]AssetItem,
 	if query.Mime != "" {
 		dbQuery = dbQuery.Where("mime_type LIKE ?", query.Mime+"%")
 	}
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
-		}
-		dbQuery = dbQuery.Where("created_at < ? OR (created_at = ? AND id < ?)", cursor.CreatedAt, cursor.CreatedAt, cursor.ID)
-	}
 
+	offset := (page - 1) * pageSize
 	var rows []model.Asset
-	err := dbQuery.Order("created_at DESC, id DESC").Limit(limit + 1).Find(&rows).Error
+	err := dbQuery.Order("created_at DESC, id DESC").
+		Limit(pageSize + 1).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
-		return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	hasMore := len(rows) > limit
+	hasMore := len(rows) > pageSize
 	if hasMore {
-		rows = rows[:limit]
+		rows = rows[:pageSize]
 	}
 	items := make([]AssetItem, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, assetFromModel(row))
 	}
-	nextCursor := ""
-	if hasMore && len(rows) > 0 {
-		last := rows[len(rows)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{CreatedAt: last.CreatedAt, ID: last.ID})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-	return items, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items, pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 
-func (s *AssetService) listInMemory(query AssetListQuery, limit int) ([]AssetItem, pagination.CursorPage, error) {
+func (s *AssetService) listInMemory(query AssetListQuery, page, pageSize int) ([]AssetItem, pagination.ListPage, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	items := make([]AssetItem, 0, len(s.items))
@@ -334,26 +324,20 @@ func (s *AssetService) listInMemory(query AssetListQuery, limit int) ([]AssetIte
 		items = append(items, item)
 	}
 	items = sortAssetsByCreatedAt(items)
-	end := limit
-	hasMore := len(items) > limit
+
+	offset := (page - 1) * pageSize
+	if offset >= len(items) {
+		return []AssetItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+	}
+	end := offset + pageSize
+	hasMore := end < len(items)
 	if end > len(items) {
 		end = len(items)
 	}
-	pageItems := items[:end]
-	nextCursor := ""
-	if hasMore && len(pageItems) > 0 {
-		last := pageItems[len(pageItems)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{CreatedAt: last.CreatedAt, ID: last.ID})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-	return pageItems, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items[offset:end], pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 

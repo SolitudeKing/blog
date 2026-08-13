@@ -8,7 +8,7 @@ import (
 
 const (
 	prefix        = "blog:v1"
-	articlePrefix = "blog:v2"
+	articlePrefix = "blog:v3"
 )
 
 func ArticleDetailKey(slug string) string {
@@ -19,8 +19,8 @@ func ArticleDetailPattern() string {
 	return articlePrefix + ":article:detail:*"
 }
 
-func ArticleListKey(cursor string, limit int, filterHash string) string {
-	return fmt.Sprintf("%s:article:list:%s:%d:%s", articlePrefix, cursor, limit, filterHash)
+func ArticleListKey(page int, pageSize int, filterHash string) string {
+	return fmt.Sprintf("%s:article:list:%d:%d:%s", articlePrefix, page, pageSize, filterHash)
 }
 
 func ArticleListPattern() string {

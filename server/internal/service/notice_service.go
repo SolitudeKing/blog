@@ -21,10 +21,10 @@ type NoticeService struct {
 }
 
 type NoticeListQuery struct {
-	Cursor  string
-	Limit   int
-	Keyword string
-	Enabled *bool
+	Page     int
+	PageSize int
+	Keyword  string
+	Enabled  *bool
 }
 
 type NoticeItem struct {
@@ -85,12 +85,13 @@ func (s *NoticeService) Active() (*NoticeItem, error) {
 	return nil, nil
 }
 
-func (s *NoticeService) ManageList(query NoticeListQuery) ([]NoticeItem, pagination.CursorPage, error) {
-	limit := pagination.NormalizeLimit(query.Limit)
+func (s *NoticeService) ManageList(query NoticeListQuery) ([]NoticeItem, pagination.ListPage, error) {
+	page := pagination.NormalizePage(query.Page)
+	pageSize := pagination.NormalizePageSize(query.PageSize)
 	if s.db != nil {
-		return s.listFromDB(query, limit)
+		return s.listFromDB(query, page, pageSize)
 	}
-	return s.listInMemory(query, limit)
+	return s.listInMemory(query, page, pageSize)
 }
 
 func (s *NoticeService) Create(req NoticeSaveRequest) (NoticeItem, error) {
@@ -206,7 +207,7 @@ func (s *NoticeService) Delete(id string) error {
 	return apperrors.New(apperrors.CodeResourceNotFound)
 }
 
-func (s *NoticeService) listFromDB(query NoticeListQuery, limit int) ([]NoticeItem, pagination.CursorPage, error) {
+func (s *NoticeService) listFromDB(query NoticeListQuery, page, pageSize int) ([]NoticeItem, pagination.ListPage, error) {
 	dbQuery := s.db.Model(&model.Notice{})
 	if query.Keyword != "" {
 		dbQuery = dbQuery.Where("title LIKE ? OR content LIKE ?", "%"+query.Keyword+"%", "%"+query.Keyword+"%")
@@ -214,53 +215,32 @@ func (s *NoticeService) listFromDB(query NoticeListQuery, limit int) ([]NoticeIt
 	if query.Enabled != nil {
 		dbQuery = dbQuery.Where("enabled = ?", *query.Enabled)
 	}
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
-		}
-		dbQuery = dbQuery.Where(
-			"created_at < ? OR (created_at = ? AND id < ?)",
-			cursor.CreatedAt,
-			cursor.CreatedAt,
-			cursor.ID,
-		)
-	}
 
+	offset := (page - 1) * pageSize
 	var rows []model.Notice
-	err := dbQuery.Order("created_at DESC, id DESC").Limit(limit + 1).Find(&rows).Error
+	err := dbQuery.Order("created_at DESC, id DESC").
+		Limit(pageSize + 1).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
-		return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	hasMore := len(rows) > limit
+	hasMore := len(rows) > pageSize
 	if hasMore {
-		rows = rows[:limit]
+		rows = rows[:pageSize]
 	}
 	items := make([]NoticeItem, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, noticeFromModel(row))
 	}
-	nextCursor := ""
-	if hasMore && len(rows) > 0 {
-		last := rows[len(rows)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{
-			CreatedAt: last.CreatedAt,
-			ID:        last.ID,
-		})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-	return items, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items, pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 
-func (s *NoticeService) listInMemory(query NoticeListQuery, limit int) ([]NoticeItem, pagination.CursorPage, error) {
+func (s *NoticeService) listInMemory(query NoticeListQuery, page, pageSize int) ([]NoticeItem, pagination.ListPage, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -279,40 +259,19 @@ func (s *NoticeService) listInMemory(query NoticeListQuery, limit int) ([]Notice
 	}
 	items = sortNoticesByCreatedAt(items)
 
-	start := 0
-	if query.Cursor != "" {
-		cursor, err := pagination.DecodeCursor(query.Cursor)
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInvalidCursor)
-		}
-		for index, item := range items {
-			if item.CreatedAt.Equal(cursor.CreatedAt) && item.ID == cursor.ID {
-				start = index + 1
-				break
-			}
-		}
+	offset := (page - 1) * pageSize
+	if offset >= len(items) {
+		return []NoticeItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
 	}
-
-	end := start + limit
+	end := offset + pageSize
 	hasMore := end < len(items)
 	if end > len(items) {
 		end = len(items)
 	}
-	pageItems := items[start:end]
-	nextCursor := ""
-	if hasMore && len(pageItems) > 0 {
-		last := pageItems[len(pageItems)-1]
-		var err error
-		nextCursor, err = pagination.EncodeCursor(pagination.CursorPayload{CreatedAt: last.CreatedAt, ID: last.ID})
-		if err != nil {
-			return nil, pagination.CursorPage{}, apperrors.New(apperrors.CodeInternalServerError)
-		}
-	}
-	return pageItems, pagination.CursorPage{
-		Cursor:     query.Cursor,
-		NextCursor: nextCursor,
-		Limit:      limit,
-		HasMore:    hasMore,
+	return items[offset:end], pagination.ListPage{
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 

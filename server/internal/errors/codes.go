@@ -14,7 +14,7 @@ const (
 	CodeInvalidRequest        = 20000
 	CodeMissingRequiredField  = 20001
 	CodeInvalidParameter      = 20002
-	CodeInvalidCursor         = 20003
+	CodeInvalidPage           = 20003
 	CodeUnsupportedAPIVersion = 20004
 	CodeMalformedJSONBody     = 20005
 
@@ -47,7 +47,7 @@ var messages = map[int]string{
 	CodeInvalidRequest:         "invalid request",
 	CodeMissingRequiredField:   "missing required field",
 	CodeInvalidParameter:       "invalid parameter",
-	CodeInvalidCursor:          "invalid cursor",
+	CodeInvalidPage:            "invalid page",
 	CodeUnsupportedAPIVersion:  "unsupported api version",
 	CodeMalformedJSONBody:      "malformed json body",
 	CodeResourceNotFound:       "resource not found",

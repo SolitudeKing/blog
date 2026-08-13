@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apperrors "solitude-blog/server/internal/errors"
-	"solitude-blog/server/internal/pagination"
 	"solitude-blog/server/internal/response"
 	"solitude-blog/server/internal/service"
 )
@@ -103,13 +102,14 @@ func (h *ArticleHandler) Delete(c *gin.Context) {
 }
 
 func articleListQuery(c *gin.Context) service.ArticleListQuery {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, _ := strconv.Atoi(c.Query("page"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
 	return service.ArticleListQuery{
-		Cursor:  c.Query("cursor"),
-		Limit:   pagination.NormalizeLimit(limit),
-		Topic:   c.Query("topic"),
-		Tag:     c.Query("tag"),
-		Keyword: c.Query("keyword"),
-		Status:  c.Query("status"),
+		Page:     page,
+		PageSize: pageSize,
+		Topic:    c.Query("topic"),
+		Tag:      c.Query("tag"),
+		Keyword:  c.Query("keyword"),
+		Status:   c.Query("status"),
 	}
 }
