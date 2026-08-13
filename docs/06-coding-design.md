@@ -99,14 +99,20 @@ APP_PORT=8080
 APP_API_VERSION=v1
 # Compose 使用 http://localhost；宿主机 Vite 开发时使用 http://localhost:5173。
 SITE_BASE_URL=http://localhost
+# MySQL / Redis 由外部托管服务提供，把连接信息指向实际实例即可。
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_DATABASE=blog
 MYSQL_USER=blog
 MYSQL_PASSWORD=...
+# false 不启用；true 启用并校验证书；skip-verify 启用但跳过证书校验（仅自签名证书场景）。
+MYSQL_TLS=false
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
+# Redis 6+ ACL 用户名；留空时等价于仅密码，兼容旧版本 Redis。
+REDIS_USER=
 REDIS_PASSWORD=...
+REDIS_TLS=false
 JWT_ACCESS_SECRET=...
 JWT_REFRESH_SECRET=...
 ADMIN_USERNAME=admin
@@ -114,7 +120,7 @@ ADMIN_PASSWORD=...
 STORAGE_LOCAL_ROOT=./storage/uploads
 ```
 
-`.env` 只记录原子连接字段，Go 配置层负责组合 `MySQLDSN` 和 `RedisAddr`，调用方仍使用统一的完整配置。Compose 为 API 容器显式覆盖 `MYSQL_HOST=mysql`、`MYSQL_PORT=3306`、`REDIS_HOST=redis`、`REDIS_PORT=6379`；API 在宿主机运行时使用 `127.0.0.1` 和 Compose 映射到宿主机的端口。
+`.env` 只记录原子连接字段，Go 配置层负责组合 `MySQLDSN` 和 `RedisAddr`，调用方仍使用统一的完整配置。Compose **不再覆盖** `MYSQL_HOST` / `REDIS_HOST`；外部实例地址直接由 `.env` 透传到 API 容器，API 通过该地址直连外部 MySQL / Redis。
 
 当前没有 Celery 或其他异步任务服务，因此 `.env` 不记录 `CELERY_BROKER_URL`、`CELERY_RESULT_BACKEND` 等无消费者配置。实际 `.env` 不得写入文档或提交。
 

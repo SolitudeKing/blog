@@ -97,13 +97,13 @@ storage/uploads/
 
 ## 部署边界
 
-Compose 包含 `mysql`、`redis`、`api`、`nginx` 四个服务：
+Compose 仅打包 `api` 与 `nginx` 两个服务；**MySQL 与 Redis 由外部托管服务提供**，不在本仓库 Compose 内启动：
 
 - 只有 Nginx 面向外部监听。
-- MySQL、Redis 和 API 的调试端口绑定 `127.0.0.1`。
-- Compose 要求显式提供数据库和 Redis 密码。
+- API 调试端口（若有）绑定 `127.0.0.1`；外部 MySQL / Redis 不暴露宿主机端口。
+- `.env` 通过原子变量注入外部实例地址与端口，Go 配置层据此组合 DSN / Addr。
 - Nginx 配置只处理 HTTP；HTTPS 由真实边缘代理或平台终止。
-- MySQL、Redis 和上传文件使用独立命名卷。
+- 外部数据库 / 缓存的备份责任由托管方承担；本仓库仅保留 `api-storage` 上传卷，仍需独立备份。
 - 常驻服务使用 `restart: unless-stopped`，但仍需外部监控。
 
 部署和恢复步骤见 [部署与备份运行手册](./08-deployment-runbook.md)。
