@@ -1180,7 +1180,8 @@
   font-size: var(--text-sm);
 }
 
-.mist-admin-comments time {
+.mist-admin-comments time,
+.mist-admin-comments__meta {
   color: var(--text-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
@@ -1274,7 +1275,8 @@
   content: "";
 }
 
-.mist-admin-activity time {
+.mist-admin-activity time,
+.mist-admin-activity__label {
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
