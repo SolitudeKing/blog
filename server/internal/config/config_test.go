@@ -236,6 +236,133 @@ func TestParsePortRejectsOutOfRangeAndMalformedValues(t *testing.T) {
 	}
 }
 
+func TestResolveMySQLDSNAppendsTLSParam(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		tlsValue     string
+		wantContains string
+		wantOmit     bool
+	}{
+		{name: "false omitted", tlsValue: "false", wantOmit: true},
+		{name: "empty omitted", tlsValue: "", wantOmit: true},
+		{name: "true appends tls=true", tlsValue: "true", wantContains: "tls=true"},
+		{name: "skip-verify appends tls=skip-verify", tlsValue: "skip-verify", wantContains: "tls=skip-verify"},
+		{name: "ON alias", tlsValue: "ON", wantContains: "tls=true"},
+		{name: "OFF alias", tlsValue: "OFF", wantOmit: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			values := atomicConnectionEnv()
+			if tc.tlsValue != "" {
+				values["MYSQL_TLS"] = tc.tlsValue
+			}
+
+			dsn, err := resolveMySQLDSN(mapEnvLookup(values))
+			if err != nil {
+				t.Fatalf("resolveMySQLDSN() error = %v", err)
+			}
+
+			if tc.wantOmit {
+				if strings.Contains(dsn, "tls=") {
+					t.Fatalf("DSN = %q, want no tls= param", dsn)
+				}
+				return
+			}
+			if !strings.Contains(dsn, tc.wantContains) {
+				t.Fatalf("DSN = %q, want substring %q", dsn, tc.wantContains)
+			}
+		})
+	}
+}
+
+func TestResolveMySQLDSNRejectsUnsupportedTLS(t *testing.T) {
+	t.Parallel()
+
+	values := atomicConnectionEnv()
+	values["MYSQL_TLS"] = "custom-name"
+
+	if _, err := resolveMySQLDSN(mapEnvLookup(values)); err == nil {
+		t.Fatal("resolveMySQLDSN() error = nil, want unsupported value error")
+	}
+}
+
+func TestMySQLTLSParam(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		raw        string
+		wantParam  string
+		wantOK     bool
+		wantErrMsg string
+	}{
+		{raw: "", wantParam: "", wantOK: false},
+		{raw: "false", wantParam: "", wantOK: false},
+		{raw: "TRUE", wantParam: "true", wantOK: true},
+		{raw: "skip-verify", wantParam: "skip-verify", wantOK: true},
+		{raw: "bogus", wantParam: "", wantOK: false, wantErrMsg: "unsupported value"},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			param, ok, err := mysqlTLSParam(tc.raw)
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatalf("mysqlTLSParam(%q) error = nil, want error containing %q", tc.raw, tc.wantErrMsg)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("mysqlTLSParam(%q) error = %v, want contains %q", tc.raw, err, tc.wantErrMsg)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("mysqlTLSParam(%q) unexpected error: %v", tc.raw, err)
+			}
+			if ok != tc.wantOK {
+				t.Fatalf("mysqlTLSParam(%q) ok = %v, want %v", tc.raw, ok, tc.wantOK)
+			}
+			if param != tc.wantParam {
+				t.Fatalf("mysqlTLSParam(%q) param = %q, want %q", tc.raw, param, tc.wantParam)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsUnsupportedTLS(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mysql", func(t *testing.T) {
+		cfg := validTestConfig()
+		cfg.MySQLTLS = "custom-name"
+		if err := cfg.Validate(); err == nil {
+			t.Fatal("Validate() error = nil, want MYSQL_TLS validation error")
+		}
+	})
+
+	t.Run("redis", func(t *testing.T) {
+		cfg := validTestConfig()
+		cfg.RedisTLS = "custom-name"
+		if err := cfg.Validate(); err == nil {
+			t.Fatal("Validate() error = nil, want REDIS_TLS validation error")
+		}
+	})
+}
+
+func TestValidateAcceptsSupportedTLS(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"false", "true", "skip-verify"} {
+		t.Run(value, func(t *testing.T) {
+			cfg := validTestConfig()
+			cfg.MySQLTLS = value
+			cfg.RedisTLS = value
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil for TLS=%q", err, value)
+			}
+		})
+	}
+}
+
 func atomicConnectionEnv() map[string]string {
 	return map[string]string{
 		"MYSQL_HOST":     "2001:db8::10",

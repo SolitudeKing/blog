@@ -26,6 +26,16 @@ type Config struct {
 	// 留空时等价于仅密码，兼容旧版本 Redis。
 	RedisUsername string
 
+	// MySQLTLS 对应 MYSQL_TLS：
+	//   - 空 / "false" / "0" / "off" → 不启用 TLS（默认）
+	//   - "true" / "1" / "on"        → 启用 TLS，使用系统根证书校验
+	//   - "skip-verify"              → 启用 TLS 但跳过证书校验（仅开发或自签名证书场景）
+	// 其它非空值在 Validate 阶段被拒绝。
+	MySQLTLS string
+
+	// RedisTLS 对应 REDIS_TLS：取值语义同 MySQLTLS。
+	RedisTLS string
+
 	JWTAccessSecret  string
 	JWTRefreshSecret string
 	JWTAccessTTL     time.Duration
@@ -76,6 +86,8 @@ func Load() (Config, error) {
 		RedisAddr:        redisAddr,
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
 		RedisUsername:    getEnv("REDIS_USER", ""),
+		MySQLTLS:         strings.TrimSpace(getEnv("MYSQL_TLS", "")),
+		RedisTLS:         strings.TrimSpace(getEnv("REDIS_TLS", "")),
 		JWTAccessSecret:  getEnv("JWT_ACCESS_SECRET", "dev-access-secret"),
 		JWTRefreshSecret: getEnv("JWT_REFRESH_SECRET", "dev-refresh-secret"),
 		JWTAccessTTL:     time.Duration(getEnvInt("JWT_ACCESS_TTL_MINUTES", 30)) * time.Minute,
@@ -116,6 +128,12 @@ func (c Config) Validate() error {
 		if err := validateHostPort("Redis address", c.RedisAddr); err != nil {
 			return err
 		}
+	}
+	if _, _, err := mysqlTLSParam(c.MySQLTLS); err != nil {
+		return fmt.Errorf("MYSQL_TLS is invalid: %w", err)
+	}
+	if _, _, err := mysqlTLSParam(c.RedisTLS); err != nil {
+		return fmt.Errorf("REDIS_TLS is invalid: %w", err)
 	}
 	if c.JWTAccessTTL <= 0 {
 		return errors.New("JWT_ACCESS_TTL_MINUTES must be greater than zero")
@@ -228,6 +246,14 @@ func resolveMySQLDSN(lookup envLookup) (string, error) {
 	driverConfig.ParseTime = true
 	driverConfig.Loc = time.UTC
 	driverConfig.Params = map[string]string{"charset": "utf8mb4"}
+
+	mysqlTLS, _ := lookup("MYSQL_TLS")
+	mysqlTLS = strings.TrimSpace(mysqlTLS)
+	if tlsParam, enabled, err := mysqlTLSParam(mysqlTLS); err != nil {
+		return "", fmt.Errorf("MYSQL_TLS is invalid: %w", err)
+	} else if enabled {
+		driverConfig.Params["tls"] = tlsParam
+	}
 	return driverConfig.FormatDSN(), nil
 }
 
@@ -269,6 +295,30 @@ func hasAnyEnv(lookup envLookup, keys ...string) bool {
 		}
 	}
 	return false
+}
+
+// mysqlTLSParam 把 MYSQL_TLS 字符串翻译为 DSN 中 tls= 参数的取值。
+//
+// 约定：
+//   - 空 / "false" / "0" / "off" / "no" → enabled=false（不写入 tls= 参数，使用明文 TCP）
+//   - "true" / "1" / "on"               → enabled=true，param="true"
+//     （database 层负责以同名注册 *tls.Config，使用系统根证书校验）
+//   - "skip-verify"                     → enabled=true，param="skip-verify"
+//     （database 层负责以同名注册 *tls.Config，跳过证书校验）
+//   - 其它非空值 → 报错
+func mysqlTLSParam(raw string) (string, bool, error) {
+	switch strings.ToLower(raw) {
+	case "":
+		return "", false, nil
+	case "false", "0", "off", "no":
+		return "", false, nil
+	case "true", "1", "on":
+		return "true", true, nil
+	case "skip-verify":
+		return "skip-verify", true, nil
+	default:
+		return "", false, fmt.Errorf("unsupported value %q (allowed: false, true, skip-verify)", raw)
+	}
 }
 
 func getRequiredEnv(lookup envLookup, key string) (string, error) {

@@ -2,12 +2,14 @@ package database
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
@@ -47,6 +49,9 @@ func Open(ctx context.Context, cfg config.Config) (Resources, error) {
 func openMySQL(ctx context.Context, cfg config.Config) (*gorm.DB, error) {
 	if strings.TrimSpace(cfg.MySQLDSN) == "" {
 		return nil, errors.New("MYSQL_DSN is required")
+	}
+	if err := registerMySQLTLSConfig(cfg.MySQLDSN); err != nil {
+		return nil, err
 	}
 	if err := ensureDatabase(ctx, cfg.MySQLDSN); err != nil {
 		return nil, err
@@ -111,12 +116,19 @@ func openRedis(ctx context.Context, cfg config.Config) (*redis.Client, error) {
 		return nil, nil
 	}
 
-	client := redis.NewClient(&redis.Options{
+	options := &redis.Options{
 		Addr:     cfg.RedisAddr,
 		Username: cfg.RedisUsername, // Redis 6+ ACL；留空时等价于仅密码。
 		Password: cfg.RedisPassword,
 		DB:       0,
-	})
+	}
+	if tlsConfig, enabled, err := redisTLSConfig(cfg.RedisTLS); err != nil {
+		return nil, err
+	} else if enabled {
+		options.TLSConfig = tlsConfig
+	}
+
+	client := redis.NewClient(options)
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, err
 	}
@@ -479,4 +491,66 @@ func Close(resources Resources) error {
 		}
 	}
 	return closeErr
+}
+
+// mysqlTLSRegistry 跟踪我们已向 mysql_driver 注册过的 TLS 配置名，
+// 防止同一进程内重复 RegisterTLSConfig 触发 panic。
+// 外部用户通过 mysql_driver.RegisterTLSConfig 自定义的名字也会被记录。
+var mysqlTLSRegistry sync.Map
+
+// registerMySQLTLSConfig 解析 DSN 中的 tls= 参数并按需向 mysql_driver 注册 TLS 配置。
+// 支持的 DSN 参数值：
+//   - "true"         → 注册同名配置，使用系统根证书校验
+//   - "skip-verify"  → 注册同名配置，跳过证书校验（仅开发或自签名证书场景）
+//   - 其它非空值    → 假定用户已在外部通过 RegisterTLSConfig 注册过同名配置，本函数不重复注册
+//   - 空 / "false"  → 不启用 TLS，直接返回
+func registerMySQLTLSConfig(dsn string) error {
+	parsed, err := mysqlDriver.ParseDSN(dsn)
+	if err != nil {
+		return err
+	}
+	tlsName := strings.TrimSpace(parsed.Params["tls"])
+	switch tlsName {
+	case "", "false":
+		return nil
+	case "true":
+		return registerMySQLTLSConfigOnce(tlsName, &tls.Config{MinVersion: tls.VersionTLS12})
+	case "skip-verify":
+		return registerMySQLTLSConfigOnce(tlsName, &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true,
+		})
+	default:
+		// 假定用户已在外部注册过同名配置；如果未注册，mysql_driver 会在握手时报错。
+		return nil
+	}
+}
+
+func registerMySQLTLSConfigOnce(name string, cfg *tls.Config) error {
+	if _, loaded := mysqlTLSRegistry.Load(name); loaded {
+		return nil
+	}
+	if err := mysqlDriver.RegisterTLSConfig(name, cfg); err != nil {
+		return err
+	}
+	mysqlTLSRegistry.Store(name, true)
+	return nil
+}
+
+// redisTLSConfig 把 REDIS_TLS 字符串翻译为 redis.Options.TLSConfig 字段。
+// 取值语义与 MYSQL_TLS 一致：false / 空 / true / skip-verify。
+func redisTLSConfig(raw string) (*tls.Config, bool, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "false", "0", "off", "no":
+		return nil, false, nil
+	case "true", "1", "on":
+		return &tls.Config{MinVersion: tls.VersionTLS12}, true, nil
+	case "skip-verify":
+		return &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true,
+		}, true, nil
+	default:
+		return nil, false, errors.New("REDIS_TLS only supports false / true / skip-verify")
+	}
 }
