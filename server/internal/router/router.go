@@ -1,6 +1,8 @@
 package router
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"solitude-blog/server/internal/config"
@@ -24,7 +26,10 @@ type Handlers struct {
 }
 
 func Register(r *gin.Engine, h Handlers, cfg config.Config) {
-	r.Static("/uploads", cfg.StorageLocalRoot)
+	// 仅在本地存储驱动下挂载 /uploads 静态目录；S3 模式下文件由对象存储直接提供外链。
+	if strings.EqualFold(strings.TrimSpace(cfg.StorageDriver), "local") || cfg.StorageDriver == "" {
+		r.Static("/uploads", cfg.StorageLocalRoot)
+	}
 
 	r.GET("healthz", h.Health.Healthz)
 	r.GET("rss.xml", h.Feed.RSS)

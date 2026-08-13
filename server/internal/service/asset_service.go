@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,15 +25,16 @@ import (
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
 	"solitude-blog/server/internal/pagination"
+	"solitude-blog/server/internal/storage"
 )
 
 const maxAssetUploadSize int64 = 10 * 1024 * 1024
 
 type AssetService struct {
-	db      *gorm.DB
-	rootDir string
-	mu      sync.RWMutex
-	items   []AssetItem
+	db    *gorm.DB
+	store storage.ObjectStorage
+	mu    sync.RWMutex
+	items []AssetItem
 }
 
 type AssetListQuery struct {
@@ -72,8 +75,8 @@ type AssetReferenceItem struct {
 	URL   string `json:"url"`
 }
 
-func NewAssetService(db *gorm.DB, rootDir string) *AssetService {
-	return &AssetService{db: db, rootDir: rootDir}
+func NewAssetService(db *gorm.DB, store storage.ObjectStorage) *AssetService {
+	return &AssetService{db: db, store: store}
 }
 
 func (s *AssetService) List(query AssetListQuery) ([]AssetItem, pagination.CursorPage, error) {
@@ -98,6 +101,7 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	}
 	defer source.Close()
 
+	// 先读前 512 字节嗅探 MIME；MIME 白名单不通过直接拒绝。
 	head := make([]byte, 512)
 	n, _ := source.Read(head)
 	mimeType := http.DetectContentType(head[:n])
@@ -105,13 +109,19 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	if !allowed {
 		return AssetItem{}, apperrors.New(apperrors.CodeUnsupportedFileType)
 	}
-	if seeker, ok := source.(io.Seeker); ok {
-		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-			return AssetItem{}, apperrors.New(apperrors.CodeInvalidRequest)
-		}
-	} else {
-		return AssetItem{}, apperrors.New(apperrors.CodeInvalidRequest)
+
+	// 单次 io.Copy 同时写哈希与内存缓冲区，避免两次读取；
+	// 受 maxAssetUploadSize 限制，整文件驻留内存可接受。
+	hasher := sha256.New()
+	var buffer bytes.Buffer
+	multi := io.MultiWriter(hasher, &buffer)
+	if _, err := io.Copy(multi, source); err != nil {
+		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
 	}
+	data := buffer.Bytes()
+	hashSum := hasher.Sum(nil)
+
+	width, height := decodeImageDimensions(data, mimeType)
 
 	now := time.Now().UTC()
 	storageKey := filepath.ToSlash(filepath.Join(
@@ -119,43 +129,26 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 		now.Format("01"),
 		randomAssetName()+ext,
 	))
-	fullPath := filepath.Join(s.rootDir, filepath.FromSlash(storageKey))
-	if err := ensureParentDir(fullPath); err != nil {
-		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
-	}
 
-	target, err := createFile(fullPath)
+	url, err := s.store.Put(context.Background(), storageKey, bytes.NewReader(data), int64(len(data)), mimeType)
 	if err != nil {
 		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
 	}
-	keepFile := false
-	defer func() {
-		if !keepFile {
-			_ = removeFile(fullPath)
-		}
-	}()
-	hash := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(target, hash), source)
-	closeErr := target.Close()
-	if copyErr != nil || closeErr != nil {
-		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
-	}
 
-	width, height := imageDimensions(fullPath, mimeType)
 	if displayName == "" {
 		displayName = fileHeader.Filename
 	}
 	item := AssetItem{
 		DisplayName: displayName,
 		StorageKey:  storageKey,
-		URL:         "/uploads/" + storageKey,
+		URL:         url,
 		ThumbURL:    "",
 		MimeType:    mimeType,
 		Ext:         strings.TrimPrefix(ext, "."),
-		Size:        uint64(written),
+		Size:        uint64(len(data)),
 		Width:       width,
 		Height:      height,
-		SHA256:      hex.EncodeToString(hash.Sum(nil)),
+		SHA256:      hex.EncodeToString(hashSum),
 		Status:      "ready",
 		RefCount:    0,
 		CreatedAt:   now,
@@ -165,9 +158,10 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	if s.db != nil {
 		row := assetModelFromItem(item)
 		if err := s.db.Create(&row).Error; err != nil {
+			// 数据库写入失败时清理已上传的对象，避免孤儿文件。
+			_ = s.store.Delete(context.Background(), storageKey)
 			return AssetItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
-		keepFile = true
 		return assetFromModel(row), nil
 	}
 
@@ -175,7 +169,6 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	defer s.mu.Unlock()
 	item.ID = uint64(len(s.items) + 1)
 	s.items = append(s.items, item)
-	keepFile = true
 	return item, nil
 }
 
@@ -240,7 +233,8 @@ func (s *AssetService) Delete(id string) error {
 		if err := s.db.Delete(&row).Error; err != nil {
 			return apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
-		_ = removeFile(filepath.Join(s.rootDir, filepath.FromSlash(row.StorageKey)))
+		// 删库后清理对象，失败不阻塞业务（与原行为一致）。
+		_ = s.store.Delete(context.Background(), row.StorageKey)
 		return nil
 	}
 
@@ -252,7 +246,7 @@ func (s *AssetService) Delete(id string) error {
 				return apperrors.New(apperrors.CodeReferencedResourceUsed)
 			}
 			s.items = append(s.items[:index], s.items[index+1:]...)
-			_ = removeFile(filepath.Join(s.rootDir, filepath.FromSlash(item.StorageKey)))
+			_ = s.store.Delete(context.Background(), item.StorageKey)
 			return nil
 		}
 	}
@@ -413,16 +407,13 @@ func assetExtensionForMIME(mimeType string) (string, bool) {
 	return ext, allowed
 }
 
-func imageDimensions(path string, mimeType string) (uint, uint) {
+// decodeImageDimensions 从已读取的字节流解码尺寸，避免本地/S3 模式下 IO 语义差异。
+// 仅 jpeg/png/gif 由标准库 image 支持；webp 与未识别类型返回 0,0（不影响功能）。
+func decodeImageDimensions(data []byte, mimeType string) (uint, uint) {
 	if mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif" {
 		return 0, 0
 	}
-	file, err := openFile(path)
-	if err != nil {
-		return 0, 0
-	}
-	defer file.Close()
-	config, _, err := image.DecodeConfig(file)
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return 0, 0
 	}

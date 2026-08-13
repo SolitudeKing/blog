@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -13,6 +14,7 @@ import (
 	"solitude-blog/server/internal/middleware"
 	"solitude-blog/server/internal/router"
 	"solitude-blog/server/internal/service"
+	"solitude-blog/server/internal/storage"
 )
 
 func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resources, error) {
@@ -24,6 +26,12 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	if err != nil {
 		return nil, resources, err
 	}
+
+	objectStore, err := storage.NewFromConfig(ctx, cfg)
+	if err != nil {
+		return nil, resources, fmt.Errorf("init storage: %w", err)
+	}
+	slog.Info("object storage initialized", "driver", objectStore.Kind())
 
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -41,7 +49,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	tagService := service.NewTagService(resources.DB, resources.Redis)
 	noticeService := service.NewNoticeService(resources.DB)
 	dashboardService := service.NewDashboardService(resources.DB)
-	assetService := service.NewAssetService(resources.DB, cfg.StorageLocalRoot)
+	assetService := service.NewAssetService(resources.DB, objectStore)
 	feedService := service.NewFeedService(resources.DB)
 	searchService := service.NewSearchService(resources.DB)
 
