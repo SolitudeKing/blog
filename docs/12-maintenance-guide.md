@@ -12,7 +12,7 @@
 | `server/internal/service/` | 业务规则、事务编排、缓存失效和领域校验 |
 | `server/internal/model/` | GORM 模型与跨层稳定领域常量 |
 | `server/internal/database/` | 数据库连接、结构升级和初始化数据 |
-| `deploy/` | Compose、Nginx、健康检查与数据库运维脚本 |
+| `deploy/` | Compose、Nginx 与健康检查脚本（外部 MySQL / Redis 不在本仓库内启动，备份由托管方负责） |
 | `docs/` | 当前契约、维护方法、待办和验收记录 |
 | `demo/` | 不参与运行的静态设计蓝图；用于校准正式前端的视觉、布局与交互方向 |
 
@@ -67,8 +67,9 @@ npm run build
 ### 部署与脚本
 
 ```bash
-sh -n deploy/scripts/backup-mysql.sh deploy/scripts/healthcheck.sh deploy/scripts/restore-mysql.sh
+sh -n deploy/scripts/healthcheck.sh
 docker compose --env-file .env -f deploy/docker-compose.yml config --quiet
+docker compose --env-file .env -f deploy/docker-compose.yml config --services   # 应仅输出 api / nginx
 docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 docker compose --env-file .env -f deploy/docker-compose.yml exec nginx nginx -t
 sh deploy/scripts/healthcheck.sh
@@ -87,7 +88,7 @@ git diff --check
 2. 用稳定 slug、标题、创建时间和关联关系确认测试对象，不跨环境照搬历史自增 ID。
 3. 按“文章关联 → 文章 → 无引用标签/专题 → 无引用媒体文件”的顺序清理。
 4. 清理专题、标签或媒体前再次查询引用；名称相似不构成删除依据。
-5. 检查站点配置是否被测试导入覆盖，并清理 Redis 中相关缓存。
+5. 检查站点配置是否被测试导入覆盖，并清理外部 Redis 中相关缓存（按托管方控制台或本机 `redis-cli` 操作）。
 6. 清理后验证公开列表、后台列表、RSS、sitemap、文章详情和媒体访问。
 7. 迁移报告、SQL 临时文件和数据库备份保持在忽略目录中；确认不再需要后再删除。
 

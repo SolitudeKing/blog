@@ -9,7 +9,7 @@
 | 前端 | Vue 3 + Vite + TypeScript + Sass，自研基础组件 |
 | 后端 | Go + Gin + GORM + JWT |
 | 数据 | MySQL 是业务数据唯一可信来源，Redis 只承载可重建的读取缓存 |
-| 部署 | Docker Compose + Nginx；当前仓库不包含 TLS 终止 |
+| 部署 | Docker Compose + Nginx，仅打包 `api` 与 `nginx` 两个服务；MySQL / Redis 由外部托管服务提供，备份由托管方负责；当前仓库不包含 TLS 终止 |
 | 主题 | `mist-sea-salt`、`mist-forest` × `light`、`dark` |
 | 专题 | 雾里拾笺 `NODES/nodes`、微光造物 `CODE/code`、风过留痕 `JOTTING/jotting` |
 
