@@ -113,6 +113,7 @@ func openRedis(ctx context.Context, cfg config.Config) (*redis.Client, error) {
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisAddr,
+		Username: cfg.RedisUsername, // Redis 6+ ACL；留空时等价于仅密码。
 		Password: cfg.RedisPassword,
 		DB:       0,
 	})
