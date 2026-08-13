@@ -97,8 +97,12 @@
         </div>
       </section>
 
-      <div v-if="page.has_more && !error" class="archive-footer">
-        <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+      <div v-if="!error" class="archive-footer">
+        <BasePagination
+          :loading="loadingMore"
+          :has-more="page.has_more"
+          @load-more="loadMore"
+        />
       </div>
     </div>
   </section>
@@ -108,6 +112,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'

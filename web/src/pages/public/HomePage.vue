@@ -133,10 +133,12 @@
         </div>
 
         <div v-if="articles.length && !error" class="home-section__footer">
-          <BaseButton v-if="page.has_more" variant="secondary" :loading="loadingMore" @click="loadMore">
-            加载更多
-          </BaseButton>
-          <span v-else class="home-section__end">
+          <BasePagination
+            :loading="loadingMore"
+            :has-more="page.has_more"
+            @load-more="loadMore"
+          />
+          <span v-if="!page.has_more" class="home-section__end">
             {{ currentThemeElements.home_latest_end_text }}
           </span>
         </div>
@@ -183,6 +185,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import defaultAuthorAvatar from '@/assets/images/default-author-avatar.svg'
 import ArticleCard from '@/components/blog/ArticleCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'

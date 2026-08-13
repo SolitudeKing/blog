@@ -111,8 +111,12 @@
           </template>
         </BaseEmpty>
 
-        <div v-if="notices.length && page.has_more" class="notice-list__footer">
-          <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+        <div v-if="notices.length" class="notice-list__footer">
+          <BasePagination
+            :loading="loadingMore"
+            :has-more="page.has_more"
+            @load-more="loadMore"
+          />
         </div>
       </section>
     </div>
@@ -122,6 +126,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'

@@ -89,10 +89,12 @@
       </template>
     </BaseEmpty>
 
-    <div v-if="articles.length && page.has_more" class="admin-list-footer">
-      <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">
-        加载更多
-      </BaseButton>
+    <div v-if="articles.length" class="admin-list-footer">
+      <BasePagination
+        :loading="loadingMore"
+        :has-more="page.has_more"
+        @load-more="loadMore"
+      />
     </div>
   </section>
 </template>
@@ -101,6 +103,7 @@
 import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'

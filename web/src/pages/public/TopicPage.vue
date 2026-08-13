@@ -78,15 +78,12 @@
       </div>
 
       <div v-if="articles.length && !error" class="topic-stream__footer">
-        <BaseButton
-          v-if="page.has_more"
-          variant="secondary"
+        <BasePagination
           :loading="loadingMore"
-          @click="loadMore"
-        >
-          加载更多
-        </BaseButton>
-        <span v-else>已抵达 {{ activeTopic.name }} 的尽头</span>
+          :has-more="page.has_more"
+          @load-more="loadMore"
+        />
+        <span v-if="!page.has_more">已抵达 {{ activeTopic.name }} 的尽头</span>
       </div>
     </section>
   </section>
@@ -97,6 +94,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ArticleCard from '@/components/blog/ArticleCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'

@@ -133,8 +133,12 @@
           <BaseButton variant="secondary" size="sm" @click="loadMore">重试加载</BaseButton>
         </div>
 
-        <div v-if="results.length && page.has_more && !error" class="search-footer">
-          <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+        <div v-if="results.length && !error" class="search-footer">
+          <BasePagination
+            :loading="loadingMore"
+            :has-more="page.has_more"
+            @load-more="loadMore"
+          />
         </div>
       </section>
 
@@ -159,6 +163,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
