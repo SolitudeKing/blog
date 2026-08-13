@@ -7,24 +7,13 @@
   >
     <div class="home-featured-story__media" aria-hidden="true">
       <span class="home-featured-story__index">{{ topicLabel }} / Top</span>
-      <svg viewBox="0 0 680 220">
-        <rect x="36" y="50" width="164" height="116" rx="16" stroke-width="1.4" />
-        <rect x="258" y="28" width="164" height="70" rx="12" stroke-width="1.2" opacity=".72" />
-        <rect x="258" y="124" width="164" height="70" rx="12" stroke-width="1.2" opacity=".72" />
-        <rect x="480" y="76" width="164" height="70" rx="12" stroke-width="1.2" opacity=".48" />
-        <path
-          d="M200 108h58M422 63h28c18 0 30 12 30 30v18M422 159h28c18 0 30-12 30-30v-18"
-          stroke-width="1.4"
-        />
-        <circle cx="230" cy="108" r="4" />
-        <path d="M68 84h98M68 108h72M68 132h84" stroke-width="1.2" opacity=".62" />
-      </svg>
+      <img :class="{ 'is-default': usingDefaultCover }" :src="coverImageSrc" alt="" @error="useDefaultCover" />
     </div>
 
     <div class="home-featured-story__body">
-      <h3>
+      <div role="heading" aria-level="3">
         <RouterLink :id="headingId" :to="articlePath">{{ article.title }}</RouterLink>
-      </h3>
+      </div>
       <p v-if="article.summary">{{ article.summary }}</p>
       <div class="home-meta-row">
         <time :datetime="articleDate">{{ displayDate }}</time>
@@ -42,9 +31,9 @@
     <span class="home-story-rail__number">
       {{ articleNumber }} / {{ topicLabel }}<template v-if="primaryTag"> · {{ primaryTag }}</template>
     </span>
-    <h3>
+    <div role="heading" aria-level="3">
       <RouterLink :id="headingId" :to="articlePath">{{ article.title }}</RouterLink>
-    </h3>
+    </div>
     <p v-if="article.summary">{{ article.summary }}</p>
     <div class="home-meta-row">
       <time :datetime="articleDate">{{ displayDate }}</time>
@@ -65,9 +54,9 @@
 
     <div class="home-post-card__body">
       <span class="home-post-card__index">POST / {{ articleNumber }}</span>
-      <h3>
+      <div role="heading" aria-level="3">
         <RouterLink :id="headingId" :to="articlePath">{{ article.title }}</RouterLink>
-      </h3>
+      </div>
       <p v-if="article.summary">{{ article.summary }}</p>
     </div>
 
@@ -79,7 +68,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import defaultArticlePreview from '@/assets/images/default-article-preview.svg'
 import type { ArticleListItem } from '@/types/article'
 
 const props = withDefaults(
@@ -102,6 +92,18 @@ const articleDate = computed(() => props.article.published_at || props.article.c
 const articleNumber = computed(() => String(props.article.id || props.index).padStart(3, '0'))
 const topicLabel = computed(() => props.article.topic?.label || props.article.topic?.name || 'NODES')
 const primaryTag = computed(() => props.article.tags[0] || '')
+const coverFailed = ref(false)
+const coverURL = computed(() => props.article.cover_url?.trim() || '')
+const usingDefaultCover = computed(() => coverFailed.value || !coverURL.value)
+const coverImageSrc = computed(() => (usingDefaultCover.value ? defaultArticlePreview : coverURL.value))
+
+watch(coverURL, () => {
+  coverFailed.value = false
+})
+
+function useDefaultCover() {
+  coverFailed.value = true
+}
 
 const displayDate = computed(() => {
   if (!articleDate.value) {

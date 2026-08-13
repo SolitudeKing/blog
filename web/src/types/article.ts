@@ -10,6 +10,7 @@ export interface ArticleListItem {
   title: string
   slug: string
   summary: string
+  cover_url: string
   status: 'draft' | 'published' | 'private' | 'archived'
   topic_id: number
   topic: ArticleTopic
@@ -44,6 +45,7 @@ export interface ArticleSavePayload {
   title: string
   slug: string
   summary: string
+  cover_url: string
   content_md: string
   topic_id: number
   tag_ids: number[]

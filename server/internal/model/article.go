@@ -11,6 +11,7 @@ type Article struct {
 	Title       string         `gorm:"size:180;not null" json:"title"`
 	Slug        string         `gorm:"size:220;not null;uniqueIndex" json:"slug"`
 	Summary     string         `gorm:"size:500" json:"summary"`
+	CoverURL    string         `gorm:"size:500" json:"cover_url"`
 	ContentMD   string         `gorm:"type:longtext" json:"content_md"`
 	Status      string         `gorm:"size:32;not null;index" json:"status"`
 	TopicID     uint64         `gorm:"index" json:"topic_id"`

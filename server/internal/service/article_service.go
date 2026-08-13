@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -48,6 +49,7 @@ type ArticleItem struct {
 	Title       string         `json:"title"`
 	Slug        string         `json:"slug"`
 	Summary     string         `json:"summary"`
+	CoverURL    string         `json:"cover_url"`
 	Status      string         `json:"status"`
 	TopicID     uint64         `json:"topic_id"`
 	Topic       TopicReference `json:"topic"`
@@ -83,6 +85,7 @@ type ArticleCreateRequest struct {
 	Title     string   `json:"title"`
 	Slug      string   `json:"slug"`
 	Summary   string   `json:"summary"`
+	CoverURL  string   `json:"cover_url"`
 	ContentMD string   `json:"content_md"`
 	TopicID   uint64   `json:"topic_id"`
 	TagIDs    []uint64 `json:"tag_ids"`
@@ -184,6 +187,10 @@ func (s *ArticleService) Create(req ArticleCreateRequest, actorID uint64) (Artic
 	if err != nil {
 		return ArticleItem{}, err
 	}
+	coverURL, err := normalizeArticleCoverURL(req.CoverURL)
+	if err != nil {
+		return ArticleItem{}, err
+	}
 
 	if s.db != nil {
 		var created ArticleDetail
@@ -209,6 +216,7 @@ func (s *ArticleService) Create(req ArticleCreateRequest, actorID uint64) (Artic
 				Title:     req.Title,
 				Slug:      req.Slug,
 				Summary:   req.Summary,
+				CoverURL:  coverURL,
 				ContentMD: req.ContentMD,
 				Status:    status,
 				TopicID:   topicID,
@@ -242,6 +250,7 @@ func (s *ArticleService) Create(req ArticleCreateRequest, actorID uint64) (Artic
 		return created.ArticleItem, nil
 	}
 
+	req.CoverURL = coverURL
 	return s.createInMemory(req, status)
 }
 
@@ -257,6 +266,10 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest, actorID uin
 		return ArticleDetail{}, apperrors.New(apperrors.CodeUnauthorized)
 	}
 	status, err := normalizeArticleStatus(req.Status)
+	if err != nil {
+		return ArticleDetail{}, err
+	}
+	coverURL, err := normalizeArticleCoverURL(req.CoverURL)
 	if err != nil {
 		return ArticleDetail{}, err
 	}
@@ -297,6 +310,7 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest, actorID uin
 			article.Title = req.Title
 			article.Slug = req.Slug
 			article.Summary = req.Summary
+			article.CoverURL = coverURL
 			article.ContentMD = req.ContentMD
 			article.Status = status
 			article.TopicID = topicID
@@ -328,6 +342,7 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest, actorID uin
 		return detail, nil
 	}
 
+	req.CoverURL = coverURL
 	return s.updateInMemory(parsed, req, status)
 }
 
@@ -646,6 +661,7 @@ func (s *ArticleService) createInMemory(req ArticleCreateRequest, status string)
 			Title:       req.Title,
 			Slug:        req.Slug,
 			Summary:     req.Summary,
+			CoverURL:    req.CoverURL,
 			Status:      status,
 			TopicID:     inMemoryTopicID(req.TopicID),
 			Topic:       inMemoryTopicReference(req.TopicID),
@@ -677,6 +693,7 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 			item.Title = req.Title
 			item.Slug = req.Slug
 			item.Summary = req.Summary
+			item.CoverURL = req.CoverURL
 			item.ContentMD = req.ContentMD
 			item.Status = status
 			item.TopicID = inMemoryTopicID(req.TopicID)
@@ -789,12 +806,13 @@ func itemFromModel(article model.Article) ArticleItem {
 		tags = append(tags, tag.Slug)
 	}
 	return ArticleItem{
-		ID:      article.ID,
-		Title:   article.Title,
-		Slug:    article.Slug,
-		Summary: article.Summary,
-		Status:  article.Status,
-		TopicID: article.TopicID,
+		ID:       article.ID,
+		Title:    article.Title,
+		Slug:     article.Slug,
+		Summary:  article.Summary,
+		CoverURL: article.CoverURL,
+		Status:   article.Status,
+		TopicID:  article.TopicID,
 		Topic: TopicReference{
 			ID:    article.Topic.ID,
 			Name:  article.Topic.Name,
@@ -836,6 +854,14 @@ func normalizeArticleStatus(status string) (string, error) {
 	default:
 		return "", apperrors.New(apperrors.CodeInvalidParameter)
 	}
+}
+
+func normalizeArticleCoverURL(value string) (string, error) {
+	coverURL := strings.TrimSpace(value)
+	if utf8.RuneCountInString(coverURL) > 500 {
+		return "", apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	return coverURL, nil
 }
 
 func contains(values []string, target string) bool {

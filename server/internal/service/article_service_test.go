@@ -54,6 +54,36 @@ func TestArticleServiceUsesCanonicalTopicAndDeduplicatesTagIDs(t *testing.T) {
 	}
 }
 
+func TestArticleServiceStoresArticleCoverURL(t *testing.T) {
+	service := NewArticleService(nil, nil)
+
+	item, err := service.Create(ArticleCreateRequest{
+		Title:    "带预览图的文章",
+		Slug:     "with-cover",
+		TopicID:  1,
+		CoverURL: "  /uploads/articles/cover.webp  ",
+	}, 7)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if item.CoverURL != "/uploads/articles/cover.webp" {
+		t.Fatalf("Create() cover_url = %q", item.CoverURL)
+	}
+
+	detail, err := service.Update("1", ArticleUpdateRequest{
+		Title:    item.Title,
+		Slug:     item.Slug,
+		TopicID:  item.TopicID,
+		CoverURL: "https://example.com/new-cover.webp",
+	}, 7)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if detail.CoverURL != "https://example.com/new-cover.webp" {
+		t.Fatalf("Update() cover_url = %q", detail.CoverURL)
+	}
+}
+
 func assertAppErrorCode(t *testing.T, err error, code int) {
 	t.Helper()
 	appErr, ok := err.(apperrors.AppError)

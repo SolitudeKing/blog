@@ -3,7 +3,7 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Editor</p>
-        <h1>{{ isEditing ? '编辑文章' : '新建文章' }}</h1>
+        <div role="heading" aria-level="1">{{ isEditing ? '编辑文章' : '新建文章' }}</div>
       </div>
       <RouterLink class="mist-button mist-button--secondary" to="/admin/articles">返回列表</RouterLink>
     </header>
@@ -13,6 +13,13 @@
         <BaseInput v-model="form.title" label="标题" />
         <BaseInput v-model="form.slug" label="Slug" />
         <BaseTextarea v-model="form.summary" label="摘要" :rows="4" />
+        <BaseInput
+          v-model="form.cover_url"
+          type="url"
+          label="文章预览图 URL"
+          hint="可填写媒体库中的 /uploads/... 路径或 https://... 图片地址；留空时首页使用默认预览图。"
+          :maxlength="500"
+        />
         <BaseTextarea v-model="form.content_md" label="Markdown 正文" :rows="18" />
       </div>
 
@@ -57,7 +64,7 @@
 
         <div v-if="isEditing" class="editor-versions">
           <div class="dashboard-panel__header">
-            <h2>版本记录</h2>
+            <div role="heading" aria-level="2">版本记录</div>
             <button class="text-link" type="button" @click="loadVersions">刷新</button>
           </div>
           <div v-if="versions.length" class="editor-version-list">
@@ -111,6 +118,7 @@ const form = reactive<ArticleSavePayload>({
   title: '',
   slug: '',
   summary: '',
+  cover_url: '',
   content_md: '',
   topic_id: 0,
   tag_ids: [],
@@ -153,6 +161,7 @@ onMounted(async () => {
     form.title = article.title
     form.slug = article.slug
     form.summary = article.summary
+    form.cover_url = article.cover_url
     form.content_md = article.content_md
     form.status = article.status
     form.topic_id = article.topic_id
