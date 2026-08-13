@@ -2245,14 +2245,16 @@
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   min-width: 0;
+  justify-content: start;
   gap: var(--space-4);
 }
 
 .media-card {
   display: grid;
   min-width: 0;
+  max-width: 320px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

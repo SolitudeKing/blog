@@ -96,8 +96,12 @@
       </template>
     </BaseEmpty>
 
-    <div v-if="assets.length && page.has_more" class="media-footer">
-      <BaseButton variant="secondary" :loading="loadingMore" @click="loadMore">加载更多</BaseButton>
+    <div v-if="assets.length" class="media-footer">
+      <BasePagination
+        :loading="loadingMore"
+        :has-more="page.has_more"
+        @load-more="loadMore"
+      />
     </div>
 
     <!-- 上传 Modal -->
@@ -200,6 +204,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import BasePagination from '@/components/base/BasePagination.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import UploadButton from '@/components/media/UploadButton.vue'
