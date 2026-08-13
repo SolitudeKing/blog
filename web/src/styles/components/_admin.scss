@@ -700,7 +700,7 @@
   min-width: 0;
 }
 
-.admin-page__header h1 {
+.admin-page__header [role='heading'][aria-level='1'] {
   margin: var(--space-1) 0 0;
   overflow-wrap: anywhere;
   font-size: clamp(26px, 3vw, 36px);
@@ -1012,7 +1012,7 @@
   padding-top: var(--space-4);
 }
 
-.editor-versions h2 {
+.editor-versions [role='heading'][aria-level='2'] {
   margin: 0;
   font-size: 17px;
 }
@@ -1119,12 +1119,24 @@
   padding: clamp(var(--space-4), 2vw, var(--space-5));
 }
 
-.taxonomy-panel h2,
-.settings-panel h2,
-.notice-panel h2,
-.media-panel h2 {
+.taxonomy-panel [role='heading'][aria-level='2'],
+.settings-panel [role='heading'][aria-level='2'],
+.notice-panel [role='heading'][aria-level='2'],
+.media-panel [role='heading'][aria-level='2'] {
   margin: 0;
   font-size: clamp(18px, 2vw, 22px);
+}
+
+.taxonomy-panel__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.taxonomy-panel__header .mist-button {
+  flex: none;
 }
 
 .taxonomy-form,
@@ -1182,6 +1194,136 @@
   overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.taxonomy-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: var(--space-5);
+  background: var(--scrim);
+}
+
+.taxonomy-dialog__panel {
+  display: grid;
+  width: min(640px, 100%);
+  max-height: min(760px, calc(100dvh - var(--space-10)));
+  gap: var(--space-5);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.taxonomy-dialog__panel:focus {
+  outline: none;
+}
+
+.taxonomy-dialog__header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-4);
+}
+
+.taxonomy-dialog__header > div {
+  min-width: 0;
+}
+
+.taxonomy-dialog__header p,
+.taxonomy-dialog__header [role='heading'][aria-level='2'] {
+  margin: 0;
+}
+
+.taxonomy-dialog__header p {
+  margin-bottom: var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.taxonomy-dialog__header [role='heading'][aria-level='2'] {
+  font-size: clamp(20px, 3vw, 26px);
+  line-height: 1.25;
+}
+
+.taxonomy-dialog__close {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.taxonomy-dialog__close:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.taxonomy-dialog__close:focus-visible {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.taxonomy-dialog__close:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.taxonomy-dialog__close svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.taxonomy-dialog__error {
+  margin: 0;
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--danger);
+  background: var(--bg-card);
+}
+
+.taxonomy-dialog-enter-active,
+.taxonomy-dialog-leave-active {
+  transition: opacity var(--transition-base);
+}
+
+.taxonomy-dialog-enter-active .taxonomy-dialog__panel,
+.taxonomy-dialog-leave-active .taxonomy-dialog__panel {
+  transition: transform var(--transition-base);
+}
+
+.taxonomy-dialog-enter-from,
+.taxonomy-dialog-leave-to {
+  opacity: 0;
+}
+
+.taxonomy-dialog-enter-from .taxonomy-dialog__panel,
+.taxonomy-dialog-leave-to .taxonomy-dialog__panel {
+  transform: translateY(var(--space-4));
 }
 
 .settings-form {
@@ -1373,7 +1515,7 @@
   text-transform: uppercase;
 }
 
-.settings-theme-preview h3,
+.settings-theme-preview [role='heading'][aria-level='3'],
 .settings-theme-preview p {
   margin: 0;
 }
@@ -1527,7 +1669,7 @@
   min-width: 0;
 }
 
-.dashboard-welcome h1 {
+.dashboard-welcome [role='heading'][aria-level='1'] {
   margin: var(--space-2) 0 var(--space-1);
   overflow-wrap: anywhere;
   font-size: clamp(var(--text-2xl), 3vw, var(--text-3xl));
@@ -1584,12 +1726,12 @@
   border-color: var(--danger);
 }
 
-.dashboard-state h2,
+.dashboard-state [role='heading'][aria-level='2'],
 .dashboard-state p {
   margin: 0;
 }
 
-.dashboard-state h2 {
+.dashboard-state [role='heading'][aria-level='2'] {
   color: var(--text-primary);
   font-size: var(--text-lg);
 }
@@ -1654,7 +1796,7 @@
   gap: var(--space-4);
 }
 
-.dashboard-focus__primary h2 {
+.dashboard-focus__primary [role='heading'][aria-level='2'] {
   max-width: 19ch;
   margin: var(--space-8) 0 var(--space-4);
   overflow-wrap: anywhere;
@@ -1713,8 +1855,8 @@
   gap: var(--space-5);
 }
 
-.dashboard-briefing h2,
-.dashboard-section-header h2 {
+.dashboard-briefing [role='heading'][aria-level='2'],
+.dashboard-section-header [role='heading'][aria-level='2'] {
   margin: var(--space-1) 0 0;
   font-size: var(--text-xl);
   line-height: var(--leading-tight);
@@ -1871,7 +2013,7 @@
   gap: var(--space-3);
 }
 
-.dashboard-panel__header h2 {
+.dashboard-panel__header [role='heading'][aria-level='2'] {
   min-width: 0;
   margin: 0;
   font-size: clamp(17px, 2vw, 21px);
@@ -2240,7 +2382,7 @@
   font-size: 20px;
 }
 
-.login-card h1 {
+.login-card [role='heading'][aria-level='1'] {
   margin: var(--space-1) 0 0;
   font-size: clamp(26px, 8vw, 34px);
   font-weight: 700;
@@ -2621,7 +2763,7 @@
     padding: var(--space-5);
   }
 
-  .dashboard-focus__primary h2 {
+  .dashboard-focus__primary [role='heading'][aria-level='2'] {
     margin-top: var(--space-6);
     font-size: var(--text-2xl);
   }
@@ -2753,6 +2895,15 @@
 }
 
 @media (max-width: 639px) {
+  .taxonomy-dialog {
+    align-items: end;
+    padding: var(--space-3);
+  }
+
+  .taxonomy-dialog__panel {
+    max-height: calc(100dvh - var(--space-6));
+  }
+
   .admin-layout__user {
     display: none;
   }
@@ -2773,6 +2924,8 @@
   .admin-layout__sidebar,
   .admin-layout__scrim,
   .admin-layout__skip-link,
+  .taxonomy-dialog,
+  .taxonomy-dialog__panel,
   .admin-layout__nav-item,
   .admin-layout__menu-button,
   .admin-layout__sidebar-toggle,

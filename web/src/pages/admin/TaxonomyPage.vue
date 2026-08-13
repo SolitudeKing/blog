@@ -3,7 +3,7 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Taxonomy</p>
-        <h1>专题与标签</h1>
+        <div role="heading" aria-level="1">专题与标签</div>
       </div>
       <BaseButton variant="secondary" :loading="loading" @click="loadAll">刷新</BaseButton>
     </header>
@@ -15,30 +15,10 @@
 
     <div class="taxonomy-grid">
       <section class="taxonomy-panel">
-        <h2>专题</h2>
-        <form class="taxonomy-form" :aria-busy="savingTopic" @submit.prevent="saveTopic">
-          <BaseInput v-model="topicForm.name" label="专题名称" required />
-          <BaseInput
-            v-model="topicForm.label"
-            label="Label"
-            hint="用于文章卡片等紧凑位置的短标签"
-            required
-          />
-          <BaseInput v-model="topicForm.slug" label="Slug" required />
-          <BaseInput
-            v-model="topicForm.cover_url"
-            label="封面 URL"
-            hint="可填写 /uploads/... 相对路径或 https://... 绝对地址"
-          />
-          <BaseInput v-model="topicSortOrder" label="排序" type="number" />
-          <BaseTextarea v-model="topicForm.description" label="描述" :rows="3" />
-          <div class="taxonomy-form__actions">
-            <BaseButton type="submit" :loading="savingTopic">{{ editingTopicId ? '保存专题' : '新增专题' }}</BaseButton>
-            <BaseButton v-if="editingTopicId" type="button" variant="secondary" @click="resetTopicForm">
-              取消
-            </BaseButton>
-          </div>
-        </form>
+        <header class="taxonomy-panel__header">
+          <div role="heading" aria-level="2">专题</div>
+          <BaseButton ref="topicTriggerRef" size="sm" @click="openTopicDialog()">新增专题</BaseButton>
+        </header>
 
         <div class="taxonomy-list">
           <div v-for="topic in topics" :key="topic.id" class="taxonomy-item">
@@ -47,7 +27,7 @@
               <p>{{ topic.label }} · {{ topic.slug }}<template v-if="topic.article_count !== undefined"> · 已发布 {{ topic.article_count }} 篇</template></p>
             </div>
             <div class="taxonomy-item__actions">
-              <button class="text-link" type="button" @click="editTopic(topic)">编辑</button>
+              <button class="text-link" type="button" @click="openTopicDialog(topic)">编辑</button>
               <button class="text-link text-link--danger" type="button" @click="removeTopic(topic.id)">
                 删除
               </button>
@@ -57,22 +37,10 @@
       </section>
 
       <section class="taxonomy-panel">
-        <h2>标签</h2>
-        <form class="taxonomy-form" :aria-busy="savingTag" @submit.prevent="saveTag">
-          <BaseInput v-model="tagForm.name" label="名称" />
-          <BaseInput v-model="tagForm.slug" label="Slug" />
-          <BaseInput
-            v-model="tagForm.color"
-            label="颜色"
-            hint="使用 #RGB 或 #RRGGBB 格式，例如 #5f8d62"
-            :error="tagColorError"
-          />
-          <BaseTextarea v-model="tagForm.description" label="描述" :rows="3" />
-          <div class="taxonomy-form__actions">
-            <BaseButton type="submit" :loading="savingTag">{{ editingTagId ? '保存标签' : '新增标签' }}</BaseButton>
-            <BaseButton v-if="editingTagId" type="button" variant="secondary" @click="resetTagForm">取消</BaseButton>
-          </div>
-        </form>
+        <header class="taxonomy-panel__header">
+          <div role="heading" aria-level="2">标签</div>
+          <BaseButton ref="tagTriggerRef" size="sm" @click="openTagDialog()">新增标签</BaseButton>
+        </header>
 
         <div class="taxonomy-list">
           <div v-for="tag in tags" :key="tag.id" class="taxonomy-item">
@@ -84,21 +52,83 @@
               <p>{{ tag.slug }}</p>
             </div>
             <div class="taxonomy-item__actions">
-              <button class="text-link" type="button" @click="editTag(tag)">编辑</button>
+              <button class="text-link" type="button" @click="openTagDialog(tag)">编辑</button>
               <button class="text-link text-link--danger" type="button" @click="removeTag(tag.id)">删除</button>
             </div>
           </div>
         </div>
       </section>
     </div>
+
+    <Teleport to="body">
+      <Transition name="taxonomy-dialog">
+        <div
+          v-if="activeDialog"
+          class="taxonomy-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="taxonomy-dialog-title"
+          @click.self="closeDialog()"
+          @keydown="handleDialogKeydown"
+        >
+          <section ref="dialogPanelRef" class="taxonomy-dialog__panel" tabindex="-1">
+            <header class="taxonomy-dialog__header">
+              <div>
+                <p>{{ activeDialog === 'topic' ? 'Topic' : 'Tag' }}</p>
+                <div id="taxonomy-dialog-title" role="heading" aria-level="2">
+                  {{ activeDialog === 'topic' ? (editingTopicId ? '编辑专题' : '新增专题') : (editingTagId ? '编辑标签' : '新增标签') }}
+                </div>
+              </div>
+              <button
+                ref="dialogCloseButtonRef"
+                class="taxonomy-dialog__close"
+                type="button"
+                aria-label="关闭弹窗"
+                :disabled="savingTopic || savingTag"
+                @click="closeDialog()"
+              >
+                <SvgIcon name="close" />
+              </button>
+            </header>
+
+            <p v-if="formError" class="taxonomy-dialog__error" role="alert">{{ formError }}</p>
+
+            <form v-if="activeDialog === 'topic'" class="taxonomy-form" :aria-busy="savingTopic" @submit.prevent="saveTopic">
+              <BaseInput v-model="topicForm.name" label="专题名称" required />
+              <BaseInput v-model="topicForm.label" label="Label" hint="用于文章卡片等紧凑位置的短标签" required />
+              <BaseInput v-model="topicForm.slug" label="Slug" required />
+              <BaseInput v-model="topicForm.cover_url" label="封面 URL" hint="可填写 /uploads/... 相对路径或 https://... 绝对地址" />
+              <BaseInput v-model="topicSortOrder" label="排序" type="number" />
+              <BaseTextarea v-model="topicForm.description" label="描述" :rows="3" />
+              <div class="taxonomy-form__actions">
+                <BaseButton type="submit" :loading="savingTopic">{{ editingTopicId ? '保存专题' : '新增专题' }}</BaseButton>
+                <BaseButton type="button" variant="secondary" :disabled="savingTopic" @click="closeDialog()">取消</BaseButton>
+              </div>
+            </form>
+
+            <form v-else class="taxonomy-form" :aria-busy="savingTag" @submit.prevent="saveTag">
+              <BaseInput v-model="tagForm.name" label="名称" required />
+              <BaseInput v-model="tagForm.slug" label="Slug" required />
+              <BaseInput v-model="tagForm.color" label="颜色" hint="使用 #RGB 或 #RRGGBB 格式，例如 #5f8d62" :error="tagColorError" required />
+              <BaseTextarea v-model="tagForm.description" label="描述" :rows="3" />
+              <div class="taxonomy-form__actions">
+                <BaseButton type="submit" :loading="savingTag">{{ editingTagId ? '保存标签' : '新增标签' }}</BaseButton>
+                <BaseButton type="button" variant="secondary" :disabled="savingTag" @click="closeDialog()">取消</BaseButton>
+              </div>
+            </form>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import {
   createTag,
   createTopic,
@@ -117,8 +147,17 @@ const loading = ref(false)
 const savingTopic = ref(false)
 const savingTag = ref(false)
 const error = ref('')
+const formError = ref('')
 const editingTopicId = ref<number | null>(null)
 const editingTagId = ref<number | null>(null)
+const activeDialog = ref<'topic' | 'tag' | null>(null)
+const topicTriggerRef = ref<InstanceType<typeof BaseButton> | null>(null)
+const tagTriggerRef = ref<InstanceType<typeof BaseButton> | null>(null)
+const dialogCloseButtonRef = ref<HTMLButtonElement | null>(null)
+const dialogPanelRef = ref<HTMLElement | null>(null)
+
+let lockedScrollY = 0
+let previousBodyStyle: Partial<Record<'position' | 'top' | 'left' | 'right' | 'width' | 'overflow', string>> = {}
 
 const topicForm = reactive<TopicPayload>({
   name: '',
@@ -194,7 +233,7 @@ async function loadAll() {
 
 async function saveTopic() {
   savingTopic.value = true
-  error.value = ''
+  formError.value = ''
   try {
     const payload: TopicPayload = {
       ...topicForm,
@@ -209,23 +248,13 @@ async function saveTopic() {
     } else {
       await createTopic(payload)
     }
-    resetTopicForm()
     await loadAll()
+    await closeDialog(true, true)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存专题失败'
+    formError.value = err instanceof Error ? err.message : '保存专题失败'
   } finally {
     savingTopic.value = false
   }
-}
-
-function editTopic(topic: TopicItem) {
-  editingTopicId.value = topic.id
-  topicForm.name = topic.name
-  topicForm.label = topic.label
-  topicForm.slug = topic.slug
-  topicForm.description = topic.description
-  topicForm.cover_url = topic.cover_url
-  topicForm.sort_order = topic.sort_order
 }
 
 async function removeTopic(id: number) {
@@ -251,9 +280,9 @@ function resetTopicForm() {
 }
 
 async function saveTag() {
-  error.value = ''
+  formError.value = ''
   if (tagColorError.value) {
-    error.value = tagColorError.value
+    formError.value = tagColorError.value
     return
   }
 
@@ -268,21 +297,13 @@ async function saveTag() {
     } else {
       await createTag(payload)
     }
-    resetTagForm()
     await loadAll()
+    await closeDialog(true, true)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存标签失败'
+    formError.value = err instanceof Error ? err.message : '保存标签失败'
   } finally {
     savingTag.value = false
   }
-}
-
-function editTag(tag: TagItem) {
-  editingTagId.value = tag.id
-  tagForm.name = tag.name
-  tagForm.slug = tag.slug
-  tagForm.description = tag.description
-  tagForm.color = tag.color || '#5f8d62'
 }
 
 async function removeTag(id: number) {
@@ -304,6 +325,133 @@ function resetTagForm() {
   tagForm.description = ''
   tagForm.color = '#5f8d62'
 }
+
+function lockPage() {
+  const { body } = document
+  lockedScrollY = window.scrollY
+  previousBodyStyle = {
+    position: body.style.position,
+    top: body.style.top,
+    left: body.style.left,
+    right: body.style.right,
+    width: body.style.width,
+    overflow: body.style.overflow,
+  }
+  body.style.position = 'fixed'
+  body.style.top = `-${lockedScrollY}px`
+  body.style.left = '0'
+  body.style.right = '0'
+  body.style.width = '100%'
+  body.style.overflow = 'hidden'
+  const app = document.getElementById('app')
+  if (app) {
+    app.inert = true
+  }
+}
+
+function unlockPage() {
+  const { body } = document
+  body.style.position = previousBodyStyle.position ?? ''
+  body.style.top = previousBodyStyle.top ?? ''
+  body.style.left = previousBodyStyle.left ?? ''
+  body.style.right = previousBodyStyle.right ?? ''
+  body.style.width = previousBodyStyle.width ?? ''
+  body.style.overflow = previousBodyStyle.overflow ?? ''
+  const app = document.getElementById('app')
+  if (app) {
+    app.inert = false
+  }
+  window.scrollTo(0, lockedScrollY)
+}
+
+async function openDialog(kind: 'topic' | 'tag') {
+  formError.value = ''
+  activeDialog.value = kind
+  lockPage()
+  await nextTick()
+  dialogCloseButtonRef.value?.focus()
+}
+
+async function closeDialog(restoreFocus = true, force = false) {
+  if (!activeDialog.value || (!force && (savingTopic.value || savingTag.value))) {
+    return
+  }
+  const dialog = activeDialog.value
+  activeDialog.value = null
+  resetTopicForm()
+  resetTagForm()
+  formError.value = ''
+  unlockPage()
+  if (!restoreFocus) {
+    return
+  }
+  await nextTick()
+  const trigger = dialog === 'topic' ? topicTriggerRef.value : tagTriggerRef.value
+  trigger?.$el.focus({ preventScroll: true })
+}
+
+function openTopicDialog(topic?: TopicItem) {
+  resetTopicForm()
+  if (topic) {
+    editingTopicId.value = topic.id
+    topicForm.name = topic.name
+    topicForm.label = topic.label
+    topicForm.slug = topic.slug
+    topicForm.description = topic.description
+    topicForm.cover_url = topic.cover_url
+    topicForm.sort_order = topic.sort_order
+  }
+  void openDialog('topic')
+}
+
+function openTagDialog(tag?: TagItem) {
+  resetTagForm()
+  if (tag) {
+    editingTagId.value = tag.id
+    tagForm.name = tag.name
+    tagForm.slug = tag.slug
+    tagForm.description = tag.description
+    tagForm.color = tag.color || '#5f8d62'
+  }
+  void openDialog('tag')
+}
+
+function handleDialogKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    void closeDialog()
+    return
+  }
+  if (event.key !== 'Tab' || !dialogPanelRef.value) {
+    return
+  }
+  const focusable = Array.from(
+    dialogPanelRef.value.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute('hidden'))
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (!first || !last) {
+    event.preventDefault()
+    dialogPanelRef.value.focus()
+    return
+  }
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+onBeforeUnmount(() => {
+  if (activeDialog.value) {
+    activeDialog.value = null
+    unlockPage()
+  }
+})
 
 function toSlug(value: string) {
   return value
