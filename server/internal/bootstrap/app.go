@@ -40,6 +40,7 @@ func NewApp(ctx context.Context, cfg config.Config) (*gin.Engine, database.Resou
 	engine := gin.New()
 	engine.Use(middleware.RequestID())
 	engine.Use(middleware.Recovery())
+	engine.Use(middleware.CorsForDev(cfg))
 	engine.Use(middleware.APIVersion(cfg.APIVersion))
 
 	authService := service.NewAuthService(cfg, resources.DB)
