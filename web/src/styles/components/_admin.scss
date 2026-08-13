@@ -2944,3 +2944,38 @@
     animation: none;
   }
 }
+
+.settings-avatar {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-avatar__field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.settings-avatar__upload {
+  align-self: end;
+  margin-bottom: var(--space-2);
+}
+
+.settings-avatar__preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-thick) solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+
+  img {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-full, 9999px);
+    object-fit: cover;
+    border: var(--border-thin) solid var(--border-muted);
+  }
+}

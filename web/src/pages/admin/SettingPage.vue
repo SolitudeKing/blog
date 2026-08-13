@@ -14,13 +14,25 @@
             <div role="heading" aria-level="2">基础信息</div>
             <BaseInput v-model="form.site_name" label="站点名称" />
             <BaseInput v-model="form.author" label="作者" />
-            <BaseInput
-              v-model="form.author_avatar_url"
-              type="url"
-              label="作者头像 URL"
-              hint="可填写 /uploads/... 相对路径或 https://... 绝对地址；留空时使用默认头像。"
-              :maxlength="500"
-            />
+            <div class="settings-avatar">
+              <div class="settings-avatar__field">
+                <BaseInput
+                  v-model="form.author_avatar_url"
+                  type="text"
+                  inputmode="url"
+                  label="作者头像 URL"
+                  hint="可填写 /uploads/... 相对路径或 https://... 绝对地址；点击右侧上传按钮直接上传。留空时使用默认头像。"
+                  :maxlength="500"
+                />
+                <UploadButton class="settings-avatar__upload" label="上传头像" @upload="onAvatarUpload" />
+              </div>
+              <div v-if="form.author_avatar_url" class="settings-avatar__preview">
+                <img :src="form.author_avatar_url" :alt="form.author || 'author avatar'" />
+                <button class="text-link text-link--danger" type="button" @click="form.author_avatar_url = ''">
+                  清除头像
+                </button>
+              </div>
+            </div>
             <BaseTextarea v-model="form.essay" label="站点签名" :rows="4" />
             <BaseInput
               v-model="form.icp_number"
@@ -151,6 +163,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import UploadButton from '@/components/media/UploadButton.vue'
 import {
   cloneThemeElementMap,
   createDefaultThemeElementMap,
@@ -161,6 +174,7 @@ import { useToast } from '@/composables/useToast'
 import { getSettingDetail, updateSetting } from '@/api/modules/setting'
 import { useSettingStore } from '@/stores/setting'
 import type { LobbySetting, SettingPayload } from '@/types/setting'
+import type { AssetItem } from '@/types/asset'
 
 const socialItems = [
   { key: 'gitee', label: 'Gitee' },
@@ -203,6 +217,12 @@ const selectedThemeElements = computed(() => form.theme_elements[form.theme])
 onMounted(() => {
   void loadSetting()
 })
+
+function onAvatarUpload(asset: AssetItem) {
+  // local 驱动下 asset.url 是 Nginx 可解析的 /uploads/... 相对路径；
+  // s3 驱动下为 STORAGE_S3_PUBLIC_URL/<key>。两种形态都直接写入即可。
+  form.author_avatar_url = asset.url
+}
 
 function assignSetting(setting: LobbySetting) {
   form.site_name = setting.site_name
