@@ -5,52 +5,6 @@ x-service-logging: &service-logging
     max-file: "5"
 
 services:
-  mysql:
-    image: mysql:8.4
-    container_name: solitude-blog-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
-      MYSQL_USER: ${MYSQL_USER:-blog}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
-      TZ: ${TZ:-Asia/Shanghai}
-    ports:
-      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -u root --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    logging: *service-logging
-
-  redis:
-    image: redis:7.4-alpine
-    container_name: solitude-blog-redis
-    restart: unless-stopped
-    command: >
-      sh -c 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "redis-cli -a \"$${REDIS_PASSWORD}\" ping",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging: *service-logging
-
   api:
     build:
       context: ../server
@@ -63,14 +17,17 @@ services:
       APP_PORT: 8080
       APP_API_VERSION: ${APP_API_VERSION:-v1}
       SITE_BASE_URL: ${SITE_BASE_URL:-http://localhost}
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
+      # MySQL / Redis 均假设由外部服务提供，Compose 仅透传连接信息。
+      MYSQL_HOST: ${MYSQL_HOST:?MYSQL_HOST must be set}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
-      MYSQL_USER: ${MYSQL_USER:-blog}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST must be set}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_USER: ${REDIS_USER:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
       JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-30}
@@ -80,11 +37,6 @@ services:
       ADMIN_NICKNAME: ${ADMIN_NICKNAME:-Solitude King}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_ROOT: /app/storage/uploads
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
@@ -117,6 +69,4 @@ services:
     logging: *service-logging
 
 volumes:
-  mysql-data:
-  redis-data:
   api-storage:
