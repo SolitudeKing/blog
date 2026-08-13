@@ -1328,9 +1328,21 @@
 
 .settings-form {
   display: grid;
+  gap: var(--space-5);
+}
+
+.settings-form__grid {
+  display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
   align-items: start;
   gap: var(--space-5);
+}
+
+/* 窄屏回落：基础信息 + 主题外观单列堆叠 */
+@media (max-width: 960px) {
+  .settings-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .settings-form__main {
@@ -1343,6 +1355,29 @@
 .settings-panel--appearance {
   position: sticky;
   top: calc(var(--layout-admin-header, 64px) + var(--space-5));
+}
+
+/* 主题外观小节间距统一 */
+.settings-panel--appearance > * + * {
+  margin-top: var(--space-5);
+}
+
+.settings-panel--appearance > .settings-theme-picker {
+  margin-top: 0;
+  padding-top: var(--space-4);
+  border-top: var(--border-thin) solid var(--border);
+}
+
+.settings-panel--appearance > .settings-theme-elements {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: var(--border-thin) solid var(--border);
+}
+
+.settings-panel--appearance > .settings-theme-preview {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: var(--border-thin) solid var(--border);
 }
 
 .settings-panel__description {
@@ -2947,37 +2982,51 @@
 
 .settings-avatar {
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+/* 窄屏回落：缩略图与输入区上下排布 */
+@media (max-width: 640px) {
+  .settings-avatar {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .settings-avatar__field {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
   gap: var(--space-3);
 }
 
-.settings-avatar__upload {
-  align-self: end;
-  margin-bottom: var(--space-2);
+.settings-avatar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .settings-avatar__preview {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--border-thick) solid var(--border-muted);
-  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full, 9999px);
   background: var(--surface-soft);
+  border: var(--border-thick) solid var(--border-muted);
+  overflow: hidden;
 
   img {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--radius-full, 9999px);
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border: var(--border-thin) solid var(--border-muted);
   }
+}
+
+.settings-avatar__placeholder {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  letter-spacing: 0.1em;
 }
 
 .taxonomy-form__cover {
