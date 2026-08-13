@@ -97,7 +97,25 @@
               <BaseInput v-model="topicForm.name" label="专题名称" required />
               <BaseInput v-model="topicForm.label" label="Label" hint="用于文章卡片等紧凑位置的短标签" required />
               <BaseInput v-model="topicForm.slug" label="Slug" required />
-              <BaseInput v-model="topicForm.cover_url" label="封面 URL" hint="可填写 /uploads/... 相对路径或 https://... 绝对地址" />
+              <div class="taxonomy-form__cover">
+                <div class="taxonomy-form__cover-field">
+                  <BaseInput
+                    v-model="topicForm.cover_url"
+                    type="text"
+                    inputmode="url"
+                    label="封面 URL"
+                    hint="可填写 /uploads/... 相对路径或 https://... 绝对地址；点击右侧上传按钮直接上传。"
+                    :maxlength="500"
+                  />
+                  <UploadButton label="上传封面" @upload="onTopicCoverUpload" />
+                </div>
+                <div v-if="topicForm.cover_url" class="taxonomy-form__cover-preview">
+                  <img :src="topicForm.cover_url" :alt="topicForm.label || topicForm.name || 'topic cover'" />
+                  <button class="text-link text-link--danger" type="button" @click="topicForm.cover_url = ''">
+                    清除封面
+                  </button>
+                </div>
+              </div>
               <BaseInput v-model="topicSortOrder" label="排序" type="number" />
               <BaseTextarea v-model="topicForm.description" label="描述" :rows="3" />
               <div class="taxonomy-form__actions">
@@ -129,6 +147,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
+import UploadButton from '@/components/media/UploadButton.vue'
 import {
   createTag,
   createTopic,
@@ -140,6 +159,7 @@ import {
   updateTopic,
 } from '@/api/modules/taxonomy'
 import type { TagItem, TagPayload, TopicItem, TopicPayload } from '@/types/taxonomy'
+import type { AssetItem } from '@/types/asset'
 
 const topics = ref<TopicItem[]>([])
 const tags = ref<TagItem[]>([])
@@ -229,6 +249,12 @@ async function loadAll() {
   } finally {
     loading.value = false
   }
+}
+
+function onTopicCoverUpload(asset: AssetItem) {
+  // local 驱动下 asset.url 是 Nginx 可解析的 /uploads/... 相对路径；
+  // s3 驱动下为 STORAGE_S3_PUBLIC_URL/<key>。两种形态都直接写入即可。
+  topicForm.cover_url = asset.url
 }
 
 async function saveTopic() {

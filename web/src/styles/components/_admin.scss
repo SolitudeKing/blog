@@ -2979,3 +2979,33 @@
     border: var(--border-thin) solid var(--border-muted);
   }
 }
+
+.taxonomy-form__cover {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.taxonomy-form__cover-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.taxonomy-form__cover-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-thick) solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+
+  img {
+    max-height: 96px;
+    max-width: 200px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    border: var(--border-thin) solid var(--border-muted);
+  }
+}
