@@ -102,9 +102,15 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	defer source.Close()
 
 	// 先读前 512 字节嗅探 MIME；MIME 白名单不通过直接拒绝。
+	// 由于 multipart.File 是顺序 reader，嗅探消耗的字节必须先写入 buffer 与 hasher，
+	// 否则 io.Copy 后续会从游标处继续读，导致落盘文件丢失前 512 字节（PNG/JPG magic header 全丢）。
 	head := make([]byte, 512)
-	n, _ := source.Read(head)
-	mimeType := http.DetectContentType(head[:n])
+	n, err := io.ReadFull(source, head)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return AssetItem{}, apperrors.New(apperrors.CodeInvalidRequest)
+	}
+	head = head[:n]
+	mimeType := http.DetectContentType(head)
 	ext, allowed := assetExtensionForMIME(mimeType)
 	if !allowed {
 		return AssetItem{}, apperrors.New(apperrors.CodeUnsupportedFileType)
@@ -113,9 +119,10 @@ func (s *AssetService) Upload(fileHeader *multipart.FileHeader, displayName stri
 	// 单次 io.Copy 同时写哈希与内存缓冲区，避免两次读取；
 	// 受 maxAssetUploadSize 限制，整文件驻留内存可接受。
 	hasher := sha256.New()
+	hasher.Write(head)
 	var buffer bytes.Buffer
-	multi := io.MultiWriter(hasher, &buffer)
-	if _, err := io.Copy(multi, source); err != nil {
+	buffer.Write(head)
+	if _, err := io.Copy(io.MultiWriter(hasher, &buffer), source); err != nil {
 		return AssetItem{}, apperrors.New(apperrors.CodeStorageUnavailable)
 	}
 	data := buffer.Bytes()
