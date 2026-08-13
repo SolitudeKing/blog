@@ -22,9 +22,7 @@
           {{ opt.label }}
         </option>
       </select>
-      <svg class="mist-select__chevron" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
-      </svg>
+      <SvgIcon class="mist-select__chevron" name="chevron-down" />
     </span>
     <span v-if="hint" :id="hintId" class="mist-field__hint">{{ hint }}</span>
     <span v-if="error" :id="errorId" class="mist-field__error" role="alert">{{ error }}</span>
@@ -33,6 +31,7 @@
 
 <script setup lang="ts" generic="T extends string | number">
 import { computed, useAttrs, useId } from 'vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 
 defineOptions({ inheritAttrs: false })
 

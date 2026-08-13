@@ -5,7 +5,7 @@
         <span class="login-card__mark" aria-hidden="true">S</span>
         <div>
           <p class="login-card__eyebrow">Solitude Admin</p>
-          <h1>欢迎回来</h1>
+          <div role="heading" aria-level="1">欢迎回来</div>
         </div>
       </header>
       <p class="login-card__description">登录后继续管理文章、媒体与站点设置。</p>

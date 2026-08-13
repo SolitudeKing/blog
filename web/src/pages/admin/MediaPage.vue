@@ -3,14 +3,14 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Media</p>
-        <h1>媒体库</h1>
+        <div role="heading" aria-level="1">媒体库</div>
       </div>
       <BaseButton variant="secondary" :loading="loading" @click="loadAssets()">刷新</BaseButton>
     </header>
 
     <div class="media-layout">
       <aside class="media-panel" :aria-busy="uploading || saving">
-        <h2>上传资源</h2>
+        <div role="heading" aria-level="2">上传资源</div>
         <label class="mist-field">
           <span class="mist-field__label">文件</span>
           <input class="mist-input" type="file" accept="image/*" @change="selectFile" />
@@ -19,7 +19,7 @@
         <BaseButton :loading="uploading" :disabled="!selectedFile" @click="upload">上传</BaseButton>
 
         <div v-if="editingAsset" class="media-edit">
-          <h2>资源信息</h2>
+          <div role="heading" aria-level="2">资源信息</div>
           <BaseInput v-model="editForm.display_name" label="显示名称" />
           <BaseInput v-model="editForm.alt_text" label="Alt 文本" />
           <div class="media-actions">
@@ -78,9 +78,7 @@
           description="从左侧上传第一张图片，文章配图不用愁。"
         >
           <template #icon>
-            <svg class="admin-empty__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <path d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M9 9h.01" />
-            </svg>
+            <SvgIcon class="admin-empty__icon" name="empty-image" />
           </template>
         </BaseEmpty>
 
@@ -98,6 +96,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { deleteAsset, getAssetList, updateAsset, uploadAsset } from '@/api/modules/asset'
 import { useToast } from '@/composables/useToast'
 import type { CursorPage } from '@/api/types'

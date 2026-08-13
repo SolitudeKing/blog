@@ -6,9 +6,7 @@
 
     <section class="article-detail-page">
       <RouterLink class="article-back-channel" to="/">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M19 12H5m6-6-6 6 6 6" />
-        </svg>
+        <SvgIcon name="arrow-left" />
         <span>
           <small>Back to stream</small>
           <strong>返回文章列表</strong>
@@ -22,14 +20,12 @@
               <span v-if="article.topic"><strong>{{ topicLabel }}</strong></span>
               <span>{{ formattedDate }}</span>
             </p>
-            <h1>{{ article.title }}</h1>
+            <div role="heading" aria-level="1">{{ article.title }}</div>
             <p v-if="article.summary" class="article-detail__summary">{{ article.summary }}</p>
 
             <div class="article-detail__toolbar">
               <button class="cta-pill" type="button" @click="copyLink">
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1" />
-                </svg>
+                <SvgIcon name="link" />
                 {{ copyLabel }}
               </button>
             </div>
@@ -54,12 +50,7 @@
         </header>
 
         <figure class="article-detail__cover">
-          <svg aria-hidden="true" viewBox="0 0 960 320">
-            <path d="M70 205c125-88 215 78 340-10s215 78 340-10 150 34 190 2" />
-            <path d="M70 244c125-70 215 62 340-8s215 62 340-8 150 28 190 2" />
-            <circle cx="720" cy="96" r="42" />
-            <path d="M130 94h260M130 126h190M130 158h225" />
-          </svg>
+          <SvgIcon name="article-cover" />
           <figcaption>{{ topicLabel }} · {{ formattedDate }}</figcaption>
         </figure>
 
@@ -80,7 +71,7 @@
           <span class="article-detail__author-avatar" aria-hidden="true">{{ authorInitial }}</span>
           <div>
             <span>Written by</span>
-            <h2>{{ author }}</h2>
+            <div role="heading" aria-level="2">{{ author }}</div>
             <p>{{ authorEssay }}</p>
           </div>
         </footer>
@@ -106,10 +97,7 @@
       <div v-else-if="error" role="alert">
         <BaseEmpty title="文章加载失败" :description="error" cta-text="返回首页" cta-to="/">
           <template #icon>
-            <svg viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v6M12 17h.01" />
-            </svg>
+            <SvgIcon name="info" />
           </template>
         </BaseEmpty>
       </div>
@@ -121,9 +109,7 @@
         cta-to="/"
       >
         <template #icon>
-          <svg viewBox="0 0 24 24">
-            <path d="M5 3h10l4 4v14H5V3Zm10 0v5h4M9 13h6M9 17h4" />
-          </svg>
+          <SvgIcon name="document" />
         </template>
       </BaseEmpty>
 
@@ -137,9 +123,7 @@
         :aria-expanded="tocDrawerOpen"
         @click="openTocDrawer"
       >
-        <svg class="toc-fab__icon" aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
-        </svg>
+        <SvgIcon class="toc-fab__icon" name="list" />
       </button>
 
       <Teleport to="body">
@@ -157,7 +141,7 @@
             <section ref="tocPanelRef" class="toc-drawer__panel" tabindex="-1">
               <div class="toc-drawer__handle" aria-hidden="true" />
               <header class="toc-drawer__header">
-                <h2 id="mobile-article-toc-title">文章目录</h2>
+                <div id="mobile-article-toc-title" role="heading" aria-level="2">文章目录</div>
                 <button
                   ref="tocCloseRef"
                   class="toc-drawer__close"
@@ -165,9 +149,7 @@
                   aria-label="关闭文章目录"
                   @click="closeTocDrawer()"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="m6 6 12 12M18 6 6 18" />
-                  </svg>
+                  <SvgIcon name="close" />
                 </button>
               </header>
               <BlogToc
@@ -191,6 +173,7 @@ import { useRoute, RouterLink } from 'vue-router'
 import BlogToc from '@/components/blog/BlogToc.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getArticleDetail, getArticleList } from '@/api/modules/article'
 import type { ArticleDetail, ArticleListItem } from '@/types/article'
 import type { BlogTocItem } from '@/types/toc'

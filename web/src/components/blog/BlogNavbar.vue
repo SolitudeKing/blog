@@ -3,9 +3,7 @@
     <div class="blog-navbar__inner">
       <RouterLink class="blog-navbar__brand" to="/" :aria-label="`${siteName}，返回首页`">
         <span class="blog-navbar__brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M3 8.5c3-3 6 3 9 0s6 3 9 0M3 15.5c3-3 6 3 9 0s6 3 9 0" />
-          </svg>
+          <SvgIcon name="brand-waves" />
         </span>
         <span class="blog-navbar__brand-copy">
           <strong class="blog-navbar__brand-text">{{ siteName }}</strong>
@@ -52,7 +50,7 @@
             <header class="navbar-drawer__header">
               <div>
                 <p>{{ siteName }}</p>
-                <h2 id="public-navigation-title">站点导航</h2>
+                <div id="public-navigation-title" role="heading" aria-level="2">站点导航</div>
               </div>
               <button
                 ref="closeButtonRef"
@@ -61,9 +59,7 @@
                 aria-label="关闭主导航"
                 @click="closeDrawer()"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
+                <SvgIcon name="close" />
               </button>
             </header>
 
@@ -85,6 +81,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseThemeControls from '@/components/base/BaseThemeControls.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { useSettingStore } from '@/stores/setting'
 
 const navItems = [

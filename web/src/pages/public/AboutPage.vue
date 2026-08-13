@@ -3,7 +3,7 @@
     <header class="about-hero">
       <div class="about-hero__copy">
         <p class="about-kicker">About the keeper</p>
-        <h1 id="about-title">你好，我是 {{ author }}</h1>
+        <div id="about-title" role="heading" aria-level="1">你好，我是 {{ author }}</div>
         <p class="about-hero__lead">{{ essay }}</p>
         <p class="about-hero__signature">{{ siteName }} 的维护者</p>
         <div class="about-hero__actions">
@@ -16,27 +16,7 @@
 
       <div class="about-hero__visual">
         <figure class="about-portrait mist-luminous" :aria-labelledby="portraitCaptionId">
-          <svg class="about-portrait__field" viewBox="0 0 620 720" fill="none" stroke="currentColor" aria-hidden="true">
-            <path
-              d="M-40 292c88-75 132 70 220-5s132-55 220 4 132 74 220-8 132-32 220-5"
-              stroke-width="1.5"
-              opacity=".76"
-            />
-            <path
-              d="M-40 332c88-52 132 50 220-2s132-35 220 3 132 46 220-5 132-22 220-3"
-              stroke-width="1"
-              opacity=".42"
-            />
-            <path
-              d="M-40 374c88-32 132 31 220-1s132-19 220 2 132 28 220-4 132-12 220-2"
-              stroke-width=".8"
-              opacity=".26"
-            />
-            <path d="M42 92c74 30 82 94 40 150s-37 113 14 162 54 119 2 188" stroke-width="1" opacity=".22" />
-            <path d="M516 72c-70 51-78 117-28 166s43 116-12 164-56 112-14 176" stroke-width="1" opacity=".22" />
-            <circle cx="310" cy="326" r="196" stroke-width="1" opacity=".15" />
-            <circle cx="310" cy="326" r="148" stroke-width="1" opacity=".22" />
-          </svg>
+          <SvgIcon class="about-portrait__field" name="about-field" />
           <span class="about-portrait__monogram" aria-hidden="true">{{ authorInitial }}</span>
           <figcaption :id="portraitCaptionId" class="about-portrait__caption">
             <span>{{ author }}</span>
@@ -50,7 +30,7 @@
       <div class="about-principles">
         <header class="about-principles__intro">
           <p class="about-kicker">Publishing principles</p>
-          <h2 id="principles-title">让内容按自己的节奏生长</h2>
+          <div id="principles-title" role="heading" aria-level="2">让内容按自己的节奏生长</div>
           <p>这些原则约束这个博客的设计与维护方式，也帮助阅读始终停留在内容本身。</p>
         </header>
 
@@ -58,7 +38,7 @@
           <li v-for="(principle, index) in principles" :key="principle.title" class="about-principle">
             <span class="about-principle__index" aria-hidden="true">{{ formatIndex(index) }}</span>
             <div>
-              <h3>{{ principle.title }}</h3>
+              <div role="heading" aria-level="3">{{ principle.title }}</div>
               <p>{{ principle.description }}</p>
             </div>
           </li>
@@ -75,9 +55,9 @@
       <div class="about-contact mist-glass--strong">
         <div>
           <p class="about-kicker">Say hello</p>
-          <h2 id="contact-title">
+          <div id="contact-title" role="heading" aria-level="2">
             {{ socialEntries.length ? '在这些地方找到我' : '联系方式暂时停泊' }}
-          </h2>
+          </div>
           <p>
             {{
               socialEntries.length
@@ -96,9 +76,7 @@
             :rel="entry.external ? 'noopener noreferrer' : undefined"
           >
             <span>{{ entry.label }}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path d="M7 17 17 7M8 7h9v9" />
-            </svg>
+            <SvgIcon name="arrow-up-right" />
           </a>
         </nav>
 
@@ -113,6 +91,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { useSettingStore } from '@/stores/setting'
 import { createSocialLinkEntries } from '@/utils/socialLinks'
 

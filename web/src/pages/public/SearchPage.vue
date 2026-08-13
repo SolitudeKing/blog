@@ -3,7 +3,7 @@
     <header class="search-hero">
       <div class="search-hero__copy">
         <p class="search-kicker">Search the current</p>
-        <h1 id="search-title">打捞一段想法</h1>
+        <div id="search-title" role="heading" aria-level="1">打捞一段想法</div>
         <p>输入一个词，沿着标题、摘要、正文、专题与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p>
       </div>
 
@@ -20,14 +20,11 @@
     </header>
 
     <section class="search-workbench mist-glass--strong" aria-labelledby="search-workbench-title">
-      <h2 id="search-workbench-title" class="sr-only">文章搜索工作台</h2>
+      <div id="search-workbench-title" class="sr-only" role="heading" aria-level="2">文章搜索工作台</div>
       <form class="search-form" role="search" @submit.prevent="submitSearch">
         <label class="sr-only" for="article-search">搜索文章标题、摘要、正文、专题或标签</label>
         <div class="search-input-wrap">
-          <svg class="search-input-wrap__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" />
-            <path d="m16 16 4 4" />
-          </svg>
+          <SvgIcon class="search-input-wrap__icon" name="search" />
           <input
             id="article-search"
             ref="inputRef"
@@ -47,9 +44,7 @@
             aria-label="清空搜索"
             @click="clearSearch"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path d="m7 7 10 10M17 7 7 17" />
-            </svg>
+            <SvgIcon name="close" />
           </button>
         </div>
         <BaseButton class="search-submit" type="submit" :loading="loading">搜索</BaseButton>
@@ -80,12 +75,12 @@
         :aria-busy="loading || loadingMore"
       >
         <header v-if="searched" class="search-results__header">
-          <h2 id="results-title" class="search-results__count">
+          <div id="results-title" class="search-results__count" role="heading" aria-level="2">
             {{ page.has_more ? '已加载' : '找到' }} <strong>{{ results.length }}</strong> 篇文章
-          </h2>
+          </div>
           <span>按相关度排序</span>
         </header>
-        <h2 v-else id="results-title" class="sr-only">搜索结果</h2>
+        <div v-else id="results-title" class="sr-only" role="heading" aria-level="2">搜索结果</div>
 
         <div v-if="loading && !results.length" class="page-state" aria-busy="true" aria-label="正在搜索">
           <BaseSkeleton variant="card" :count="2" />
@@ -100,9 +95,9 @@
           <li v-for="(item, index) in results" :key="item.id" class="search-result">
             <span class="search-result__index" aria-hidden="true">{{ formatResultIndex(index) }}</span>
             <article>
-              <h3>
+              <div role="heading" aria-level="3">
                 <RouterLink :to="`/articles/${item.slug}`">{{ item.title }}</RouterLink>
-              </h3>
+              </div>
               <p>
                 <template v-for="(part, partIndex) in highlight(item.snippet)" :key="`${item.id}-${partIndex}`">
                   <mark v-if="part.hit">{{ part.text }}</mark>
@@ -124,18 +119,12 @@
           description="可以尝试缩短关键词，或从“设计”“代码”“写作”这些航标重新出发。"
         >
           <template #icon>
-            <svg viewBox="0 0 24 24">
-              <circle cx="10.5" cy="10.5" r="6.5" />
-              <path d="m15.5 15.5 5 5M8 10.5h5" />
-            </svg>
+            <SvgIcon name="search-minus" />
           </template>
         </BaseEmpty>
 
         <div v-else class="page-state search-page__prompt">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <circle cx="10.5" cy="10.5" r="6.5" />
-            <path d="m15.5 15.5 5 5" />
-          </svg>
+          <SvgIcon name="search" />
           <p>输入关键词开始搜索</p>
         </div>
 
@@ -150,7 +139,7 @@
       </section>
 
       <aside v-if="fieldMap.length" class="search-aside mist-glass" aria-labelledby="search-map-title">
-        <h2 id="search-map-title">命中海图</h2>
+        <div id="search-map-title" role="heading" aria-level="2">命中海图</div>
         <div class="search-map">
           <div v-for="field in fieldMap" :key="field.label" class="search-map__row">
             <span>{{ field.label }}</span>
@@ -172,6 +161,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { searchArticles } from '@/api/modules/article'
 import type { CursorPage } from '@/api/types'
 import type { ArticleSearchItem } from '@/types/article'

@@ -65,7 +65,7 @@
   text-transform: uppercase;
 }
 
-.topic-hero h1 {
+.topic-hero [role='heading'][aria-level='1'] {
   max-width: 12ch;
   margin: var(--space-3) 0 var(--space-6);
   font-family: var(--font-serif);
@@ -125,7 +125,7 @@
   gap: var(--space-8);
 }
 
-.topic-stream__heading h2 {
+.topic-stream__heading [role='heading'][aria-level='2'] {
   margin: var(--space-2) 0 0;
   font-family: var(--font-serif);
   font-size: clamp(var(--text-xl), 4vw, var(--text-2xl));
@@ -222,7 +222,7 @@
   letter-spacing: 0.12em;
 }
 
-.not-found-stage h1 {
+.not-found-stage [role='heading'][aria-level='1'] {
   margin: var(--space-4) 0;
   font-family: var(--font-serif);
   font-size: clamp(var(--text-2xl), 6vw, var(--text-hero));

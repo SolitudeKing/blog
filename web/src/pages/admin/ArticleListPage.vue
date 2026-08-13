@@ -3,7 +3,7 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Articles</p>
-        <h1>文章管理</h1>
+        <div role="heading" aria-level="1">文章管理</div>
       </div>
       <RouterLink class="mist-button" to="/admin/articles/new">新建文章</RouterLink>
     </header>
@@ -85,9 +85,7 @@
       description="点击右上角的“新建文章”开始写作。"
     >
       <template #icon>
-        <svg class="admin-empty__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-          <path d="M6 3h9l4 4v14H6zM15 3v5h4M9 12h7M9 16h5" />
-        </svg>
+        <SvgIcon class="admin-empty__icon" name="empty-article" />
       </template>
     </BaseEmpty>
 
@@ -105,6 +103,7 @@ import { useRoute } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { deleteArticle, getManagedArticleList } from '@/api/modules/article'
 import { useToast } from '@/composables/useToast'
 import type { CursorPage } from '@/api/types'

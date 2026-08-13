@@ -30,9 +30,7 @@
             @click="onNavigationClick"
           >
             <span class="admin-layout__brand-mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M3 8.5c3-3 6 3 9 0s6 3 9 0M3 15.5c3-3 6 3 9 0s6 3 9 0" />
-              </svg>
+              <SvgIcon name="brand-waves" />
             </span>
             <span class="admin-layout__brand-copy">
               <strong id="admin-nav-title">Solitude</strong>
@@ -50,12 +48,7 @@
             :title="navigationToggleLabel"
             @click="toggleNavigation"
           >
-            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <rect x="3.5" y="4" width="17" height="16" rx="2" />
-              <path d="M9 4v16" />
-              <path v-if="shellCollapsed" d="m13 9 3 3-3 3" />
-              <path v-else d="m16 9-3 3 3 3" />
-            </svg>
+            <SvgIcon :name="shellCollapsed ? 'sidebar-expand' : 'sidebar-collapse'" />
           </button>
 
           <button
@@ -67,9 +60,7 @@
             aria-label="关闭导航菜单"
             @click="closeDrawer()"
           >
-            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            <SvgIcon name="close" />
           </button>
         </div>
 
@@ -88,7 +79,7 @@
               :tabindex="navigationTabIndex"
               @click="onNavigationClick"
             >
-              <component :is="item.icon" />
+              <SvgIcon :name="item.icon" />
               <span class="admin-layout__nav-label">{{ item.label }}</span>
             </RouterLink>
           </section>
@@ -105,9 +96,7 @@
             :tabindex="navigationTabIndex"
             @click="onNavigationClick"
           >
-            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <path d="M14 5h5v5M19 5l-8 8M18 13v6H5V6h6" />
-            </svg>
+            <SvgIcon name="external-link" />
             <span class="admin-layout__view-site-label">查看博客</span>
           </RouterLink>
 
@@ -127,9 +116,7 @@
               title="退出登录"
               @click="onLogout"
             >
-              <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
-              </svg>
+              <SvgIcon name="logout" />
             </button>
           </div>
         </div>
@@ -159,11 +146,7 @@
           :title="navigationToggleLabel"
           @click="toggleNavigation"
         >
-            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <rect x="3.5" y="4" width="17" height="16" rx="2" />
-              <path d="M9 4v16" />
-              <path d="M13 9h4M13 12h4M13 15h4" />
-            </svg>
+            <SvgIcon name="sidebar" />
         </button>
         <div>
           <span>{{ currentPage.kicker }}</span>
@@ -173,10 +156,7 @@
 
       <form class="admin-layout__search" role="search" @submit.prevent="onAdminSearch">
         <label class="sr-only" for="admin-global-search">搜索文章</label>
-        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m15.5 15.5 4 4" />
-        </svg>
+        <SvgIcon name="search" />
         <input
           id="admin-global-search"
           ref="searchInput"
@@ -211,7 +191,6 @@
 <script setup lang="ts">
 import {
   computed,
-  h,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -220,6 +199,8 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseThemeControls from '@/components/base/BaseThemeControls.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
+import type { SvgIconName } from '@/config/svgIcons'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 
@@ -282,52 +263,26 @@ const pageTitles: Record<string, { kicker: string; title: string }> = {
 const currentPage = computed(() =>
   pageTitles[String(route.name ?? '')] ?? { kicker: 'Admin', title: '创作工作台' },
 )
-const svg = (paths: string) =>
-  h(
-    'svg',
-    {
-      viewBox: '0 0 24 24',
-      stroke: 'currentColor',
-      fill: 'none',
-      'stroke-width': '1.7',
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
-      'aria-hidden': 'true',
-      focusable: 'false',
-    },
-    paths.split('|').map((d) => h('path', { d })),
-  )
-
-const IconDashboard = () =>
-  svg('M4 4h6v7H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 15h6v5H4z')
-const IconArticle = () =>
-  svg('M6 3h9l4 4v14H6z|M15 3v5h4|M9 12h7|M9 16h7')
-const IconTopic = () =>
-  svg('M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z')
-const IconMedia = () =>
-  svg('M4 5h16v14H4z|m4 10 3-3 3 3 2-2 4 4|M9 9h.01')
-const IconNotice = () =>
-  svg('M4 10v4l10 3V7L4 10z|M14 10h2a3 3 0 0 1 0 6h-2|M7 15l1 4h3')
-const IconSettings = () =>
-  svg('M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z|M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4')
-
-const navigationGroups = [
+const navigationGroups: Array<{
+  label: string
+  items: Array<{ to: string; label: string; icon: SvgIconName }>
+}> = [
   {
     label: '工作台',
-    items: [{ to: '/admin', label: '仪表盘', icon: IconDashboard }],
+    items: [{ to: '/admin', label: '仪表盘', icon: 'dashboard' }],
   },
   {
     label: '内容',
     items: [
-      { to: '/admin/articles', label: '文章管理', icon: IconArticle },
-      { to: '/admin/taxonomy', label: '专题与标签', icon: IconTopic },
-      { to: '/admin/media', label: '媒体库', icon: IconMedia },
-      { to: '/admin/notices', label: '公告管理', icon: IconNotice },
+      { to: '/admin/articles', label: '文章管理', icon: 'article' },
+      { to: '/admin/taxonomy', label: '专题与标签', icon: 'topic-grid' },
+      { to: '/admin/media', label: '媒体库', icon: 'media' },
+      { to: '/admin/notices', label: '公告管理', icon: 'empty-notice' },
     ],
   },
   {
     label: '系统',
-    items: [{ to: '/admin/settings', label: '站点设置', icon: IconSettings }],
+    items: [{ to: '/admin/settings', label: '站点设置', icon: 'settings' }],
   },
 ]
 

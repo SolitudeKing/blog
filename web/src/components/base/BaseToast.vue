@@ -30,9 +30,7 @@
             aria-label="关闭通知"
             @click="dismiss(item.id)"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
-            </svg>
+            <SvgIcon name="close" />
           </button>
         </div>
       </TransitionGroup>
@@ -42,6 +40,7 @@
 
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 
 const { items, dismiss, pause, resume } = useToast()
 

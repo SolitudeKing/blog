@@ -3,14 +3,14 @@
     <header class="admin-page__header">
       <div>
         <p class="admin-page__eyebrow">Notices</p>
-        <h1>公告管理</h1>
+        <div role="heading" aria-level="1">公告管理</div>
       </div>
       <BaseButton variant="secondary" :loading="loading" @click="loadNotices()">刷新</BaseButton>
     </header>
 
     <div class="notice-grid">
       <form class="notice-panel" :aria-busy="saving" @submit.prevent="saveNotice">
-        <h2>{{ editingId ? '编辑公告' : '新增公告' }}</h2>
+        <div role="heading" aria-level="2">{{ editingId ? '编辑公告' : '新增公告' }}</div>
         <BaseInput v-model="form.title" label="标题" />
         <BaseTextarea v-model="form.content" label="内容" :rows="5" />
 
@@ -107,9 +107,7 @@
           description="创建一条公告，让访客在首页第一眼看到。"
         >
           <template #icon>
-            <svg class="admin-empty__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <path d="M4 10v4l10 3V7L4 10zM14 10h2a3 3 0 0 1 0 6h-2M7 15l1 4h3" />
-            </svg>
+            <SvgIcon class="admin-empty__icon" name="empty-notice" />
           </template>
         </BaseEmpty>
 
@@ -128,6 +126,7 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { createNotice, deleteNotice, getManagedNoticeList, updateNotice } from '@/api/modules/notice'
 import { useToast } from '@/composables/useToast'
 import type { CursorPage } from '@/api/types'

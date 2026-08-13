@@ -31,7 +31,7 @@
   text-transform: uppercase;
 }
 
-.archive-hero__copy h1 {
+.archive-hero__copy [role='heading'][aria-level='1'] {
   max-width: 10ch;
   margin: var(--space-4) 0 var(--space-5);
   color: var(--text-primary);
@@ -194,7 +194,7 @@
   outline: none;
 }
 
-.archive-year:focus .archive-year__label h2 {
+.archive-year:focus .archive-year__label [role='heading'][aria-level='2'] {
   border-radius: var(--radius-sm);
   box-shadow: var(--focus-ring);
 }
@@ -218,7 +218,7 @@
   display: none;
 }
 
-.archive-year__label h2 {
+.archive-year__label [role='heading'][aria-level='2'] {
   position: sticky;
   top: calc(var(--layout-public-header) + 64px + var(--space-6));
   width: max-content;
@@ -235,7 +235,7 @@
   margin-top: var(--space-12);
 }
 
-.archive-month h3 {
+.archive-month [role='heading'][aria-level='3'] {
   margin: 0 0 var(--space-4);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -366,7 +366,7 @@
     padding-block: var(--space-10) var(--space-12);
   }
 
-  .archive-hero__copy h1 {
+  .archive-hero__copy [role='heading'][aria-level='1'] {
     font-size: clamp(42px, 14vw, 64px);
   }
 
@@ -402,7 +402,7 @@
     padding-bottom: var(--space-16);
   }
 
-  .archive-year__label h2 {
+  .archive-year__label [role='heading'][aria-level='2'] {
     position: relative;
     top: auto;
     font-size: 40px;

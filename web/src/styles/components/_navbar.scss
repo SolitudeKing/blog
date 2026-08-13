@@ -156,7 +156,7 @@
   background: var(--accent-softer);
 }
 
-.blog-navbar__nav a.router-link-active,
+.blog-navbar__nav a.router-link-exact-active,
 .blog-navbar__nav a[aria-current='page'] {
   border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
   color: var(--accent-active);
@@ -324,7 +324,7 @@
     text-transform: uppercase;
   }
 
-  h2 {
+  [role='heading'][aria-level='2'] {
     margin: 0;
     font-family: var(--font-serif);
     font-size: 22px;
@@ -385,7 +385,7 @@
       background-color var(--transition-fast);
 
     &:hover,
-    &.router-link-active,
+    &.router-link-exact-active,
     &[aria-current='page'] {
       border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
       color: var(--accent-active);

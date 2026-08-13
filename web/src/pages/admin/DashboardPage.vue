@@ -3,7 +3,7 @@
     <header class="dashboard-welcome">
       <div>
         <p class="admin-page__eyebrow">{{ todayLabel }}</p>
-        <h1>创作工作台</h1>
+        <div role="heading" aria-level="1">创作工作台</div>
         <p>从最近一次编辑继续，让内容发布保持清晰而从容。</p>
       </div>
       <div class="dashboard-welcome__actions">
@@ -11,9 +11,7 @@
           刷新数据
         </BaseButton>
         <RouterLink class="mist-button mist-button--lg" to="/admin/articles/new">
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <SvgIcon name="plus" />
           新建文章
         </RouterLink>
       </div>
@@ -28,7 +26,7 @@
     >
       <span class="dashboard-state__indicator" aria-hidden="true" />
       <div>
-        <h2 id="dashboard-loading-title">正在整理工作台</h2>
+        <div id="dashboard-loading-title" role="heading" aria-level="2">正在整理工作台</div>
         <p>正在读取文章、媒体与站点统计。</p>
       </div>
     </section>
@@ -40,7 +38,7 @@
       aria-labelledby="dashboard-error-title"
     >
       <div>
-        <h2 id="dashboard-error-title">工作台暂时无法载入</h2>
+        <div id="dashboard-error-title" role="heading" aria-level="2">工作台暂时无法载入</div>
         <p>{{ error }}</p>
       </div>
       <BaseButton variant="secondary" @click="loadSummary">重新加载</BaseButton>
@@ -59,7 +57,7 @@
           </div>
 
           <template v-if="focusArticle">
-            <h2 id="dashboard-focus-title">{{ focusArticle.title }}</h2>
+            <div id="dashboard-focus-title" role="heading" aria-level="2">{{ focusArticle.title }}</div>
             <p>
               {{ currentDraft ? '这篇草稿仍在等待完成，继续上一次的写作节奏。' : '这是最近更新的内容，可继续编辑或查看发布结果。' }}
             </p>
@@ -76,9 +74,7 @@
             <div class="dashboard-focus__actions">
               <RouterLink class="mist-button" :to="`/admin/articles/${focusArticle.id}`">
                 {{ currentDraft ? '继续写作' : '打开编辑器' }}
-                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
+                <SvgIcon name="arrow-right" />
               </RouterLink>
               <RouterLink
                 v-if="focusArticle.status === 'published'"
@@ -91,7 +87,7 @@
           </template>
 
           <template v-else>
-            <h2 id="dashboard-focus-title">把第一篇文章写进今天</h2>
+            <div id="dashboard-focus-title" role="heading" aria-level="2">把第一篇文章写进今天</div>
             <p>工作台已经准备好，从一个标题或一段 Markdown 开始。</p>
             <div class="dashboard-focus__actions">
               <RouterLink class="mist-button" to="/admin/articles/new">开始写作</RouterLink>
@@ -103,7 +99,7 @@
           <header>
             <div>
               <span class="admin-page__eyebrow">Publishing</span>
-              <h2 id="dashboard-briefing-title">当前公告</h2>
+              <div id="dashboard-briefing-title" role="heading" aria-level="2">当前公告</div>
             </div>
             <strong>{{ summary.notice_counts.enabled.toString().padStart(2, '0') }}</strong>
           </header>
@@ -131,7 +127,7 @@
         role="region"
         aria-labelledby="dashboard-metrics-title"
       >
-        <h2 id="dashboard-metrics-title" class="sr-only">站点数据概览</h2>
+        <div id="dashboard-metrics-title" class="sr-only" role="heading" aria-level="2">站点数据概览</div>
         <dl>
           <div
             v-for="metric in metrics"
@@ -153,7 +149,7 @@
           <header class="dashboard-section-header">
             <div>
               <span class="admin-page__eyebrow">Content stream</span>
-              <h2 id="dashboard-recent-title">最近文章</h2>
+              <div id="dashboard-recent-title" role="heading" aria-level="2">最近文章</div>
             </div>
             <RouterLink class="text-link" to="/admin/articles">查看全部</RouterLink>
           </header>
@@ -168,9 +164,7 @@
                 <span class="status-pill" :class="`status-pill--${article.status}`">
                   {{ statusText(article.status) }}
                 </span>
-                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
+                <SvgIcon name="arrow-right" />
               </RouterLink>
             </li>
           </ol>
@@ -185,7 +179,7 @@
             <header class="dashboard-section-header">
               <div>
                 <span class="admin-page__eyebrow">Readers</span>
-                <h2 id="dashboard-top-title">热门文章</h2>
+                <div id="dashboard-top-title" role="heading" aria-level="2">热门文章</div>
               </div>
             </header>
             <ol v-if="summary.top_articles.length" class="dashboard-ranked-list">
@@ -206,7 +200,7 @@
             <header class="dashboard-section-header">
               <div>
                 <span class="admin-page__eyebrow">Taxonomy</span>
-                <h2 id="dashboard-topic-title">专题分布</h2>
+                <div id="dashboard-topic-title" role="heading" aria-level="2">专题分布</div>
               </div>
               <RouterLink class="text-link" to="/admin/taxonomy">管理</RouterLink>
             </header>
@@ -232,6 +226,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getDashboardSummary } from '@/api/modules/dashboard'
 import type { DashboardArticleItem, DashboardNoticeItem, DashboardSummary } from '@/types/dashboard'
 

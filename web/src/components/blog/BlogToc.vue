@@ -2,7 +2,7 @@
   <aside v-if="items.length" class="blog-toc" :aria-labelledby="headingId">
     <div class="blog-toc__header">
       <span class="blog-toc__dot" aria-hidden="true"></span>
-      <h2 :id="headingId">{{ title }}</h2>
+      <div :id="headingId" role="heading" aria-level="2">{{ title }}</div>
     </div>
     <nav class="blog-toc__nav" :aria-label="title">
       <a

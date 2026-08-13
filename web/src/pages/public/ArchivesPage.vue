@@ -3,7 +3,7 @@
     <header class="archive-hero">
       <div class="archive-hero__copy">
         <p class="archive-kicker">Archive · {{ archiveRange }}</p>
-        <h1 id="archive-title">所有足迹，都有刻度</h1>
+        <div id="archive-title" role="heading" aria-level="1">所有足迹，都有刻度</div>
         <p>
           从最近一次发布向过去回望。这里按年份与月份整理已经公开的文章，让每一段记录都能被重新抵达。
         </p>
@@ -14,11 +14,7 @@
         <span class="archive-hero__label">
           {{ page.has_more ? '篇已加载文章' : '篇公开文章' }} · {{ yearEntries.length }} 个年份
         </span>
-        <svg class="archive-hero__wave" viewBox="0 0 640 240" fill="none" stroke="currentColor" aria-hidden="true">
-          <path d="M-20 128c80-72 120 69 200-3s120-52 200 5 120 65 200-8 120-38 200-7" stroke-width="1.5" />
-          <path d="M-20 162c80-44 120 42 200-2s120-31 200 2 120 40 200-4 120-22 200-3" stroke-width="1" opacity=".5" />
-          <path d="M-20 192h780" stroke-width="1" opacity=".24" />
-        </svg>
+        <SvgIcon class="archive-hero__wave" name="archive-wave" />
       </div>
     </header>
 
@@ -58,9 +54,7 @@
         description="发布文章后会按年/月自动汇总到这里。"
       >
         <template #icon>
-          <svg viewBox="0 0 24 24">
-            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" />
-          </svg>
+          <SvgIcon name="book-open" />
         </template>
       </BaseEmpty>
 
@@ -78,10 +72,10 @@
         tabindex="-1"
       >
         <div class="archive-year__label">
-          <h2 :id="`archive-year-label-${year.year}`">
+          <div :id="`archive-year-label-${year.year}`" role="heading" aria-level="2">
             {{ year.year }}
             <span class="sr-only">，{{ year.total }} 篇文章</span>
-          </h2>
+          </div>
         </div>
 
         <div class="archive-year__months">
@@ -91,7 +85,7 @@
             class="archive-month"
             :aria-labelledby="`archive-month-${month.key}`"
           >
-            <h3 :id="`archive-month-${month.key}`">{{ month.label }}</h3>
+            <div :id="`archive-month-${month.key}`" role="heading" aria-level="3">{{ month.label }}</div>
             <ol class="archive-list">
               <li v-for="entry in month.entries" :key="entry.id" class="archive-item">
                 <time :datetime="entry.datetime">{{ entry.displayDate }}</time>
@@ -116,6 +110,7 @@ import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getArticleList } from '@/api/modules/article'
 import type { ArticleListItem } from '@/types/article'
 import type { CursorPage } from '@/api/types'

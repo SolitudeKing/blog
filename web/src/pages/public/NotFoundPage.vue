@@ -3,7 +3,7 @@
     <div class="not-found-stage mist-luminous">
       <div class="not-found-stage__copy">
         <p class="not-found-stage__code">404 · LOST IN THE MIST</p>
-        <h1 id="not-found-title">这条路隐入了雾中</h1>
+        <div id="not-found-title" role="heading" aria-level="1">这条路隐入了雾中</div>
         <p>页面可能已经迁移、删除，或者从未在这里出现。你可以回到熟悉的入口继续漫游。</p>
         <div class="not-found-stage__actions">
           <RouterLink class="mist-button" :to="primaryTarget">{{ primaryLabel }}</RouterLink>
@@ -13,12 +13,7 @@
         </div>
       </div>
 
-      <svg class="not-found-stage__field" viewBox="0 0 520 360" aria-hidden="true">
-        <path d="M-30 185c78-68 117 64 195-4s117-50 195 4 117 66 195-8" />
-        <path d="M-30 228c78-42 117 40 195-2s117-29 195 2 117 38 195-5" />
-        <circle cx="346" cy="112" r="58" />
-        <path d="M104 94h132M104 126h92M104 158h112" />
-      </svg>
+      <SvgIcon class="not-found-stage__field" name="not-found-field" />
     </div>
   </section>
 </template>
@@ -26,6 +21,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 
 const route = useRoute()
 const isAdminPath = computed(() => route.path.startsWith('/admin'))

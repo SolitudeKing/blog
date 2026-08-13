@@ -10,13 +10,11 @@
     <header class="topic-hero">
       <div class="topic-hero__copy">
         <RouterLink class="topic-hero__back" to="/">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M19 12H5m6-6-6 6 6 6" />
-          </svg>
+          <SvgIcon name="arrow-left" />
           返回首页
         </RouterLink>
         <p class="topic-kicker">Topic · {{ activeTopic.label }}</p>
-        <h1 :id="topicTitleId">{{ activeTopic.name }}</h1>
+        <div :id="topicTitleId" role="heading" aria-level="1">{{ activeTopic.name }}</div>
         <p>{{ activeTopic.description }}</p>
       </div>
 
@@ -33,7 +31,7 @@
       <header class="topic-stream__heading">
         <div>
           <p class="topic-kicker">Reading stream</p>
-          <h2 id="topic-stream-title">沿着这条线索继续阅读</h2>
+          <div id="topic-stream-title" role="heading" aria-level="2">沿着这条线索继续阅读</div>
         </div>
         <span role="status" aria-live="polite">{{ resultStatus }}</span>
       </header>
@@ -70,9 +68,7 @@
         cta-to="/archives"
       >
         <template #icon>
-          <svg viewBox="0 0 24 24">
-            <path d="M5 4h10l4 4v12H5V4Zm10 0v5h4M8 13h8M8 16h6" />
-          </svg>
+          <SvgIcon name="document-lines" />
         </template>
       </BaseEmpty>
 
@@ -103,6 +99,7 @@ import ArticleCard from '@/components/blog/ArticleCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import NotFoundPage from '@/pages/public/NotFoundPage.vue'
 import { getArticleList } from '@/api/modules/article'
 import { findTopicBySlug } from '@/config/topicCatalog'

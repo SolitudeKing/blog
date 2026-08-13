@@ -2,21 +2,18 @@
   <div class="home-view">
     <section class="home-stage" aria-labelledby="home-title">
       <article class="home-stage__profile mist-luminous">
-        <div class="home-stage__avatar" role="img" :aria-label="`${author} 的头像`">
-          <span aria-hidden="true">{{ authorInitial }}</span>
-          <svg aria-hidden="true" viewBox="0 0 220 220">
-            <path d="M18 160c38-22 57 22 95 0s57 22 95 0" />
-            <path d="M26 180c34-18 51 18 85 0s51 18 85 0" />
-          </svg>
+        <div class="home-stage__avatar">
+          <img :src="authorAvatarSrc" :alt="`${author} 的头像`" @error="useDefaultAuthorAvatar" />
+          <span v-if="usingDefaultAuthorAvatar" aria-hidden="true">{{ authorInitial }}</span>
         </div>
 
         <div class="home-stage__identity">
           <span class="home-kicker">Blog keeper · Solitude</span>
-          <h1 id="home-title">
+          <div id="home-title" role="heading" aria-level="1">
             <span>你好，我是</span>
             {{ author }}
             <small>@{{ authorHandle }}</small>
-          </h1>
+          </div>
           <p class="home-stage__motto">“{{ essay }}”</p>
           <p class="home-stage__status">
             <span aria-hidden="true" />
@@ -31,16 +28,11 @@
               :target="entry.external ? '_blank' : undefined"
               :rel="entry.external ? 'noopener noreferrer' : undefined"
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M7 17 17 7M9 7h8v8" />
-              </svg>
+              <SvgIcon name="arrow-up-right" />
               {{ entry.label }}
             </a>
             <a href="/rss.xml">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <circle cx="6" cy="18" r="1" />
-                <path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14" />
-              </svg>
+              <SvgIcon name="rss" />
               RSS
             </a>
           </nav>
@@ -49,7 +41,7 @@
 
       <aside class="home-stage__intro" aria-labelledby="home-intro-title">
         <span class="home-kicker">{{ siteName }}</span>
-        <h2 id="home-intro-title">一份持续更新的博客，也是公开的思考现场</h2>
+        <div id="home-intro-title" role="heading" aria-level="2">一份持续更新的博客，也是公开的思考现场</div>
         <p>
           在这里记录工程实践、设计系统与构建过程。文章保留可复用的方法，也保留问题发生时的真实判断。
         </p>
@@ -84,13 +76,11 @@
       <header class="home-section__heading">
         <div>
           <span class="home-kicker">Latest posts</span>
-          <h2 id="latest-title">最近发布的博客</h2>
+          <div id="latest-title" role="heading" aria-level="2">最近发布的博客</div>
         </div>
         <RouterLink class="home-arrow-link" to="/archives">
           查看全部归档
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
+          <SvgIcon name="arrow-right" />
         </RouterLink>
       </header>
 
@@ -133,9 +123,7 @@
           :description="currentThemeElements.home_latest_empty_description"
         >
           <template #icon>
-            <svg viewBox="0 0 24 24">
-              <path d="M5 4h10l4 4v12H5V4Zm10 0v5h4M8 13h8M8 16h6" />
-            </svg>
+            <SvgIcon name="document-lines" />
           </template>
         </BaseEmpty>
 
@@ -159,7 +147,7 @@
       <div class="home-topics">
         <div class="home-topics__intro">
           <span class="home-kicker">Topics</span>
-          <h2 id="topics-title">从这些专题进入</h2>
+          <div id="topics-title" role="heading" aria-level="2">从这些专题进入</div>
         </div>
         <nav class="home-topics__links" aria-label="文章专题">
           <RouterLink
@@ -179,7 +167,7 @@
       <div class="home-notice mist-glass--subtle">
         <div>
           <span class="home-kicker">Site notice</span>
-          <h2 id="notice-title">{{ activeNotice.title }}</h2>
+          <div id="notice-title" role="heading" aria-level="2">{{ activeNotice.title }}</div>
           <p>{{ activeNotice.content }}</p>
         </div>
         <RouterLink class="mist-button mist-button--secondary" to="/archives">
@@ -191,11 +179,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import defaultAuthorAvatar from '@/assets/images/default-author-avatar.svg'
 import ArticleCard from '@/components/blog/ArticleCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getArticleList } from '@/api/modules/article'
 import { getActiveNotice } from '@/api/modules/notice'
 import { getTagList, getTopicList } from '@/api/modules/taxonomy'
@@ -236,6 +226,12 @@ const author = computed(() => setting.lobby?.author ?? 'Solitude King')
 const essay = computed(() => setting.lobby?.essay?.trim() || '把复杂的技术写清楚，也把无法量化的感受留在字里行间。')
 const currentThemeElements = computed(() => resolveLobbyThemeElements(setting.lobby))
 const authorInitial = computed(() => author.value.trim().slice(0, 1).toUpperCase())
+const configuredAuthorAvatarURL = computed(() => setting.lobby?.author_avatar_url?.trim() || '')
+const authorAvatarFailed = ref(false)
+const usingDefaultAuthorAvatar = computed(() => authorAvatarFailed.value || !configuredAuthorAvatarURL.value)
+const authorAvatarSrc = computed(() =>
+  usingDefaultAuthorAvatar.value ? defaultAuthorAvatar : configuredAuthorAvatarURL.value,
+)
 const authorHandle = computed(() =>
   author.value
     .trim()
@@ -248,6 +244,10 @@ const railArticles = computed(() => articles.value.slice(1, 4))
 const remainingArticles = computed(() => articles.value.slice(4))
 
 const socialEntries = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
+
+watch(configuredAuthorAvatarURL, () => {
+  authorAvatarFailed.value = false
+})
 
 const articleTotal = computed(() => {
   const counts = topicCatalog.map((catalogTopic) => {
@@ -342,5 +342,9 @@ function findCatalogTopic(catalogTopic: { slug: string; label: string }) {
     topics.value.find((item) => item.slug.trim().toLowerCase() === catalogTopic.slug) ??
     topics.value.find((item) => normalizeTopicLabel(item.label) === catalogTopic.label)
   )
+}
+
+function useDefaultAuthorAvatar() {
+  authorAvatarFailed.value = true
 }
 </script>
