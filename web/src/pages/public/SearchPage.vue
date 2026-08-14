@@ -135,12 +135,13 @@
 
         <div v-if="results.length && !error" class="search-footer">
           <BasePagination
-            mode="prevNext"
-            :page="page.page"
-            :has-more="page.has_more"
+            mode="pages"
+            :model-value="page.page"
+            :total="page.total"
+            :page-size="page.page_size"
             :loading="loadingMore"
-            @prev="goPrevPage"
-            @next="goNextPage"
+            align="center"
+            @change="goToPage"
           />
         </div>
       </section>
@@ -213,6 +214,7 @@ const page = reactive({
   page: 1,
   page_size: 20,
   count: 0,
+  total: 0,
   has_more: false,
 })
 
@@ -327,6 +329,7 @@ async function runSearch(targetPage: number, replace = false) {
     results.value = result.data
     page.page = result.page
     page.page_size = result.page_size
+    page.total = result.total
     page.count = result.count
     page.has_more = result.has_more
   } catch (err) {
@@ -349,6 +352,11 @@ async function goNextPage() {
 async function goPrevPage() {
   if (loadingMore.value || page.page <= 1) return
   await runSearch(page.page - 1)
+}
+
+async function goToPage(targetPage: number) {
+  if (loadingMore.value || targetPage === page.page) return
+  await runSearch(targetPage)
 }
 
 async function retrySearch() {

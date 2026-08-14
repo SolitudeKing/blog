@@ -1,5 +1,9 @@
 <template>
-  <nav class="base-pagination" :class="`base-pagination--${mode}`" aria-label="分页">
+  <nav
+    class="base-pagination"
+    :class="[`base-pagination--${mode}`, `base-pagination--align-${align}`]"
+    aria-label="分页"
+  >
     <!-- 加载更多模式：单一"加载更多"按钮 -->
     <template v-if="mode === 'loadMore'">
       <button
@@ -96,6 +100,8 @@ type PageItem =
 const props = withDefaults(
   defineProps<{
     mode?: 'loadMore' | 'prevNext' | 'pages'
+    /** 对齐方式：start 居左 / center 居中 / end 居右；3 种模式都生效 */
+    align?: 'start' | 'center' | 'end'
     /** loadMore 模式 */
     loading?: boolean
     hasMore?: boolean
@@ -112,6 +118,7 @@ const props = withDefaults(
   }>(),
   {
     mode: 'loadMore',
+    align: 'center',
     loading: false,
     hasMore: false,
     label: '加载更多',
@@ -276,6 +283,19 @@ function goTo(page: number) {
 
 .base-pagination--pages {
   gap: var(--space-2);
+}
+
+/* 对齐方式：3 种模式都生效 */
+.base-pagination--align-start {
+  justify-content: flex-start;
+}
+
+.base-pagination--align-center {
+  justify-content: center;
+}
+
+.base-pagination--align-end {
+  justify-content: flex-end;
 }
 
 .base-pagination--prevNext {

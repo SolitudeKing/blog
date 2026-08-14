@@ -134,12 +134,13 @@
 
         <div v-if="articles.length && !error" class="home-section__footer">
           <BasePagination
-            mode="prevNext"
-            :page="page.page"
-            :has-more="page.has_more"
+            mode="pages"
+            :model-value="page.page"
+            :total="page.total"
+            :page-size="page.page_size"
             :loading="loadingMore"
-            @prev="goPrevPage"
-            @next="goNextPage"
+            align="center"
+            @change="goToPage"
           />
           <span v-if="!page.has_more" class="home-section__end">
             {{ currentThemeElements.home_latest_end_text }}
@@ -223,6 +224,7 @@ const page = reactive({
   page: 1,
   page_size: 20,
   count: 0,
+  total: 0,
   has_more: false,
 })
 
@@ -326,6 +328,7 @@ async function loadArticles(targetPage: number) {
     articles.value = result.data
     page.page = result.page
     page.page_size = result.page_size
+    page.total = result.total
     page.count = result.count
     page.has_more = result.has_more
   } catch (err) {
@@ -347,6 +350,11 @@ async function goNextPage() {
 async function goPrevPage() {
   if (loadingMore.value || page.page <= 1) return
   await loadArticles(page.page - 1)
+}
+
+async function goToPage(targetPage: number) {
+  if (loadingMore.value || targetPage === page.page) return
+  await loadArticles(targetPage)
 }
 
 function findCatalogTopic(catalogTopic: { slug: string; label: string }) {

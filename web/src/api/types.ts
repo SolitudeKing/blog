@@ -20,6 +20,7 @@ export interface ApiListResponse<T> {
   page: number
   page_size: number
   count: number
+  total: number
   has_more: boolean
 }
 

@@ -98,12 +98,13 @@
 
     <div v-if="assets.length" class="media-footer">
       <BasePagination
-        mode="prevNext"
-        :page="page.page"
-        :has-more="page.has_more"
+        mode="pages"
+        :model-value="page.page"
+        :total="page.total"
+        :page-size="page.page_size"
         :loading="loadingMore"
-        @prev="goPrevPage"
-        @next="goNextPage"
+        align="center"
+        @change="goToPage"
       />
     </div>
 
@@ -248,6 +249,7 @@ const page = reactive({
   page: 1,
   page_size: 40,
   count: 0,
+  total: 0,
   has_more: false,
 })
 
@@ -277,6 +279,7 @@ async function loadAssets(targetPage: number) {
     assets.value = result.data
     page.page = result.page
     page.page_size = result.page_size
+    page.total = result.total
     page.count = result.count
     page.has_more = result.has_more
   } catch (err) {
@@ -295,6 +298,11 @@ async function goNextPage() {
 async function goPrevPage() {
   if (loadingMore.value || page.page <= 1) return
   await loadAssets(page.page - 1)
+}
+
+async function goToPage(targetPage: number) {
+  if (loadingMore.value || targetPage === page.page) return
+  await loadAssets(targetPage)
 }
 
 function openUploadModal() {
