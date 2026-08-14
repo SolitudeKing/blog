@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	apperrors "solitude-blog/server/internal/errors"
+	"solitude-blog/server/internal/pagination"
 	"solitude-blog/server/internal/response"
 	"solitude-blog/server/internal/service"
 )
@@ -19,8 +17,7 @@ func NewArticleHandler(article *service.ArticleService) *ArticleHandler {
 }
 
 func (h *ArticleHandler) PublicList(c *gin.Context) {
-	query := articleListQuery(c)
-	items, page, err := h.article.PublicList(query)
+	items, page, err := h.article.PublicList(articleListQuery(c))
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -38,8 +35,7 @@ func (h *ArticleHandler) Detail(c *gin.Context) {
 }
 
 func (h *ArticleHandler) ManageList(c *gin.Context) {
-	query := articleListQuery(c)
-	items, page, err := h.article.ManageList(query)
+	items, page, err := h.article.ManageList(articleListQuery(c))
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -49,8 +45,7 @@ func (h *ArticleHandler) ManageList(c *gin.Context) {
 
 func (h *ArticleHandler) Create(c *gin.Context) {
 	var req service.ArticleCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+	if !response.BindJSON(c, &req) {
 		return
 	}
 	item, err := h.article.Create(req, c.GetUint64("user_id"))
@@ -81,8 +76,7 @@ func (h *ArticleHandler) VersionList(c *gin.Context) {
 
 func (h *ArticleHandler) Update(c *gin.Context) {
 	var req service.ArticleUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+	if !response.BindJSON(c, &req) {
 		return
 	}
 	item, err := h.article.Update(c.Param("id"), req, c.GetUint64("user_id"))
@@ -102,8 +96,7 @@ func (h *ArticleHandler) Delete(c *gin.Context) {
 }
 
 func articleListQuery(c *gin.Context) service.ArticleListQuery {
-	page, _ := strconv.Atoi(c.Query("page"))
-	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	page, pageSize := pagination.BindPage(c)
 	return service.ArticleListQuery{
 		Page:     page,
 		PageSize: pageSize,

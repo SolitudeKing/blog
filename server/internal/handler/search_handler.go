@@ -1,10 +1,9 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
+	"solitude-blog/server/internal/pagination"
 	"solitude-blog/server/internal/response"
 	"solitude-blog/server/internal/service"
 )
@@ -18,8 +17,7 @@ func NewSearchHandler(search *service.SearchService) *SearchHandler {
 }
 
 func (h *SearchHandler) Article(c *gin.Context) {
-	page, _ := strconv.Atoi(c.Query("page"))
-	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	page, pageSize := pagination.BindPage(c)
 	items, pageInfo, err := h.search.Article(c.Request.Context(), service.ArticleSearchQuery{
 		Page:     page,
 		PageSize: pageSize,

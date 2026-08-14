@@ -70,3 +70,20 @@ func Error(c *gin.Context, err error) {
 		Data:    nil,
 	})
 }
+
+// BindJSON 统一处理 ShouldBindJSON 错误：成功返回 nil，失败返回统一格式的 400 响应并返回 false。
+// 调用方代码：
+//   if !response.BindJSON(c, &req) { return }
+//
+// 消除 6 个 handler 中重复的：
+//   if err := c.ShouldBindJSON(&req); err != nil {
+//       response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+//       return
+//   }
+func BindJSON(c *gin.Context, req any) bool {
+	if err := c.ShouldBindJSON(req); err != nil {
+		Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+		return false
+	}
+	return true
+}

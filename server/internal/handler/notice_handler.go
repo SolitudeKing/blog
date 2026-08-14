@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	apperrors "solitude-blog/server/internal/errors"
+	"solitude-blog/server/internal/pagination"
 	"solitude-blog/server/internal/response"
 	"solitude-blog/server/internal/service"
 )
@@ -28,8 +28,7 @@ func (h *NoticeHandler) Active(c *gin.Context) {
 }
 
 func (h *NoticeHandler) ManageList(c *gin.Context) {
-	query := noticeListQuery(c)
-	items, page, err := h.notice.ManageList(query)
+	items, page, err := h.notice.ManageList(noticeListQuery(c))
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -39,8 +38,7 @@ func (h *NoticeHandler) ManageList(c *gin.Context) {
 
 func (h *NoticeHandler) Create(c *gin.Context) {
 	var req service.NoticeSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+	if !response.BindJSON(c, &req) {
 		return
 	}
 	item, err := h.notice.Create(req)
@@ -53,8 +51,7 @@ func (h *NoticeHandler) Create(c *gin.Context) {
 
 func (h *NoticeHandler) Update(c *gin.Context) {
 	var req service.NoticeSaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperrors.New(apperrors.CodeMalformedJSONBody))
+	if !response.BindJSON(c, &req) {
 		return
 	}
 	item, err := h.notice.Update(c.Param("id"), req)
@@ -74,8 +71,7 @@ func (h *NoticeHandler) Delete(c *gin.Context) {
 }
 
 func noticeListQuery(c *gin.Context) service.NoticeListQuery {
-	page, _ := strconv.Atoi(c.Query("page"))
-	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	page, pageSize := pagination.BindPage(c)
 	query := service.NoticeListQuery{
 		Page:     page,
 		PageSize: pageSize,

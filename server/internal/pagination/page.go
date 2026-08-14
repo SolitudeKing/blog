@@ -1,5 +1,11 @@
 package pagination
 
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+)
+
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 100
@@ -35,4 +41,13 @@ func NormalizePageSize(size int) int {
 		return MaxPageSize
 	}
 	return size
+}
+
+// BindPage 从 gin context 读取 page / page_size query 参数并规范化。
+// 用于消除 6 个 handler 中重复的 strconv.Atoi(c.Query("page")) 模式。
+// 错误（如非数字）会被钳到默认值而不是报错——分页参数非法时回退首页更友好。
+func BindPage(c *gin.Context) (page, pageSize int) {
+	page, _ = strconv.Atoi(c.Query("page"))
+	pageSize, _ = strconv.Atoi(c.Query("page_size"))
+	return NormalizePage(page), NormalizePageSize(pageSize)
 }
