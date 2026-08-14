@@ -6,11 +6,13 @@ const (
 )
 
 // ListPage 是增长型列表分页信息，固定放在响应体的 data 之外。
-// count 是当前页条目数（= len(data)），不是 total，避免大表 COUNT 拖慢列表接口。
+// count 是当前页条目数（= len(data)）；total 是符合条件的总条数，
+// 用于计算总页数与"跳到第 N 页"等场景。
 type ListPage struct {
 	Page     int  `json:"page"`      // 当前页码 1-based
 	PageSize int  `json:"page_size"` // 每页大小
 	Count    int  `json:"count"`     // 当前页条目数
+	Total    int  `json:"total"`     // 符合条件的总条数
 	HasMore  bool `json:"has_more"`  // 是否还有下一页
 }
 

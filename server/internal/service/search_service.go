@@ -72,6 +72,12 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 		like,
 	)
 
+	// COUNT 复用与 Find 完全一致的 Where / EXISTS 条件，不加 Limit / Offset
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+
 	offset := (page - 1) * pageSize
 	var rows []model.Article
 	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").
@@ -98,6 +104,7 @@ func (s *SearchService) Article(ctx context.Context, query ArticleSearchQuery) (
 	return items, pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    int(total),
 		HasMore:  hasMore,
 	}, nil
 }

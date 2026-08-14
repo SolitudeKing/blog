@@ -270,6 +270,7 @@ func (s *AssetService) ReferenceList(id string, page int, pageSize int) ([]Asset
 	return []AssetReferenceItem{}, pagination.ListPage{
 		Page:     normalizedPage,
 		PageSize: normalizedSize,
+		Total:    0, // 存根实现，引用关系尚未启用
 		HasMore:  false,
 	}, nil
 }
@@ -281,6 +282,12 @@ func (s *AssetService) listFromDB(query AssetListQuery, page, pageSize int) ([]A
 	}
 	if query.Mime != "" {
 		dbQuery = dbQuery.Where("mime_type LIKE ?", query.Mime+"%")
+	}
+
+	// COUNT 复用与 Find 完全一致的 Where 条件，不加 Limit / Offset
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
 
 	offset := (page - 1) * pageSize
@@ -303,6 +310,7 @@ func (s *AssetService) listFromDB(query AssetListQuery, page, pageSize int) ([]A
 	return items, pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    int(total),
 		HasMore:  hasMore,
 	}, nil
 }
@@ -327,7 +335,7 @@ func (s *AssetService) listInMemory(query AssetListQuery, page, pageSize int) ([
 
 	offset := (page - 1) * pageSize
 	if offset >= len(items) {
-		return []AssetItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+		return []AssetItem{}, pagination.ListPage{Page: page, PageSize: pageSize, Total: len(items), HasMore: false}, nil
 	}
 	end := offset + pageSize
 	hasMore := end < len(items)
@@ -337,6 +345,7 @@ func (s *AssetService) listInMemory(query AssetListQuery, page, pageSize int) ([
 	return items[offset:end], pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    len(items), // 内存模式：items 已是符合条件全集
 		HasMore:  hasMore,
 	}, nil
 }

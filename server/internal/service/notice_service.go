@@ -216,6 +216,12 @@ func (s *NoticeService) listFromDB(query NoticeListQuery, page, pageSize int) ([
 		dbQuery = dbQuery.Where("enabled = ?", *query.Enabled)
 	}
 
+	// COUNT 复用与 Find 完全一致的 Where 条件，不加 Limit / Offset
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+
 	offset := (page - 1) * pageSize
 	var rows []model.Notice
 	err := dbQuery.Order("created_at DESC, id DESC").
@@ -236,6 +242,7 @@ func (s *NoticeService) listFromDB(query NoticeListQuery, page, pageSize int) ([
 	return items, pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    int(total),
 		HasMore:  hasMore,
 	}, nil
 }
@@ -261,7 +268,7 @@ func (s *NoticeService) listInMemory(query NoticeListQuery, page, pageSize int) 
 
 	offset := (page - 1) * pageSize
 	if offset >= len(items) {
-		return []NoticeItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+		return []NoticeItem{}, pagination.ListPage{Page: page, PageSize: pageSize, Total: len(items), HasMore: false}, nil
 	}
 	end := offset + pageSize
 	hasMore := end < len(items)
@@ -271,6 +278,7 @@ func (s *NoticeService) listInMemory(query NoticeListQuery, page, pageSize int) 
 	return items[offset:end], pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    len(items), // 内存模式：items 已是符合条件全集
 		HasMore:  hasMore,
 	}, nil
 }

@@ -530,6 +530,13 @@ func (s *ArticleService) listFromDB(query ArticleListQuery, page, pageSize int, 
 			Where("tags.slug = ?", query.Tag)
 	}
 
+	// COUNT 复用与 Find 完全一致的 Where / Joins 条件，不加 Limit / Offset，
+	// 依赖 idx_articles_status_published_at 等索引避免全表扫描。
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
+		return nil, pagination.ListPage{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
+	}
+
 	offset := (page - 1) * pageSize
 	var rows []model.Article
 	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").
@@ -552,6 +559,7 @@ func (s *ArticleService) listFromDB(query ArticleListQuery, page, pageSize int, 
 	return items, pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    int(total),
 		HasMore:  hasMore,
 	}, nil
 }
@@ -591,7 +599,7 @@ func (s *ArticleService) listInMemory(query ArticleListQuery, page, pageSize int
 
 	offset := (page - 1) * pageSize
 	if offset >= len(items) {
-		return []ArticleItem{}, pagination.ListPage{Page: page, PageSize: pageSize, HasMore: false}, nil
+		return []ArticleItem{}, pagination.ListPage{Page: page, PageSize: pageSize, Total: len(items), HasMore: false}, nil
 	}
 	end := offset + pageSize
 	hasMore := end < len(items)
@@ -602,6 +610,7 @@ func (s *ArticleService) listInMemory(query ArticleListQuery, page, pageSize int
 	return items[offset:end], pagination.ListPage{
 		Page:     page,
 		PageSize: pageSize,
+		Total:    len(items), // 内存模式：items 已是符合条件全集
 		HasMore:  hasMore,
 	}, nil
 }
