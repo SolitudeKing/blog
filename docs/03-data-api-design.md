@@ -332,7 +332,7 @@ GET article/detail/my-post
 
 分页响应：
 
-增长型列表使用页码分页。列表数据固定放在 `data` 数组中，四个分页字段固定放在与 `data` 同级；专题和标签完整字典列表是明确例外。
+增长型列表使用页码分页。列表数据固定放在 `data` 数组中，分页字段固定放在与 `data` 同级；专题和标签完整字典列表是明确例外。
 
 ```json
 {
@@ -342,6 +342,7 @@ GET article/detail/my-post
   "count": 20,
   "page": 1,
   "page_size": 20,
+  "total": 87,
   "has_more": true
 }
 ```
@@ -351,9 +352,11 @@ GET article/detail/my-post
 - 请求参数统一使用 `page` 和 `page_size`。
 - `page` 默认 `1`，小于等于 `0` 时钳到 `1`；超过服务端已加载到的最大页时返回空数据。
 - `page_size` 默认 `20`，最大 `100`。
-- `has_more=true` 表示还有下一页；`has_more=false` 时已到末页。
-- `count` 为当前页条目数（等于 `len(data)`），**不是**总条数。
-- **不返回** `total` / `totalPages` / `next_cursor`，避免大表 COUNT 拖慢列表接口。
+- `count` 为当前页条目数（等于 `len(data)`）。
+- `total` 为符合筛选条件的总条数（不是当前页条目数）；用于计算总页数 `ceil(total / page_size)` 并支持"跳到第 N 页"等场景。
+- `has_more=true` 表示还有下一页；`has_more=false` 时已到末页（同时 `page * page_size >= total`）。
+- `total` 由后端对查询条件执行一次 COUNT 得出；该 COUNT 必须复用列表查询的 `Where` / `Joins` 条件，**不允许**额外加 `Limit` / `Offset`。`total` 计数依赖已建索引（`idx_articles_status_published_at` / `idx_articles_topic_status` 等），避免大表全表扫描。
+- 不再返回 `next_cursor`（键集游标已被 `page` / `page_size` 协议替代）。
 - 排序必须稳定，推荐使用 `created_at DESC, id DESC` 或业务明确指定的组合键。
 - `page` / `page_size` 非法或越界时返回 HTTP `400`，业务码 `20003`。
 
