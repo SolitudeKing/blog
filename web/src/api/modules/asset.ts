@@ -2,8 +2,8 @@ import { request, requestList } from '@/api/http'
 import type { AssetItem, AssetReferenceItem, AssetUpdatePayload } from '@/types/asset'
 
 export interface AssetListParams {
-  cursor?: string
-  limit?: number
+  page?: number
+  page_size?: number
   keyword?: string
   mime?: string
 }
@@ -13,7 +13,7 @@ export function getAssetList(params: AssetListParams = {}) {
     method: 'GET',
     url: 'asset/list',
     params: {
-      limit: 40,
+      page_size: 40,
       ...params,
     },
   })
@@ -47,13 +47,13 @@ export function deleteAsset(id: number | string) {
   })
 }
 
-export function getAssetReferenceList(id: number | string, cursor = '') {
+export function getAssetReferenceList(id: number | string, page = 1) {
   return requestList<AssetReferenceItem>({
     method: 'GET',
     url: `asset/reference-list/${id}`,
     params: {
-      cursor: cursor || undefined,
-      limit: 20,
+      page,
+      page_size: 20,
     },
   })
 }

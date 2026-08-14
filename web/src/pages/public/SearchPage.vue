@@ -130,14 +130,17 @@
 
         <div v-if="error && results.length" class="search-load-error" role="alert">
           <span>{{ error }}</span>
-          <BaseButton variant="secondary" size="sm" @click="loadMore">重试加载</BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="retrySearch">重试加载</BaseButton>
         </div>
 
         <div v-if="results.length && !error" class="search-footer">
           <BasePagination
-            :loading="loadingMore"
+            mode="prevNext"
+            :page="page.page"
             :has-more="page.has_more"
-            @load-more="loadMore"
+            :loading="loadingMore"
+            @prev="goPrevPage"
+            @next="goNextPage"
           />
         </div>
       </section>
@@ -168,7 +171,6 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { searchArticles } from '@/api/modules/article'
-import type { CursorPage } from '@/api/types'
 import type { ArticleSearchItem } from '@/types/article'
 
 interface HighlightPart {
@@ -207,10 +209,10 @@ const loadingMore = ref(false)
 const searched = ref(false)
 const error = ref('')
 let searchRequestId = 0
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 20,
+const page = reactive({
+  page: 1,
+  page_size: 20,
+  count: 0,
   has_more: false,
 })
 
@@ -265,7 +267,7 @@ async function submitSearch() {
   const currentQuery = typeof route.query.q === 'string' ? route.query.q : ''
   keyword.value = normalized
   if (normalized === currentQuery) {
-    await runSearch('', true)
+    await runSearch(1, true)
     return
   }
   await router.replace({ path: '/search', query: normalized ? { q: normalized } : {} })
@@ -283,13 +285,13 @@ async function clearSearch() {
   if (route.query.q) {
     await router.replace({ path: '/search' })
   } else {
-    await runSearch('', true)
+    await runSearch(1, true)
   }
   await nextTick()
   inputRef.value?.focus({ preventScroll: true })
 }
 
-async function runSearch(cursor = '', replace = false) {
+async function runSearch(targetPage: number, replace = false) {
   const requestId = ++searchRequestId
   if (!keyword.value) {
     results.value = []
@@ -297,28 +299,36 @@ async function runSearch(cursor = '', replace = false) {
     error.value = ''
     loading.value = false
     loadingMore.value = false
-    page.cursor = ''
-    page.next_cursor = ''
+    page.page = 1
     page.has_more = false
+    page.count = 0
     return
   }
   searched.value = true
-  if (replace || !cursor) {
+  if (replace || targetPage === 1) {
     results.value = []
     loadingMore.value = false
-    page.cursor = ''
-    page.next_cursor = ''
+    page.page = 1
     page.has_more = false
+    page.count = 0
   }
-  loading.value = !cursor
+  loading.value = targetPage === 1
+  loadingMore.value = targetPage > 1
   error.value = ''
   try {
-    const result = await searchArticles({ keyword: keyword.value, cursor: cursor || undefined, limit: page.limit })
+    const result = await searchArticles({
+      keyword: keyword.value,
+      page: targetPage,
+      page_size: page.page_size,
+    })
     if (requestId !== searchRequestId) {
       return
     }
-    results.value = cursor ? [...results.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    results.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     if (requestId === searchRequestId) {
       error.value = err instanceof Error ? err.message : '搜索失败'
@@ -326,24 +336,23 @@ async function runSearch(cursor = '', replace = false) {
   } finally {
     if (requestId === searchRequestId) {
       loading.value = false
+      loadingMore.value = false
     }
   }
 }
 
-async function loadMore() {
-  if (!page.next_cursor) {
-    return
-  }
-  loadingMore.value = true
-  try {
-    await runSearch(page.next_cursor)
-  } finally {
-    loadingMore.value = false
-  }
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await runSearch(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await runSearch(page.page - 1)
 }
 
 async function retrySearch() {
-  await runSearch('', true)
+  await runSearch(1, true)
 }
 
 function formatResultIndex(index: number) {
@@ -394,7 +403,7 @@ watch(
   async (rawQuery) => {
     const query = typeof rawQuery === 'string' ? rawQuery.trim() : ''
     keyword.value = query
-    await runSearch('', true)
+    await runSearch(1, true)
   },
   { immediate: true },
 )

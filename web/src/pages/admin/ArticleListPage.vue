@@ -91,9 +91,12 @@
 
     <div v-if="articles.length" class="admin-list-footer">
       <BasePagination
-        :loading="loadingMore"
+        mode="prevNext"
+        :page="page.page"
         :has-more="page.has_more"
-        @load-more="loadMore"
+        :loading="loadingMore"
+        @prev="goPrevPage"
+        @next="goNextPage"
       />
     </div>
   </section>
@@ -109,7 +112,6 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { deleteArticle, getManagedArticleList } from '@/api/modules/article'
 import { useToast } from '@/composables/useToast'
-import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 
 const articles = ref<ArticleListItem[]>([])
@@ -122,10 +124,10 @@ const error = ref('')
 const toast = useToast()
 let articleRequestId = 0
 
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 20,
+const page = reactive({
+  page: 1,
+  page_size: 20,
+  count: 0,
   has_more: false,
 })
 
@@ -147,38 +149,41 @@ watch(
 )
 
 function resetPage() {
-  page.cursor = ''
-  page.next_cursor = ''
+  page.page = 1
   page.has_more = false
+  page.count = 0
 }
 
 async function reload() {
   articleRequestId += 1
   articles.value = []
   resetPage()
-  await loadArticles()
+  await loadArticles(1)
 }
 
-async function loadArticles(cursor = '') {
+async function loadArticles(targetPage: number) {
   const requestId = ++articleRequestId
-  if (cursor) {
-    loadingMore.value = true
-  } else {
+  if (targetPage === 1) {
     loading.value = true
+  } else {
+    loadingMore.value = true
   }
   error.value = ''
   try {
     const result = await getManagedArticleList({
-      cursor: cursor || undefined,
-      limit: page.limit,
+      page: targetPage,
+      page_size: page.page_size,
       keyword: keyword.value || undefined,
       status: status.value || undefined,
     })
     if (requestId !== articleRequestId) {
       return
     }
-    articles.value = cursor ? [...articles.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    articles.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     if (requestId === articleRequestId) {
       error.value = err instanceof Error ? err.message : '加载文章失败'
@@ -191,12 +196,14 @@ async function loadArticles(cursor = '') {
   }
 }
 
-async function loadMore() {
-  if (!page.next_cursor || loadingMore.value) {
-    return
-  }
-  // 游标只追加当前筛选条件的数据；切换条件必须先由 reload() 清空游标。
-  await loadArticles(page.next_cursor)
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadArticles(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadArticles(page.page - 1)
 }
 
 async function removeArticle(id: number) {

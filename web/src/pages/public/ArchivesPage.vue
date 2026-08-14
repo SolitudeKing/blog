@@ -99,9 +99,12 @@
 
       <div v-if="!error" class="archive-footer">
         <BasePagination
-          :loading="loadingMore"
+          mode="prevNext"
+          :page="page.page"
           :has-more="page.has_more"
-          @load-more="loadMore"
+          :loading="loadingMore"
+          @prev="goPrevPage"
+          @next="goNextPage"
         />
       </div>
     </div>
@@ -118,7 +121,6 @@ import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getArticleList } from '@/api/modules/article'
 import type { ArticleListItem } from '@/types/article'
-import type { CursorPage } from '@/api/types'
 
 interface ArchiveEntry {
   id: number
@@ -151,10 +153,10 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
 const activeYear = ref<number | null>(null)
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 50,
+const page = reactive({
+  page: 1,
+  page_size: 50,
+  count: 0,
   has_more: false,
 })
 
@@ -231,7 +233,7 @@ const archiveSummary = computed(() => {
 })
 
 onMounted(async () => {
-  await loadArticles()
+  await loadArticles(1)
 })
 
 onBeforeUnmount(() => {
@@ -304,20 +306,26 @@ function focusYear(event: MouseEvent, year: number) {
   window.setTimeout(() => target.focus({ preventScroll: true }), reduceMotion ? 0 : 360)
 }
 
-async function loadArticles(cursor = '') {
-  if (cursor) {
-    loadingMore.value = true
-  } else {
+async function loadArticles(targetPage: number) {
+  if (targetPage === 1) {
     loading.value = true
+  } else {
+    loadingMore.value = true
   }
   error.value = ''
   try {
-    const result = await getArticleList({ cursor: cursor || undefined, limit: page.limit })
+    const result = await getArticleList({
+      page: targetPage,
+      page_size: page.page_size,
+    })
     const entries = result.data
       .map(toEntry)
       .filter((entry): entry is ArchiveEntry => entry !== null)
-    articles.value = cursor ? [...articles.value, ...entries] : entries
-    Object.assign(page, result.page)
+    articles.value = entries
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
     await setupYearObserver()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载归档失败'
@@ -329,24 +337,23 @@ async function loadArticles(cursor = '') {
 
 async function reload() {
   articles.value = []
-  page.cursor = ''
-  page.next_cursor = ''
+  page.page = 1
   page.has_more = false
-  await loadArticles()
+  page.count = 0
+  await loadArticles(1)
 }
 
 async function retryCurrentPage() {
-  if (page.next_cursor) {
-    await loadArticles(page.next_cursor)
-    return
-  }
-  await reload()
+  await loadArticles(page.page)
 }
 
-async function loadMore() {
-  if (!page.next_cursor) {
-    return
-  }
-  await loadArticles(page.next_cursor)
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadArticles(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadArticles(page.page - 1)
 }
 </script>

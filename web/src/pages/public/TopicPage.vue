@@ -74,14 +74,17 @@
 
       <div v-if="error && articles.length" class="topic-load-error" role="alert">
         <span>{{ error }}</span>
-        <BaseButton variant="secondary" size="sm" @click="loadMore">重试加载</BaseButton>
+        <BaseButton variant="secondary" size="sm" @click="reload">重试加载</BaseButton>
       </div>
 
       <div v-if="articles.length && !error" class="topic-stream__footer">
         <BasePagination
-          :loading="loadingMore"
+          mode="prevNext"
+          :page="page.page"
           :has-more="page.has_more"
-          @load-more="loadMore"
+          :loading="loadingMore"
+          @prev="goPrevPage"
+          @next="goNextPage"
         />
         <span v-if="!page.has_more">已抵达 {{ activeTopic.name }} 的尽头</span>
       </div>
@@ -101,7 +104,6 @@ import SvgIcon from '@/components/base/SvgIcon.vue'
 import NotFoundPage from '@/pages/public/NotFoundPage.vue'
 import { getArticleList } from '@/api/modules/article'
 import { findTopicBySlug } from '@/config/topicCatalog'
-import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 
 const route = useRoute()
@@ -111,10 +113,10 @@ const loadingMore = ref(false)
 const error = ref('')
 let articleRequestId = 0
 
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 20,
+const page = reactive({
+  page: 1,
+  page_size: 20,
+  count: 0,
   has_more: false,
 })
 
@@ -146,22 +148,22 @@ function resetList() {
   loading.value = false
   loadingMore.value = false
   error.value = ''
-  page.cursor = ''
-  page.next_cursor = ''
+  page.page = 1
   page.has_more = false
+  page.count = 0
 }
 
-async function loadArticles(cursor = '') {
+async function loadArticles(targetPage: number) {
   const topic = activeTopic.value
   if (!topic) {
     return
   }
 
   const requestId = ++articleRequestId
-  if (cursor) {
-    loadingMore.value = true
-  } else {
+  if (targetPage === 1) {
     loading.value = true
+  } else {
+    loadingMore.value = true
   }
   error.value = ''
 
@@ -169,14 +171,17 @@ async function loadArticles(cursor = '') {
     // topic 参数使用稳定 slug，避免诗意名称变化后破坏专题筛选链接。
     const result = await getArticleList({
       topic: topic.slug,
-      cursor: cursor || undefined,
-      limit: page.limit,
+      page: targetPage,
+      page_size: page.page_size,
     })
     if (requestId !== articleRequestId) {
       return
     }
-    articles.value = cursor ? [...articles.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    articles.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     if (requestId === articleRequestId) {
       error.value = err instanceof Error ? err.message : '加载专题文章失败'
@@ -192,14 +197,17 @@ async function loadArticles(cursor = '') {
 async function reload() {
   articleRequestId += 1
   resetList()
-  await loadArticles()
+  await loadArticles(1)
 }
 
-async function loadMore() {
-  if (!page.next_cursor || loadingMore.value) {
-    return
-  }
-  await loadArticles(page.next_cursor)
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadArticles(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadArticles(page.page - 1)
 }
 
 watch(
@@ -208,7 +216,7 @@ watch(
     articleRequestId += 1
     resetList()
     if (activeTopic.value) {
-      await loadArticles()
+      await loadArticles(1)
     }
   },
   { immediate: true },

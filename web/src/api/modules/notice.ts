@@ -2,8 +2,8 @@ import { request, requestList } from '@/api/http'
 import type { NoticeItem, NoticePayload } from '@/types/notice'
 
 export interface NoticeListParams {
-  cursor?: string
-  limit?: number
+  page?: number
+  page_size?: number
   keyword?: string
   enabled?: boolean
 }
@@ -20,7 +20,7 @@ export function getManagedNoticeList(params: NoticeListParams = {}) {
     method: 'GET',
     url: 'notice/manage-list',
     params: {
-      limit: 20,
+      page_size: 20,
       ...params,
     },
   })

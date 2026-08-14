@@ -432,7 +432,18 @@ async function loadArticle(slug: string) {
   try {
     const [detail, listResult] = await Promise.all([
       getArticleDetail(slug),
-      getArticleList({ limit: 200 }).catch(() => ({ data: [] as ArticleListItem[], page: { cursor: '', next_cursor: '', limit: 200, has_more: false } })),
+      getArticleList({ page: 1, page_size: 200 }).catch(
+        () =>
+          ({
+            data: [] as ArticleListItem[],
+            code: 0,
+            message: 'ok',
+            page: 1,
+            page_size: 200,
+            count: 0,
+            has_more: false,
+          }),
+      ),
     ])
     if (requestId !== articleRequestId) {
       return

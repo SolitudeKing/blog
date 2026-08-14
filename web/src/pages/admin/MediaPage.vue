@@ -6,7 +6,7 @@
         <div role="heading" aria-level="1">媒体库</div>
       </div>
       <div class="admin-page__actions">
-        <BaseButton variant="secondary" :loading="loading" @click="loadAssets()">刷新</BaseButton>
+        <BaseButton variant="secondary" :loading="loading" @click="loadAssets(1)">刷新</BaseButton>
         <BaseButton variant="primary" @click="openUploadModal">上传</BaseButton>
       </div>
     </header>
@@ -18,15 +18,15 @@
         type="search"
         aria-label="搜索文件名或替代文本"
         placeholder="搜索文件名或 Alt"
-        @keyup.enter="loadAssets()"
+        @keyup.enter="loadAssets(1)"
       />
       <BaseSelect
         v-model="mime"
         :options="mimeOptions"
         label="资源类型"
-        @change="loadAssets()"
+        @change="loadAssets(1)"
       />
-      <BaseButton variant="secondary" :loading="loading" @click="loadAssets()">筛选</BaseButton>
+      <BaseButton variant="secondary" :loading="loading" @click="loadAssets(1)">筛选</BaseButton>
     </div>
 
     <p v-if="loading && !assets.length" class="admin-page__status" role="status" aria-live="polite">
@@ -98,9 +98,12 @@
 
     <div v-if="assets.length" class="media-footer">
       <BasePagination
-        :loading="loadingMore"
+        mode="prevNext"
+        :page="page.page"
         :has-more="page.has_more"
-        @load-more="loadMore"
+        :loading="loadingMore"
+        @prev="goPrevPage"
+        @next="goNextPage"
       />
     </div>
 
@@ -210,7 +213,6 @@ import SvgIcon from '@/components/base/SvgIcon.vue'
 import UploadButton from '@/components/media/UploadButton.vue'
 import { deleteAsset, getAssetList, updateAsset } from '@/api/modules/asset'
 import { useToast } from '@/composables/useToast'
-import type { CursorPage } from '@/api/types'
 import type { AssetItem, AssetUpdatePayload } from '@/types/asset'
 
 const assets = ref<AssetItem[]>([])
@@ -242,10 +244,10 @@ const editForm = reactive<AssetUpdatePayload>({
   alt_text: '',
 })
 
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 40,
+const page = reactive({
+  page: 1,
+  page_size: 40,
+  count: 0,
   has_more: false,
 })
 
@@ -256,35 +258,43 @@ const mimeOptions = [
 ]
 
 onMounted(() => {
-  loadAssets()
+  loadAssets(1)
 })
 
-async function loadAssets(cursor = '') {
-  loading.value = true
+async function loadAssets(targetPage: number) {
+  if (targetPage === 1) {
+    loading.value = true
+  } else {
+    loadingMore.value = true
+  }
   try {
     const result = await getAssetList({
-      cursor: cursor || undefined,
+      page: targetPage,
+      page_size: page.page_size,
       keyword: keyword.value || undefined,
       mime: mime.value || undefined,
-      limit: page.limit,
     })
-    assets.value = cursor ? [...assets.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    assets.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     toast.error(err instanceof Error ? err.message : '加载媒体资源失败')
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
-async function loadMore() {
-  if (!page.next_cursor) return
-  loadingMore.value = true
-  try {
-    await loadAssets(page.next_cursor)
-  } finally {
-    loadingMore.value = false
-  }
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadAssets(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadAssets(page.page - 1)
 }
 
 function openUploadModal() {
@@ -322,7 +332,7 @@ async function confirmUpload() {
     toast.success('上传完成')
     showUploadModal.value = false
     resetUploadForm()
-    await loadAssets()
+    await loadAssets(1)
   } catch (err) {
     toast.error(err instanceof Error ? err.message : '上传媒体资源失败')
   } finally {

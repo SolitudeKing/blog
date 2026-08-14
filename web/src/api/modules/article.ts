@@ -8,8 +8,8 @@ import type {
 } from '@/types/article'
 
 export interface ArticleListParams {
-  cursor?: string
-  limit?: number
+  page?: number
+  page_size?: number
   keyword?: string
   topic?: string
   tag?: string
@@ -21,7 +21,7 @@ export function getArticleList(params: ArticleListParams = {}) {
     method: 'GET',
     url: 'article/list',
     params: {
-      limit: 20,
+      page_size: 20,
       ...params,
     },
   })
@@ -34,12 +34,12 @@ export function getArticleDetail(slug: string) {
   })
 }
 
-export function searchArticles(params: Pick<ArticleListParams, 'cursor' | 'limit' | 'keyword'> = {}) {
+export function searchArticles(params: Pick<ArticleListParams, 'page' | 'page_size' | 'keyword'> = {}) {
   return requestList<ArticleSearchItem>({
     method: 'GET',
     url: 'search/article',
     params: {
-      limit: 20,
+      page_size: 20,
       ...params,
     },
   })
@@ -50,7 +50,7 @@ export function getManagedArticleList(params: ArticleListParams = {}) {
     method: 'GET',
     url: 'article/manage-list',
     params: {
-      limit: 20,
+      page_size: 20,
       ...params,
     },
   })

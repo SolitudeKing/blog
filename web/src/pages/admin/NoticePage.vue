@@ -5,7 +5,7 @@
         <p class="admin-page__eyebrow">Notices</p>
         <div role="heading" aria-level="1">公告管理</div>
       </div>
-      <BaseButton variant="secondary" :loading="loading" @click="loadNotices()">刷新</BaseButton>
+      <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">刷新</BaseButton>
     </header>
 
     <div class="notice-grid">
@@ -48,15 +48,15 @@
             type="search"
             aria-label="搜索公告"
             placeholder="搜索公告"
-            @keyup.enter="loadNotices()"
+            @keyup.enter="loadNotices(1)"
           />
           <BaseSelect
             v-model="enabledFilter"
             :options="enabledOptions"
             label="公告状态"
-            @change="loadNotices()"
+            @change="loadNotices(1)"
           />
-          <BaseButton variant="secondary" :loading="loading" @click="loadNotices()">筛选</BaseButton>
+          <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">筛选</BaseButton>
         </div>
 
         <p v-if="loading && !notices.length" class="admin-page__status" role="status" aria-live="polite">
@@ -113,9 +113,12 @@
 
         <div v-if="notices.length" class="notice-list__footer">
           <BasePagination
-            :loading="loadingMore"
+            mode="prevNext"
+            :page="page.page"
             :has-more="page.has_more"
-            @load-more="loadMore"
+            :loading="loadingMore"
+            @prev="goPrevPage"
+            @next="goNextPage"
           />
         </div>
       </section>
@@ -134,7 +137,6 @@ import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { createNotice, deleteNotice, getManagedNoticeList, updateNotice } from '@/api/modules/notice'
 import { useToast } from '@/composables/useToast'
-import type { CursorPage } from '@/api/types'
 import type { NoticeItem, NoticePayload } from '@/types/notice'
 
 const notices = ref<NoticeItem[]>([])
@@ -153,10 +155,10 @@ const enabledOptions = [
   { label: '停用', value: 'false' },
 ]
 
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 20,
+const page = reactive({
+  page: 1,
+  page_size: 20,
+  count: 0,
   has_more: false,
 })
 
@@ -191,38 +193,44 @@ const endsAtInput = computed({
 })
 
 onMounted(() => {
-  loadNotices()
+  loadNotices(1)
 })
 
-async function loadNotices(cursor = '') {
-  loading.value = true
+async function loadNotices(targetPage: number) {
+  if (targetPage === 1) {
+    loading.value = true
+  } else {
+    loadingMore.value = true
+  }
   error.value = ''
   try {
     const result = await getManagedNoticeList({
-      cursor: cursor || undefined,
+      page: targetPage,
+      page_size: page.page_size,
       keyword: keyword.value || undefined,
       enabled: enabledFilter.value ? enabledFilter.value === 'true' : undefined,
-      limit: page.limit,
     })
-    notices.value = cursor ? [...notices.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    notices.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载公告失败'
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
-async function loadMore() {
-  if (!page.next_cursor) {
-    return
-  }
-  loadingMore.value = true
-  try {
-    await loadNotices(page.next_cursor)
-  } finally {
-    loadingMore.value = false
-  }
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadNotices(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadNotices(page.page - 1)
 }
 
 async function saveNotice() {
@@ -238,7 +246,7 @@ async function saveNotice() {
       toast.success('公告已创建')
     }
     resetForm()
-    await loadNotices()
+    await loadNotices(1)
   } catch (err) {
     const message = err instanceof Error ? err.message : '保存公告失败'
     error.value = message

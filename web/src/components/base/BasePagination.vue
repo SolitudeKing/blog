@@ -18,6 +18,29 @@
       </p>
     </template>
 
+    <!-- 上一页/下一页模式：基于 page + has_more，不需要 total -->
+    <template v-else-if="mode === 'prevNext'">
+      <button
+        type="button"
+        class="base-pagination__nav base-pagination__nav--prev"
+        :disabled="disabled || loading || currentPage <= 1"
+        aria-label="上一页"
+        @click="emit('prev')"
+      >
+        ‹ 上一页
+      </button>
+      <span class="base-pagination__current" aria-live="polite">第 {{ currentPage }} 页</span>
+      <button
+        type="button"
+        class="base-pagination__nav base-pagination__nav--next"
+        :disabled="disabled || loading || !hasMore"
+        aria-label="下一页"
+        @click="emit('next')"
+      >
+        下一页 ›
+      </button>
+    </template>
+
     <!-- 页码模式：完整页码器（依赖 total 字段，本期 7 列表页未启用） -->
     <template v-else-if="mode === 'pages'">
       <button
@@ -72,11 +95,13 @@ type PageItem =
 
 const props = withDefaults(
   defineProps<{
-    mode?: 'loadMore' | 'pages'
+    mode?: 'loadMore' | 'prevNext' | 'pages'
     /** loadMore 模式 */
     loading?: boolean
     hasMore?: boolean
     label?: string
+    /** prevNext 模式 */
+    page?: number
     /** pages 模式 */
     modelValue?: number
     total?: number
@@ -90,6 +115,7 @@ const props = withDefaults(
     loading: false,
     hasMore: false,
     label: '加载更多',
+    page: 1,
     modelValue: 1,
     total: 0,
     pageSize: 20,
@@ -100,11 +126,18 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   loadMore: []
+  prev: []
+  next: []
   'update:modelValue': [value: number]
   change: [value: number]
 }>()
 
-const currentPage = computed(() => Math.max(1, props.modelValue ?? 1))
+const currentPage = computed(() => {
+  if (props.mode === 'prevNext') {
+    return Math.max(1, props.page ?? 1)
+  }
+  return Math.max(1, props.modelValue ?? 1)
+})
 const totalPages = computed(() =>
   Math.max(1, Math.ceil((props.total ?? 0) / Math.max(1, props.pageSize ?? 20))),
 )
@@ -243,6 +276,25 @@ function goTo(page: number) {
 
 .base-pagination--pages {
   gap: var(--space-2);
+}
+
+.base-pagination--prevNext {
+  gap: var(--space-3);
+}
+
+.base-pagination__nav--prev,
+.base-pagination__nav--next {
+  min-width: 96px;
+  padding: 0 var(--space-3);
+  font-weight: 600;
+}
+
+.base-pagination__current {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  min-width: 6em;
+  text-align: center;
 }
 
 .base-pagination__pages {

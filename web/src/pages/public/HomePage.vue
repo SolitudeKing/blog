@@ -129,14 +129,17 @@
 
         <div v-if="articles.length && error" class="page-state page-state--compact page-state--error" role="alert">
           <p>{{ error }}</p>
-          <BaseButton variant="secondary" size="sm" @click="loadMore">重试加载</BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="reload">重试加载</BaseButton>
         </div>
 
         <div v-if="articles.length && !error" class="home-section__footer">
           <BasePagination
-            :loading="loadingMore"
+            mode="prevNext"
+            :page="page.page"
             :has-more="page.has_more"
-            @load-more="loadMore"
+            :loading="loadingMore"
+            @prev="goPrevPage"
+            @next="goNextPage"
           />
           <span v-if="!page.has_more" class="home-section__end">
             {{ currentThemeElements.home_latest_end_text }}
@@ -196,7 +199,6 @@ import { resolveLobbyThemeElements } from '@/config/themeAppearance'
 import { normalizeTopicLabel, topicCatalog } from '@/config/topicCatalog'
 import { useSettingStore } from '@/stores/setting'
 import { createSocialLinkEntries } from '@/utils/socialLinks'
-import type { CursorPage } from '@/api/types'
 import type { ArticleListItem } from '@/types/article'
 import type { NoticeItem } from '@/types/notice'
 import type { TagItem, TopicItem } from '@/types/taxonomy'
@@ -217,10 +219,10 @@ const tags = ref<TagItem[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
-const page = reactive<CursorPage>({
-  cursor: '',
-  next_cursor: '',
-  limit: 20,
+const page = reactive({
+  page: 1,
+  page_size: 20,
+  count: 0,
   has_more: false,
 })
 
@@ -279,7 +281,7 @@ const topicLinks = computed<TopicLink[]>(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadNotice(), loadTaxonomy(), loadArticles()])
+  await Promise.all([loadNotice(), loadTaxonomy(), loadArticles(1)])
 })
 
 async function loadNotice() {
@@ -303,40 +305,48 @@ async function loadTaxonomy() {
 
 async function reload() {
   articles.value = []
-  page.cursor = ''
-  page.next_cursor = ''
+  page.page = 1
   page.has_more = false
-  await loadArticles()
+  page.count = 0
+  await loadArticles(1)
 }
 
-async function loadArticles(cursor = '') {
-  if (!cursor) {
+async function loadArticles(targetPage: number) {
+  if (targetPage === 1) {
     loading.value = true
+  } else {
+    loadingMore.value = true
   }
   error.value = ''
   try {
-    const result = await getArticleList({ cursor: cursor || undefined, limit: page.limit })
-    articles.value = cursor ? [...articles.value, ...result.data] : result.data
-    Object.assign(page, result.page)
+    const result = await getArticleList({
+      page: targetPage,
+      page_size: page.page_size,
+    })
+    articles.value = result.data
+    page.page = result.page
+    page.page_size = result.page_size
+    page.count = result.count
+    page.has_more = result.has_more
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载文章失败'
   } finally {
-    if (!cursor) {
+    if (targetPage === 1) {
       loading.value = false
+    } else {
+      loadingMore.value = false
     }
   }
 }
 
-async function loadMore() {
-  if (!page.next_cursor || loadingMore.value) {
-    return
-  }
-  loadingMore.value = true
-  try {
-    await loadArticles(page.next_cursor)
-  } finally {
-    loadingMore.value = false
-  }
+async function goNextPage() {
+  if (loadingMore.value || !page.has_more) return
+  await loadArticles(page.page + 1)
+}
+
+async function goPrevPage() {
+  if (loadingMore.value || page.page <= 1) return
+  await loadArticles(page.page - 1)
 }
 
 function findCatalogTopic(catalogTopic: { slug: string; label: string }) {
