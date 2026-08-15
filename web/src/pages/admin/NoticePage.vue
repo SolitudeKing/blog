@@ -99,6 +99,8 @@
       v-model="showNoticeModal"
       :title="editingId ? '编辑公告' : '新建公告'"
       eyebrow="Notice"
+      :close-on-backdrop="false"
+      :close-on-esc="false"
       :loading="saving"
       :error="formError"
     >

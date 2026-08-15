@@ -109,7 +109,13 @@
     </div>
 
     <!-- 上传 Modal -->
-    <BaseModal v-model="showUploadModal" title="上传媒体资源" eyebrow="Upload">
+    <BaseModal
+      v-model="showUploadModal"
+      title="上传媒体资源"
+      eyebrow="Upload"
+      :close-on-backdrop="false"
+      :close-on-esc="false"
+    >
       <div class="media-edit-modal">
         <UploadButton :url="uploadForm.url" @upload="onUploadSuccess" @clear="resetUploadForm" />
         <BaseInput
@@ -138,7 +144,13 @@
     </BaseModal>
 
     <!-- 编辑 Modal -->
-    <BaseModal v-model="showEditModal" title="编辑资源信息" eyebrow="Edit">
+    <BaseModal
+      v-model="showEditModal"
+      title="编辑资源信息"
+      eyebrow="Edit"
+      :close-on-backdrop="false"
+      :close-on-esc="false"
+    >
       <div v-if="editingAsset" class="media-edit-modal">
         <div class="media-edit-modal__preview">
           <img

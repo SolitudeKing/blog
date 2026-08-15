@@ -99,7 +99,6 @@
           role="dialog"
           aria-modal="true"
           aria-labelledby="taxonomy-dialog-title"
-          @click.self="closeDialog()"
           @keydown="handleDialogKeydown"
         >
           <section ref="dialogPanelRef" class="taxonomy-dialog__panel" tabindex="-1">
@@ -475,11 +474,8 @@ function openTagDialog(tag?: TagItem) {
 }
 
 function handleDialogKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    void closeDialog()
-    return
-  }
+  // Esc 不再关闭弹窗：表单弹层只能通过关闭按钮、提交保存或取消按钮退出，
+  // 避免误触丢失未保存的输入。Tab 仍在面板内做焦点循环。
   if (event.key !== 'Tab' || !dialogPanelRef.value) {
     return
   }
