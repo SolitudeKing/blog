@@ -121,26 +121,39 @@ func (s *DashboardService) Summary() (DashboardSummary, error) {
 }
 
 func (s *DashboardService) fillArticleCounts(summary *DashboardSummary) error {
-	if err := s.db.Model(&model.Article{}).Count(&summary.ArticleCounts.Total).Error; err != nil {
+	// 一次性把 5 个状态计数 + 阅读量聚合到一行。
+	// 原实现是 6 次独立的全表 COUNT/SUM，在文章表 ≥10K 时仪表盘首次加载会
+	// 显著延迟。MySQL 的 SUM(condition) 在过滤索引命中时与 COUNT 等价。
+	type articleAggregates struct {
+		Total     int64
+		Published int64
+		Draft     int64
+		Private   int64
+		Archived  int64
+		TotalViews uint64
+	}
+	var row articleAggregates
+	err := s.db.Model(&model.Article{}).
+		Select(`
+			COUNT(*) AS total,
+			SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
+			SUM(CASE WHEN status = 'draft'     THEN 1 ELSE 0 END) AS draft,
+			SUM(CASE WHEN status = 'private'   THEN 1 ELSE 0 END) AS private,
+			SUM(CASE WHEN status = 'archived'  THEN 1 ELSE 0 END) AS archived,
+			COALESCE(SUM(view_count), 0) AS total_views
+		`).
+		Scan(&row).Error
+	if err != nil {
 		return apperrors.New(apperrors.CodeDatabaseUnavailable)
 	}
-	if err := s.db.Model(&model.Article{}).Where("status = ?", "published").Count(&summary.ArticleCounts.Published).Error; err != nil {
-		return apperrors.New(apperrors.CodeDatabaseUnavailable)
+	summary.ArticleCounts = DashboardArticleCounts{
+		Total:     row.Total,
+		Published: row.Published,
+		Draft:     row.Draft,
+		Private:   row.Private,
+		Archived:  row.Archived,
 	}
-	if err := s.db.Model(&model.Article{}).Where("status = ?", "draft").Count(&summary.ArticleCounts.Draft).Error; err != nil {
-		return apperrors.New(apperrors.CodeDatabaseUnavailable)
-	}
-	if err := s.db.Model(&model.Article{}).Where("status = ?", "private").Count(&summary.ArticleCounts.Private).Error; err != nil {
-		return apperrors.New(apperrors.CodeDatabaseUnavailable)
-	}
-	if err := s.db.Model(&model.Article{}).Where("status = ?", "archived").Count(&summary.ArticleCounts.Archived).Error; err != nil {
-		return apperrors.New(apperrors.CodeDatabaseUnavailable)
-	}
-	var totalViews uint64
-	if err := s.db.Model(&model.Article{}).Select("COALESCE(SUM(view_count), 0)").Scan(&totalViews).Error; err != nil {
-		return apperrors.New(apperrors.CodeDatabaseUnavailable)
-	}
-	summary.TotalViews = totalViews
+	summary.TotalViews = row.TotalViews
 	return nil
 }
 
@@ -220,9 +233,13 @@ func (s *DashboardService) fillTopicStats(summary *DashboardSummary) error {
 		ArticleCount int64
 	}
 	var rows []topicStatRow
+	// 复用 topic_service 的 join 条件，保持两侧 article_count 严格一致：
+	// 仪表盘展示的是"包含草稿的全量文章数"，而 topic/list 展示的是"已发布计数"；
+	// 这里独立写一条 join，避免给 helper 增加 visible-only / all-only 参数。
+	const dashboardTopicJoin = `LEFT JOIN articles ON articles.topic_id = topics.id AND articles.deleted_at IS NULL`
 	if err := s.db.Table("topics").
 		Select("topics.id, topics.name, topics.label, topics.slug, COUNT(articles.id) AS article_count").
-		Joins("LEFT JOIN articles ON articles.topic_id = topics.id AND articles.deleted_at IS NULL").
+		Joins(dashboardTopicJoin).
 		Where("topics.deleted_at IS NULL").
 		Group("topics.id, topics.name, topics.label, topics.slug").
 		Order("article_count DESC, topics.sort_order ASC, topics.id ASC").
