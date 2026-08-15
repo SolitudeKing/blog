@@ -21,6 +21,12 @@
           <div class="settings-form__row">
             <BaseInput v-model="form.site_name" label="站点名称" />
             <BaseInput v-model="form.author" label="作者" />
+            <BaseInput
+              v-model="form.author_handle"
+              label="作者 Handle"
+              hint="用于 @handle 显示；留空时使用作者名自动生成的 slug。最多 64 字。"
+              :maxlength="64"
+            />
           </div>
           <div class="settings-avatar">
             <div class="settings-avatar__preview">
@@ -77,6 +83,34 @@
               :label="item.label"
             />
           </div>
+        </section>
+
+        <section class="settings-panel">
+          <div role="heading" aria-level="2">主页文案</div>
+          <p class="settings-panel__description">
+            跟随主题色发布；切换主题不影响本组文案。留空时会回退到默认值。
+          </p>
+          <div class="settings-form__row">
+            <BaseInput
+              v-for="field in singleLineHomeFields"
+              :key="field.key"
+              v-model="form.home_content[field.key]"
+              :name="`home-content-${field.key}`"
+              :label="field.label"
+              :hint="field.hint"
+              :maxlength="field.max"
+            />
+          </div>
+          <BaseTextarea
+            v-for="field in multilineHomeFields"
+            :key="field.key"
+            v-model="form.home_content[field.key]"
+            :name="`home-content-${field.key}`"
+            :label="field.label"
+            :hint="field.hint"
+            :rows="4"
+            :maxlength="field.max"
+          />
         </section>
 
         <section class="settings-panel settings-panel--appearance">
@@ -191,6 +225,11 @@ import {
   normalizeThemeElementMap,
   themeAppearanceOptions,
 } from '@/config/themeAppearance'
+import {
+  createDefaultHomeContent,
+  homeContentFields,
+  normalizeHomeContent,
+} from '@/config/homeContent'
 import { useToast } from '@/composables/useToast'
 import { getSettingDetail, updateSetting } from '@/api/modules/setting'
 import { useSettingStore } from '@/stores/setting'
@@ -214,6 +253,7 @@ const settingStore = useSettingStore()
 const form = reactive<SettingPayload>({
   site_name: '',
   author: '',
+  author_handle: '',
   author_avatar_url: '',
   essay: '',
   icp_number: '',
@@ -226,7 +266,12 @@ const form = reactive<SettingPayload>({
     bilibili: '',
     douyin: '',
   },
+  home_content: createDefaultHomeContent(),
 })
+
+// 多行字段用 textarea 单独渲染，单行字段集中到一行内。
+const singleLineHomeFields = homeContentFields.filter((field) => !field.multiline)
+const multilineHomeFields = homeContentFields.filter((field) => field.multiline)
 
 const selectedTheme = computed(
   () =>
@@ -248,6 +293,7 @@ function onAvatarUpload(asset: AssetItem) {
 function assignSetting(setting: LobbySetting) {
   form.site_name = setting.site_name
   form.author = setting.author
+  form.author_handle = setting.author_handle ?? ''
   form.author_avatar_url = setting.author_avatar_url
   form.essay = setting.essay
   form.icp_number = setting.icp_number
@@ -260,6 +306,7 @@ function assignSetting(setting: LobbySetting) {
     bilibili: setting.social_links.bilibili ?? '',
     douyin: setting.social_links.douyin ?? '',
   }
+  form.home_content = normalizeHomeContent(setting.home_content)
 }
 
 async function loadSetting() {

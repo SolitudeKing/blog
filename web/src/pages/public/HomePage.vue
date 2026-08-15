@@ -8,16 +8,16 @@
         </div>
 
         <div class="home-stage__identity">
-          <span class="home-kicker">Blog keeper · Solitude</span>
+          <span class="home-kicker">{{ homeContent.home_profile_kicker }}</span>
           <div id="home-title" role="heading" aria-level="1">
-            <span>你好，我是</span>
+            <span>{{ homeContent.home_heading_prefix }}</span>
             {{ author }}
             <small>@{{ authorHandle }}</small>
           </div>
           <p class="home-stage__motto">“{{ essay }}”</p>
           <p class="home-stage__status">
             <span aria-hidden="true" />
-            {{ activeNotice?.title || '持续记录技术、设计与生活' }}
+            {{ activeNotice?.title || homeContent.home_status_fallback }}
           </p>
 
           <nav class="home-socials" aria-label="作者链接">
@@ -41,9 +41,9 @@
 
       <aside class="home-stage__intro" aria-labelledby="home-intro-title">
         <span class="home-kicker">{{ siteName }}</span>
-        <div id="home-intro-title" role="heading" aria-level="2">一份持续更新的博客，也是公开的思考现场</div>
+        <div id="home-intro-title" role="heading" aria-level="2">{{ homeContent.home_intro_heading }}</div>
         <p>
-          在这里记录工程实践、设计系统与构建过程。文章保留可复用的方法，也保留问题发生时的真实判断。
+          {{ homeContent.home_intro_paragraph }}
         </p>
 
         <dl class="home-metrics">
@@ -64,9 +64,9 @@
         </dl>
 
         <div class="home-stage__actions">
-          <a class="mist-button" href="#latest-posts">查看最近发布</a>
+          <a class="mist-button" href="#latest-posts">{{ homeContent.home_action_view_recent_label }}</a>
           <RouterLink class="mist-button mist-button--secondary" to="/archives">
-            浏览全部归档
+            {{ homeContent.home_action_view_archive_label }}
           </RouterLink>
         </div>
       </aside>
@@ -75,11 +75,11 @@
     <section id="latest-posts" class="home-section" aria-labelledby="latest-title">
       <header class="home-section__heading">
         <div>
-          <span class="home-kicker">Latest posts</span>
-          <div id="latest-title" role="heading" aria-level="2">最近发布的博客</div>
+          <span class="home-kicker">{{ homeContent.home_latest_kicker }}</span>
+          <div id="latest-title" role="heading" aria-level="2">{{ homeContent.home_latest_heading }}</div>
         </div>
         <RouterLink class="home-arrow-link" to="/archives">
-          查看全部归档
+          {{ homeContent.home_latest_view_all_label }}
           <SvgIcon name="arrow-right" />
         </RouterLink>
       </header>
@@ -119,7 +119,7 @@
         </div>
         <BaseEmpty
           v-else-if="!articles.length"
-          title="暂时还没有发布文章"
+          :title="homeContent.home_latest_empty_title"
           :description="currentThemeElements.home_latest_empty_description"
         >
           <template #icon>
@@ -197,6 +197,7 @@ import { getArticleList } from '@/api/modules/article'
 import { getActiveNotice } from '@/api/modules/notice'
 import { getTagList, getTopicList } from '@/api/modules/taxonomy'
 import { resolveLobbyThemeElements } from '@/config/themeAppearance'
+import { resolveLobbyHomeContent } from '@/config/homeContent'
 import { normalizeTopicLabel, topicCatalog } from '@/config/topicCatalog'
 import { useSettingStore } from '@/stores/setting'
 import { createSocialLinkEntries } from '@/utils/socialLinks'
@@ -232,6 +233,7 @@ const siteName = computed(() => setting.lobby?.site_name ?? 'Solitude Blog')
 const author = computed(() => setting.lobby?.author ?? 'Solitude King')
 const essay = computed(() => setting.lobby?.essay?.trim() || '把复杂的技术写清楚，也把无法量化的感受留在字里行间。')
 const currentThemeElements = computed(() => resolveLobbyThemeElements(setting.lobby))
+const homeContent = computed(() => resolveLobbyHomeContent(setting.lobby))
 const authorInitial = computed(() => author.value.trim().slice(0, 1).toUpperCase())
 const configuredAuthorAvatarURL = computed(() => setting.lobby?.author_avatar_url?.trim() || '')
 const authorAvatarFailed = ref(false)
@@ -239,13 +241,15 @@ const usingDefaultAuthorAvatar = computed(() => authorAvatarFailed.value || !con
 const authorAvatarSrc = computed(() =>
   usingDefaultAuthorAvatar.value ? defaultAuthorAvatar : configuredAuthorAvatarURL.value,
 )
-const authorHandle = computed(() =>
+// \u914d\u7f6e\u9879\u4f18\u5148\uff1b\u4e3a\u7a7a\u65f6\u56de\u9000\u5230\u6839\u636e author \u6d3e\u751f\u7684 slug\uff0c\u4e0e\u539f\u884c\u4e3a\u4e00\u81f4\u3002
+const fallbackAuthorHandle = computed(() =>
   author.value
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '.')
     .replace(/[^a-z0-9.\u4e00-\u9fa5]/g, ''),
 )
+const authorHandle = computed(() => setting.lobby?.author_handle?.trim() || fallbackAuthorHandle.value)
 const featuredArticle = computed(() => articles.value[0] ?? null)
 const railArticles = computed(() => articles.value.slice(1, 4))
 const remainingArticles = computed(() => articles.value.slice(4))

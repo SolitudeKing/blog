@@ -20,6 +20,7 @@ import (
 
 	"solitude-blog/server/internal/appearance"
 	"solitude-blog/server/internal/config"
+	"solitude-blog/server/internal/homecontent"
 	"solitude-blog/server/internal/model"
 )
 
@@ -427,6 +428,13 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 		if changed {
 			updates["theme_elements_json"] = themeElementsJSON
 		}
+		homeContentJSON, homeChanged, err := normalizeStoredHomeContent(row.HomeContentJSON)
+		if err != nil {
+			return err
+		}
+		if homeChanged {
+			updates["home_content_json"] = homeContentJSON
+		}
 		if len(updates) == 0 {
 			return nil
 		}
@@ -439,14 +447,20 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+	homeContentJSON, err := marshalHomeContent(homecontent.DefaultHomeContent())
+	if err != nil {
+		return err
+	}
 	return db.Create(&model.SiteSetting{
 		ID:                1,
 		SiteName:          "Solitude Blog",
 		Author:            "Solitude King",
+		AuthorHandle:      "",
 		Essay:             "Keep writing, keep shipping.",
 		Theme:             appearance.DefaultTheme,
 		Mode:              appearance.DefaultMode,
 		ThemeElementsJSON: themeElementsJSON,
+		HomeContentJSON:   homeContentJSON,
 		SocialLinksJSON: `{
 			"gitee": "",
 			"bilibili": "",
@@ -472,6 +486,28 @@ func normalizeStoredThemeElements(raw string) (string, bool, error) {
 
 func marshalThemeElements(elements appearance.ThemeElementMap) (string, error) {
 	payload, err := json.Marshal(elements)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func normalizeStoredHomeContent(raw string) (string, bool, error) {
+	stored := homecontent.HomeContent{}
+	if raw == "" || json.Unmarshal([]byte(raw), &stored) != nil {
+		payload, err := marshalHomeContent(homecontent.DefaultHomeContent())
+		return payload, true, err
+	}
+	normalized := homecontent.NormalizeHomeContent(stored)
+	if reflect.DeepEqual(stored, normalized) {
+		return raw, false, nil
+	}
+	payload, err := marshalHomeContent(normalized)
+	return payload, true, err
+}
+
+func marshalHomeContent(content homecontent.HomeContent) (string, error) {
+	payload, err := json.Marshal(content)
 	if err != nil {
 		return "", err
 	}

@@ -15,6 +15,7 @@ import (
 	"solitude-blog/server/internal/appearance"
 	"solitude-blog/server/internal/cache"
 	apperrors "solitude-blog/server/internal/errors"
+	"solitude-blog/server/internal/homecontent"
 	"solitude-blog/server/internal/model"
 )
 
@@ -23,6 +24,7 @@ const (
 	siteSettingCacheTTL            = 10 * time.Minute
 	maxICPNumberRunes              = 64
 	maxAuthorAvatarURLRunes        = 500
+	maxAuthorHandleRunes           = 64
 )
 
 type SettingService struct {
@@ -35,6 +37,7 @@ type SettingService struct {
 type LobbySetting struct {
 	SiteName        string                     `json:"site_name"`
 	Author          string                     `json:"author"`
+	AuthorHandle    string                     `json:"author_handle"`
 	AuthorAvatarURL string                     `json:"author_avatar_url"`
 	Essay           string                     `json:"essay"`
 	ICPNumber       string                     `json:"icp_number"`
@@ -42,11 +45,13 @@ type LobbySetting struct {
 	Mode            string                     `json:"mode"`
 	SocialLinks     map[string]string          `json:"social_links"`
 	ThemeElements   appearance.ThemeElementMap `json:"theme_elements"`
+	HomeContent     homecontent.HomeContent    `json:"home_content"`
 }
 
 type SettingSaveRequest struct {
 	SiteName        string                      `json:"site_name"`
 	Author          string                      `json:"author"`
+	AuthorHandle    string                      `json:"author_handle"`
 	AuthorAvatarURL string                      `json:"author_avatar_url"`
 	Essay           string                      `json:"essay"`
 	ICPNumber       string                      `json:"icp_number"`
@@ -54,6 +59,7 @@ type SettingSaveRequest struct {
 	Mode            string                      `json:"mode"`
 	SocialLinks     map[string]string           `json:"social_links"`
 	ThemeElements   *appearance.ThemeElementMap `json:"theme_elements"`
+	HomeContent     *homecontent.HomeContent    `json:"home_content"`
 }
 
 func NewSettingService(db *gorm.DB, redisClient *redis.Client) *SettingService {
@@ -93,12 +99,14 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		if err != nil {
 			return LobbySetting{}, err
 		}
-		normalized, err := normalizeSetting(req, settingFromModel(row).ThemeElements)
+		current := settingFromModel(row)
+		normalized, err := normalizeSetting(req, current.ThemeElements, current.HomeContent)
 		if err != nil {
 			return LobbySetting{}, err
 		}
 		row.SiteName = normalized.SiteName
 		row.Author = normalized.Author
+		row.AuthorHandle = normalized.AuthorHandle
 		row.AuthorAvatarURL = normalized.AuthorAvatarURL
 		row.Essay = normalized.Essay
 		row.ICPNumber = normalized.ICPNumber
@@ -106,6 +114,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		row.Mode = normalized.Mode
 		row.SocialLinksJSON = mustMarshalSocialLinks(normalized.SocialLinks)
 		row.ThemeElementsJSON = mustMarshalThemeElements(normalized.ThemeElements)
+		row.HomeContentJSON = mustMarshalHomeContent(normalized.HomeContent)
 		if err := s.db.Save(&row).Error; err != nil {
 			return LobbySetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
@@ -115,7 +124,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	normalized, err := normalizeSetting(req, s.setting.ThemeElements)
+	normalized, err := normalizeSetting(req, s.setting.ThemeElements, s.setting.HomeContent)
 	if err != nil {
 		return LobbySetting{}, err
 	}
@@ -174,6 +183,7 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 		ID:                defaultSiteSettingID,
 		SiteName:          defaults.SiteName,
 		Author:            defaults.Author,
+		AuthorHandle:      defaults.AuthorHandle,
 		AuthorAvatarURL:   defaults.AuthorAvatarURL,
 		Essay:             defaults.Essay,
 		ICPNumber:         defaults.ICPNumber,
@@ -181,6 +191,7 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 		Mode:              defaults.Mode,
 		SocialLinksJSON:   mustMarshalSocialLinks(defaults.SocialLinks),
 		ThemeElementsJSON: mustMarshalThemeElements(defaults.ThemeElements),
+		HomeContentJSON:   mustMarshalHomeContent(defaults.HomeContent),
 	}
 	if err := s.db.Create(&row).Error; err != nil {
 		return model.SiteSetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -188,7 +199,7 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 	return row, nil
 }
 
-func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.ThemeElementMap) (LobbySetting, error) {
+func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.ThemeElementMap, currentHomeContent homecontent.HomeContent) (LobbySetting, error) {
 	if req.SiteName == "" || req.Author == "" {
 		return LobbySetting{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
@@ -203,7 +214,14 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 	if utf8.RuneCountInString(authorAvatarURL) > maxAuthorAvatarURLRunes {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
+	authorHandle := strings.TrimSpace(req.AuthorHandle)
+	if utf8.RuneCountInString(authorHandle) > maxAuthorHandleRunes {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
 	if req.ThemeElements != nil && !appearance.IsValidThemeElements(*req.ThemeElements) {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	if req.HomeContent != nil && !homecontent.IsValidHomeContent(*req.HomeContent) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
 	if req.SocialLinks == nil {
@@ -216,9 +234,16 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 			themeElements[theme] = provided[theme]
 		}
 	}
+	// home_content 是平铺结构，没有"按主题合并"的概念；当请求携带 home_content 时整体替换，
+	// 字段级的 trim/默认值兜底在 NormalizeHomeContent 内完成。请求未携带则保留 DB 已有值。
+	homeContent := homecontent.NormalizeHomeContent(currentHomeContent)
+	if req.HomeContent != nil {
+		homeContent = homecontent.NormalizeHomeContent(*req.HomeContent)
+	}
 	return cloneSetting(LobbySetting{
 		SiteName:        req.SiteName,
 		Author:          req.Author,
+		AuthorHandle:    authorHandle,
 		AuthorAvatarURL: authorAvatarURL,
 		Essay:           req.Essay,
 		ICPNumber:       icpNumber,
@@ -226,6 +251,7 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 		Mode:            req.Mode,
 		SocialLinks:     req.SocialLinks,
 		ThemeElements:   themeElements,
+		HomeContent:     homeContent,
 	}), nil
 }
 
@@ -241,6 +267,7 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 	return LobbySetting{
 		SiteName:        row.SiteName,
 		Author:          row.Author,
+		AuthorHandle:    row.AuthorHandle,
 		AuthorAvatarURL: row.AuthorAvatarURL,
 		Essay:           row.Essay,
 		ICPNumber:       row.ICPNumber,
@@ -248,6 +275,7 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 		Mode:            appearance.NormalizeMode(row.Mode),
 		SocialLinks:     links,
 		ThemeElements:   appearance.NormalizeThemeElements(themeElements),
+		HomeContent:     mustUnmarshalHomeContent(row.HomeContentJSON),
 	}
 }
 
@@ -255,12 +283,14 @@ func defaultLobbySetting() LobbySetting {
 	return LobbySetting{
 		SiteName:        "Solitude Blog",
 		Author:          "Solitude King",
+		AuthorHandle:    "",
 		AuthorAvatarURL: "",
 		Essay:           "Keep writing, keep shipping.",
 		ICPNumber:       "",
 		Theme:           appearance.DefaultTheme,
 		Mode:            appearance.DefaultMode,
 		ThemeElements:   appearance.DefaultThemeElements(),
+		HomeContent:     homecontent.DefaultHomeContent(),
 		SocialLinks: map[string]string{
 			"gitee":    "",
 			"bilibili": "",
@@ -277,6 +307,7 @@ func cloneSetting(setting LobbySetting) LobbySetting {
 	}
 	setting.SocialLinks = links
 	setting.ThemeElements = appearance.CloneThemeElements(setting.ThemeElements)
+	setting.HomeContent = homecontent.CloneHomeContent(setting.HomeContent)
 	return setting
 }
 
@@ -294,4 +325,23 @@ func mustMarshalThemeElements(elements appearance.ThemeElementMap) string {
 		return "{}"
 	}
 	return string(payload)
+}
+
+func mustMarshalHomeContent(content homecontent.HomeContent) string {
+	payload, err := json.Marshal(homecontent.NormalizeHomeContent(content))
+	if err != nil {
+		return "{}"
+	}
+	return string(payload)
+}
+
+func mustUnmarshalHomeContent(raw string) homecontent.HomeContent {
+	if raw == "" {
+		return homecontent.DefaultHomeContent()
+	}
+	content := homecontent.HomeContent{}
+	if err := json.Unmarshal([]byte(raw), &content); err != nil {
+		return homecontent.DefaultHomeContent()
+	}
+	return homecontent.NormalizeHomeContent(content)
 }
