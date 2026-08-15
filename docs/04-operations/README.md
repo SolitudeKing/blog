@@ -10,6 +10,7 @@
 ## 当前内容
 
 - [Runbook · 部署与备份](./runbook/01-deployment-and-backup.md)：Compose、Nginx、健康检查、备份恢复、TLS、回滚原则。
+- [Runbook · 密钥轮换](./runbook/02-secret-rotation.md)：JWT / MySQL / Redis / Admin / S3 五个密钥的轮换步骤、影响面与回滚。
 - [复盘 · 项目审查](./reviews/01-project-review.md)：本轮已修复项与剩余 P1 / P2 风险。
 
 ## 新增文档的落点

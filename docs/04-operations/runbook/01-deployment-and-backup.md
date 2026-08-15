@@ -39,12 +39,26 @@ REDIS_HOST=<REPLACE_WITH_REDIS_HOST>
 REDIS_PORT=6379
 REDIS_USER=app
 REDIS_PASSWORD=<强密码>
+REDIS_DB=0
 REDIS_TLS=false
 ```
 
 从旧配置升级时，必须先将 `MYSQL_DSN`、`REDIS_ADDR` 拆成上述原子变量并移除旧变量。Go 加载器暂时兼容只提供旧变量的非 Compose 环境，但新旧变量同时存在会拒绝启动；当前 Compose 部署只接受原子变量。
 
 不要提交实际 `.env`。占位符不能直接用于生产。
+
+## 1.5 首次部署 · 管理员引导
+
+应用启动时会以 `ADMIN_USERNAME` / `ADMIN_PASSWORD` / `ADMIN_NICKNAME` 创建唯一一个 owner 账号。`APP_ENV=production` 下 `Validate()` 会拒绝默认 `admin/admin` 与任何含 `change-me` 的口令；`APP_ENV=development` 则会静默放行默认值，**仅供本地开发使用**。
+
+首次部署推荐流程：
+
+1. 在 `cp .env.example .env` 之后立刻设置 `ADMIN_PASSWORD=<强口令>`，至少 12 位、含大小写字母与数字。
+2. 启动后用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录 `/admin/login`。
+3. **首次登录后立即在管理后台修改密码**——这一步在生产中无任何强制约束，依赖人工执行；轮换步骤见 [runbook/02-secret-rotation.md](./02-secret-rotation.md)。
+4. 若遗忘了 owner 密码且无法登录，唯一恢复路径是直接修改 `users` 表的 `password_hash`（应用启动时不会重建 owner）。
+
+> 单一 owner 账号是当前设计约束：没有"忘记密码"邮件通道，没有自助注册，所有管理操作都走这一个账号。后续若引入多管理员或邀请流程，会作为 P1 在 `reviews/` 跟踪。
 
 ## 3. 展开并启动
 
@@ -70,12 +84,14 @@ docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 ```bash
 sh deploy/scripts/healthcheck.sh
 docker compose --env-file .env -f deploy/docker-compose.yml exec nginx nginx -t
+docker compose --env-file .env -f deploy/docker-compose.yml logs api | grep -i migrate
 ```
 
 验收点：
 
 - `api`、`nginx` 均为 running/healthy。
 - `GET /healthz` 返回 API、外部 MySQL 与外部 Redis 的健康结果；任一持久化依赖异常时返回非 2xx，使脚本和容器健康检查失败。
+- `logs api` 中能看到 GORM AutoMigrate 的输出（首次启动会建表；后续启动若 schema 未变更则只输出"nothing to migrate"）。**若完全没有 AutoMigrate 相关日志，说明启动过程在更早的阶段就失败了**，需结合 `docker compose logs api` 排查。
 - 首页、登录、公开文章列表、RSS 与 sitemap 可访问。
 - 一次受控媒体上传未触发代理层 1 MB 默认限制。
 
@@ -127,7 +143,7 @@ sh deploy/scripts/healthcheck.sh
 | --- | --- | --- |
 | MySQL | **外部托管实例** | 托管方（PITR / 快照 / 异地副本） |
 | Redis | **外部托管实例** | 托管方；本仓库仅作为可重建缓存，不作为业务事实来源 |
-| 上传文件 | `api-storage` volume | **本仓库负责**：需补充独立备份（与外部数据库的恢复点无强对应关系；丢失后通过内容运营恢复） |
+| 上传文件 | `api-storage` volume（容器内 `/app/storage/uploads`；Docker 主机位于 `/var/lib/docker/volumes/<project>_api-storage/_data/`） | **本仓库负责**：需补充独立备份（与外部数据库的恢复点无强对应关系；丢失后通过内容运营恢复） |
 | 容器日志 | Docker `json-file` | 单文件 10 MB，最多 5 个文件 |
 
 Compose 使用 `restart: unless-stopped`。部署机仍需监控磁盘、上传卷备份结果、证书、容器健康和恢复演练时间。
@@ -142,6 +158,7 @@ Compose 使用 `restart: unless-stopped`。部署机仍需监控磁盘、上传�
 ## 9. 后续 P1（不在本仓库持有）
 
 - `ensureDatabase` 创建数据库权限：当前应用启动会执行 `CREATE DATABASE IF NOT EXISTS`。若托管账号无 `CREATE` 权限，请先在托管方建库；后续将引入 `MYSQL_SKIP_CREATE_DB` 开关作为代码层补项。
-- Redis 静默默认值：`config.go` 在无 `REDIS_ADDR` 时回落 `localhost:6379`，外部化场景下可能掩盖配置遗漏。建议保持 `REDIS_HOST` 为必填，代码侧收紧作为后续。
 - TLS 自定义名字：当前仅支持内置 `true` / `skip-verify`；自定义 `tls.Config`（客户端证书 / 自定义 CA 池）作为后续 P1。
 - 显式迁移版本：当前 `database.go` 使用 GORM AutoMigrate，建议逐步迁移到版本化迁移工具（golang-migrate 等）。
+- 上传卷 `api-storage` 备份脚本：当前由运维侧自行备份卷内容，仓库内未提供脚本；后续可加 `deploy/scripts/backup-uploads.sh`。
+- 资源限制与编排：当前 `docker-compose.yml` 未声明 `deploy.resources` / `security_opt`，仅给 `api` 显式了 `user: 10001:10001`；进一步在部署环境规格明确后再评估。
