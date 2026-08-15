@@ -45,6 +45,8 @@ type TopicReference struct {
 	Slug  string `json:"slug"`
 }
 
+// PublishedAt 使用指针：未发布的草稿/归档文章序列化时输出 null，
+// 避免 time.Time 零值 "0001-01-01T00:00:00Z" 在前端被解析成 Invalid Date。
 type ArticleItem struct {
 	ID          uint64         `json:"id"`
 	Title       string         `json:"title"`
@@ -56,15 +58,28 @@ type ArticleItem struct {
 	Topic       TopicReference `json:"topic"`
 	Tags        []string       `json:"tags"`
 	ViewCount   uint64         `json:"view_count"`
-	PublishedAt time.Time      `json:"published_at"`
+	PublishedAt *time.Time     `json:"published_at"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
+// PrevArticle / NextArticle 仅出现在公开文章详情中，由 Service 在同专题下按 published_at 选取。
+// 字段直接复用轻量引用，前端无需再发请求补齐。
+type ArticleNeighbor struct {
+	ID        uint64    `json:"id"`
+	Title     string    `json:"title"`
+	Slug      string    `json:"slug"`
+	TopicID   uint64    `json:"topic_id"`
+	Topic     TopicReference `json:"topic"`
+	PublishedAt *time.Time `json:"published_at"`
+}
+
 type ArticleDetail struct {
 	ArticleItem
-	ContentMD string   `json:"content_md"`
-	TagIDs    []uint64 `json:"tag_ids"`
+	ContentMD string             `json:"content_md"`
+	TagIDs    []uint64           `json:"tag_ids"`
+	Prev      *ArticleNeighbor   `json:"prev"`
+	Next      *ArticleNeighbor   `json:"next"`
 }
 
 type ArticleVersionItem struct {
@@ -135,6 +150,7 @@ func (s *ArticleService) Detail(slug string) (ArticleDetail, error) {
 			return ArticleDetail{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		item := detailFromModel(article)
+		item.Prev, item.Next = s.findArticleNeighbors(article)
 		s.setCachedDetail(slug, item)
 		return item, nil
 	}
@@ -147,6 +163,49 @@ func (s *ArticleService) Detail(slug string) (ArticleDetail, error) {
 		}
 	}
 	return ArticleDetail{}, apperrors.New(apperrors.CodeResourceNotFound)
+}
+
+// findArticleNeighbors 在同专题下按发布时间选取上一篇 / 下一篇。
+// 必须与 Detail 共享同一过滤（status='published' AND deleted_at IS NULL），避免边界不一致。
+// 任一侧查不到都返回 nil，由前端决定是否展示。
+func (s *ArticleService) findArticleNeighbors(article model.Article) (*ArticleNeighbor, *ArticleNeighbor) {
+	if s.db == nil {
+		return nil, nil
+	}
+	neighbor := func(order string, comparator string) *ArticleNeighbor {
+		var row model.Article
+		err := s.db.Select("id", "title", "slug", "topic_id", "published_at").
+			Where("status = ? AND topic_id = ? AND published_at IS NOT NULL AND deleted_at IS NULL", "published", article.TopicID).
+			Where("published_at "+comparator+" ?", article.PublishedAt).
+			Order(order).
+			Limit(1).
+			First(&row).Error
+		if err != nil {
+			return nil
+		}
+		ref := TopicReference{
+			ID:    article.Topic.ID,
+			Name:  article.Topic.Name,
+			Label: article.Topic.Label,
+			Slug:  article.Topic.Slug,
+		}
+		var publishedAt *time.Time
+		if row.PublishedAt != nil {
+			value := *row.PublishedAt
+			publishedAt = &value
+		}
+		return &ArticleNeighbor{
+			ID:          row.ID,
+			Title:       row.Title,
+			Slug:        row.Slug,
+			TopicID:     row.TopicID,
+			Topic:       ref,
+			PublishedAt: publishedAt,
+		}
+	}
+	prev := neighbor("published_at DESC, id DESC", "<")
+	next := neighbor("published_at ASC, id ASC", ">")
+	return prev, next
 }
 
 func (s *ArticleService) Info(id string) (ArticleDetail, error) {
@@ -539,7 +598,7 @@ func (s *ArticleService) listFromDB(query ArticleListQuery, page, pageSize int, 
 
 	offset := (page - 1) * pageSize
 	var rows []model.Article
-	err := dbQuery.Order("articles.created_at DESC, articles.id DESC").
+	err := dbQuery.Order(articleListOrderClause(onlyPublished)).
 		Limit(pageSize + 1).
 		Offset(offset).
 		Find(&rows).Error
@@ -589,13 +648,8 @@ func (s *ArticleService) listInMemory(query ArticleListQuery, page, pageSize int
 		items = append(items, item)
 	}
 
-	// 内存模式按 (created_at DESC, id DESC) 排序后切片
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
-			return items[i].ID > items[j].ID
-		}
-		return items[i].CreatedAt.After(items[j].CreatedAt)
-	})
+	// 内存模式按公开/管理两套排序键稳定排序后再切片。
+	items = sortArticles(items, onlyPublished)
 
 	offset := (page - 1) * pageSize
 	if offset >= len(items) {
@@ -626,9 +680,10 @@ func (s *ArticleService) createInMemory(req ArticleCreateRequest, status string)
 	}
 
 	now := time.Now().UTC()
-	publishedAt := time.Time{}
+	var publishedAt *time.Time
 	if status == "published" {
-		publishedAt = now
+		published := now
+		publishedAt = &published
 	}
 	item := ArticleDetail{
 		ArticleItem: ArticleItem{
@@ -675,8 +730,9 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 			item.Topic = inMemoryTopicReference(req.TopicID)
 			item.TagIDs = uniqueTagIDs(req.TagIDs)
 			item.UpdatedAt = now
-			if status == "published" && item.PublishedAt.IsZero() {
-				item.PublishedAt = now
+			if status == "published" && item.PublishedAt == nil {
+				published := now
+				item.PublishedAt = &published
 			}
 			s.items[index] = item
 			return item, nil
@@ -776,9 +832,10 @@ func detailFromModel(article model.Article) ArticleDetail {
 }
 
 func itemFromModel(article model.Article) ArticleItem {
-	publishedAt := time.Time{}
+	var publishedAt *time.Time
 	if article.PublishedAt != nil {
-		publishedAt = *article.PublishedAt
+		value := *article.PublishedAt
+		publishedAt = &value
 	}
 	tags := make([]string, 0, len(article.Tags))
 	for _, tag := range article.Tags {
@@ -858,4 +915,42 @@ func tagIDsFromModel(tags []model.Tag) []uint64 {
 		ids = append(ids, tag.ID)
 	}
 	return ids
+}
+
+// articleListOrderClause 集中维护列表排序，避免在多个查询路径里复制粘贴。
+// 公开列表（onlyPublished=true）按发布时间倒序：published_at DESC NULLS LAST, id DESC；
+// 后台管理列表按创建时间倒序：created_at DESC, id DESC，与编辑视角保持一致。
+func articleListOrderClause(onlyPublished bool) string {
+	if onlyPublished {
+		return "articles.published_at IS NULL, articles.published_at DESC, articles.id DESC"
+	}
+	return "articles.created_at DESC, articles.id DESC"
+}
+
+// sortArticles 是 articleListOrderClause 在内存模式下的等价实现。
+// 公开列表使用 PublishedAt（nil 视作零值，自然落到末尾）；
+// 后台列表使用 CreatedAt。
+func sortArticles(items []ArticleItem, onlyPublished bool) []ArticleItem {
+	sort.Slice(items, func(i, j int) bool {
+		if onlyPublished {
+			ip := publishedAtOrZero(items[i].PublishedAt)
+			jp := publishedAtOrZero(items[j].PublishedAt)
+			if !ip.Equal(jp) {
+				return ip.After(jp)
+			}
+		} else {
+			if !items[i].CreatedAt.Equal(items[j].CreatedAt) {
+				return items[i].CreatedAt.After(items[j].CreatedAt)
+			}
+		}
+		return items[i].ID > items[j].ID
+	})
+	return items
+}
+
+func publishedAtOrZero(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
 }
