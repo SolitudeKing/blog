@@ -75,7 +75,8 @@ services:
     ports:
       - "${WEB_PORT:-80}:80"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null"]
+      # 用容器内自检端点，不穿透到 api / DB；DB 抖动不应把 nginx 标记为 unhealthy。
+      test: ["CMD-SHELL", "wget -qO- http://localhost/nginx-health >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 5
