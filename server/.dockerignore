@@ -1,0 +1,15 @@
+.git
+.idea
+.vscode
+.env
+.env.*
+storage
+bin
+docs
+scripts
+coverage
+*.md
+**/*_test.go
+**/*.exe
+**/*.test
+**/*.out
