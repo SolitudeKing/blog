@@ -99,6 +99,7 @@ docker compose --env-file .env -f deploy/docker-compose.yml config --services
 - [文档索引](./docs/README.md)
 - [维护指南](./docs/12-maintenance-guide.md)
 - [本轮项目审查](./docs/13-project-review.md)
+- [后端 API 优化 Backlog](./docs/backend-optimization/README.md)
 - [部署与备份手册](./docs/08-deployment-runbook.md)
 
 不要提交 `.env`、数据库备份、上传文件、构建产物或本地迁移产物。清理数据前先备份，并通过稳定 slug、引用关系和实际环境查询确认对象，不能仅凭本机历史 ID 执行删除。

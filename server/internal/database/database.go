@@ -143,6 +143,7 @@ func migrate(db *gorm.DB) error {
 		&model.Asset{},
 		&model.SiteSetting{},
 		&model.Notice{},
+		&model.RevokedRefreshToken{},
 	); err != nil {
 		return err
 	}
