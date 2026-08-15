@@ -23,10 +23,13 @@ bin/
 *.exe
 
 # Storage
-storage/uploads/
+server/storage/uploads/
 migration-output/
 backups/
 
 # IDE
 .idea/
 .vscode/
+
+
+!.gitkeep
