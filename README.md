@@ -28,8 +28,12 @@ MySQL 是业务数据的唯一可信来源，Redis 用于公开文章、站点�
 
 ## 使用 Docker Compose 启动
 
+> **完整端到端部署（生产）**：见 [docs/04-operations/runbook/00-deploy-from-scratch.md](./docs/04-operations/runbook/00-deploy-from-scratch.md)。下面 3 步仅作快速启动入口，使用 `.env` 文件路径。
+>
+> 生产环境**推荐**用 `deploy/.env.production` 作为配置载体：把它替换好之后通过 `docker compose --env-file deploy/.env.production ...` 启动；详见上面端到端指南。
+
 1. 复制 `.env.example` 为 `.env`。
-2. 填写 MySQL / Redis / JWT / 管理员必填凭据。MySQL 与 Redis 只需填写 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_TLS` 与 `REDIS_HOST`、`REDIS_PORT`、`REDIS_USER`、`REDIS_PASSWORD`、`REDIS_TLS` 等原子变量，Go 配置层会组合连接参数。**外部 MySQL / Redis 必须由运维在部署机之外提供**（参见 `docs/08-deployment-runbook.md` §1 前置条件）。
+2. 填写 MySQL / Redis / JWT / 管理员必填凭据。MySQL 与 Redis 只需填写 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_TLS` 与 `REDIS_HOST`、`REDIS_PORT`、`REDIS_USER`、`REDIS_PASSWORD`、`REDIS_TLS` 等原子变量，Go 配置层会组合连接参数。**外部 MySQL / Redis 必须由运维在部署机之外提供**（参见 [docs/04-operations/runbook/00-deploy-from-scratch.md](./docs/04-operations/runbook/00-deploy-from-scratch.md) §4 外部依赖清单）。
 3. 启动服务：
 
 ```bash
@@ -97,9 +101,10 @@ docker compose --env-file .env -f deploy/docker-compose.yml config --services
 ## 维护入口
 
 - [文档索引](./docs/README.md)
+- [端到端部署指南](./docs/04-operations/runbook/00-deploy-from-scratch.md)
 - [维护指南](./docs/12-maintenance-guide.md)
 - [本轮项目审查](./docs/13-project-review.md)
 - [后端 API 优化 Backlog](./docs/backend-optimization/README.md)
-- [部署与备份手册](./docs/08-deployment-runbook.md)
+- [部署与备份手册](./docs/04-operations/runbook/01-deployment-and-backup.md)
 
 不要提交 `.env`、数据库备份、上传文件、构建产物或本地迁移产物。清理数据前先备份，并通过稳定 slug、引用关系和实际环境查询确认对象，不能仅凭本机历史 ID 执行删除。
