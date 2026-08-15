@@ -11,11 +11,11 @@ import (
 	"solitude-blog/server/internal/storage"
 )
 
-func TestAssetMimeAllowedRejectsUnsanitizedSVG(t *testing.T) {
+func TestAssetMimeAllowedAcceptsSVG(t *testing.T) {
 	t.Parallel()
 
-	if assetMimeAllowed("image/svg+xml") {
-		t.Fatal("assetMimeAllowed(image/svg+xml) = true, want false")
+	if !assetMimeAllowed("image/svg+xml") {
+		t.Fatal("assetMimeAllowed(image/svg+xml) = false, want true")
 	}
 	for _, mimeType := range []string{"image/jpeg", "image/png", "image/gif", "image/webp"} {
 		if !assetMimeAllowed(mimeType) {
@@ -28,10 +28,11 @@ func TestAssetExtensionComesFromDetectedMIME(t *testing.T) {
 	t.Parallel()
 
 	wants := map[string]string{
-		"image/jpeg": ".jpg",
-		"image/png":  ".png",
-		"image/gif":  ".gif",
-		"image/webp": ".webp",
+		"image/jpeg":    ".jpg",
+		"image/png":     ".png",
+		"image/gif":     ".gif",
+		"image/webp":    ".webp",
+		"image/svg+xml": ".svg",
 	}
 	for mimeType, want := range wants {
 		ext, ok := assetExtensionForMIME(mimeType)

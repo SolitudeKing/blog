@@ -395,20 +395,24 @@ func assetMimeAllowed(mimeType string) bool {
 }
 
 // assetExtensionForMIME 由实际文件内容决定落盘扩展名，不能信任上传文件名。
-// 这同时避免图片伪装成 .html/.svg 后被同源静态服务按可执行类型返回。
+// MIME 由 http.DetectContentType 通过内容嗅探识别；落盘扩展名是真实类型的派生，不是用户上传的扩展名。
+// 历史上曾因此拒绝 SVG 以避免 .svg 被伪装成可执行 HTML 由同源静态服务返回；
+// 现已统一通过 S3 / 对象存储对外提供静态资源，与博客自身不同源，不再有同源 XSS 风险，
+// 故允许 image/svg+xml。前台始终通过 <img src="..."> 渲染，浏览器对 image/svg+xml 的脚本执行受限。
 func assetExtensionForMIME(mimeType string) (string, bool) {
 	extensions := map[string]string{
-		"image/jpeg": ".jpg",
-		"image/png":  ".png",
-		"image/gif":  ".gif",
-		"image/webp": ".webp",
+		"image/jpeg":    ".jpg",
+		"image/png":     ".png",
+		"image/gif":     ".gif",
+		"image/webp":    ".webp",
+		"image/svg+xml": ".svg",
 	}
 	ext, allowed := extensions[mimeType]
 	return ext, allowed
 }
 
 // decodeImageDimensions 从已读取的字节流解码尺寸，避免本地/S3 模式下 IO 语义差异。
-// 仅 jpeg/png/gif 由标准库 image 支持；webp 与未识别类型返回 0,0（不影响功能）。
+// 仅 jpeg/png/gif 由标准库 image 支持；webp / svg / 未识别类型返回 0,0（不影响功能）。
 func decodeImageDimensions(data []byte, mimeType string) (uint, uint) {
 	if mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif" {
 		return 0, 0

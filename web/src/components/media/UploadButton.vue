@@ -86,8 +86,8 @@ const props = withDefaults(
   }>(),
   {
     label: '上传图片',
-    hint: '支持 JPG / PNG / GIF / WebP，单个文件 ≤ 10MB',
-    accept: 'image/*',
+    hint: '支持 JPG / PNG / GIF / WebP / SVG，单个文件 ≤ 10MB',
+    accept: 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml',
     disabled: false,
     url: '',
   },
