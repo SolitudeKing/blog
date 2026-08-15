@@ -154,20 +154,6 @@
         </div>
       </div>
 
-      <form class="admin-layout__search" role="search" @submit.prevent="onAdminSearch">
-        <label class="sr-only" for="admin-global-search">搜索文章</label>
-        <SvgIcon name="search" />
-        <input
-          id="admin-global-search"
-          ref="searchInput"
-          v-model="adminSearch"
-          type="search"
-          autocomplete="off"
-          placeholder="搜索文章标题"
-        />
-        <kbd aria-hidden="true">Ctrl K</kbd>
-      </form>
-
       <div class="admin-layout__topbar-actions">
         <span class="admin-layout__health" :class="{ 'is-offline': !isOnline }" role="status">
           <i aria-hidden="true" />{{ isOnline ? '网络正常' : '网络离线' }}
@@ -227,8 +213,6 @@ const menuButton = ref<HTMLButtonElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
 const sidebarPanel = ref<HTMLElement | null>(null)
 const mainContent = ref<HTMLElement | null>(null)
-const searchInput = ref<HTMLInputElement | null>(null)
-const adminSearch = ref('')
 const isOnline = ref(true)
 
 let shellMedia: MediaQueryList | null = null
@@ -293,7 +277,6 @@ onMounted(() => {
   isOnline.value = window.navigator.onLine
   window.addEventListener('online', syncOnlineState)
   window.addEventListener('offline', syncOnlineState)
-  document.addEventListener('keydown', onGlobalShortcut)
 
   const storedPreference = readShellPreference()
   if (storedPreference === 'collapsed' || storedPreference === 'expanded') {
@@ -306,7 +289,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   shellMedia?.removeEventListener('change', syncViewport)
   document.removeEventListener('keydown', onDocumentKeydown)
-  document.removeEventListener('keydown', onGlobalShortcut)
   window.removeEventListener('online', syncOnlineState)
   window.removeEventListener('offline', syncOnlineState)
   unlockBodyScroll()
@@ -332,21 +314,6 @@ function syncViewport(event: MediaQueryList | MediaQueryListEvent) {
 
 function syncOnlineState() {
   isOnline.value = window.navigator.onLine
-}
-
-function onGlobalShortcut(event: KeyboardEvent) {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
-    event.preventDefault()
-    searchInput.value?.focus()
-  }
-}
-
-async function onAdminSearch() {
-  const keyword = adminSearch.value.trim()
-  await router.push({
-    name: 'admin-articles',
-    query: keyword ? { keyword } : undefined,
-  })
 }
 
 function toggleNavigation() {

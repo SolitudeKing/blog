@@ -13,52 +13,83 @@
       正在加载专题与标签…
     </p>
 
-    <div class="taxonomy-grid">
-      <section class="taxonomy-panel">
-        <header class="taxonomy-panel__header">
-          <div role="heading" aria-level="2">专题</div>
-          <BaseButton ref="topicTriggerRef" size="sm" @click="openTopicDialog()">新增专题</BaseButton>
-        </header>
-
-        <div class="taxonomy-list">
-          <div v-for="topic in topics" :key="topic.id" class="taxonomy-item">
-            <div>
-              <strong>{{ topic.name }}</strong>
-              <p>{{ topic.label }} · {{ topic.slug }}<template v-if="topic.article_count !== undefined"> · 已发布 {{ topic.article_count }} 篇</template></p>
-            </div>
-            <div class="taxonomy-item__actions">
-              <button class="text-link" type="button" @click="openTopicDialog(topic)">编辑</button>
-              <button class="text-link text-link--danger" type="button" @click="removeTopic(topic.id)">
-                删除
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="taxonomy-panel">
-        <header class="taxonomy-panel__header">
-          <div role="heading" aria-level="2">标签</div>
-          <BaseButton ref="tagTriggerRef" size="sm" @click="openTagDialog()">新增标签</BaseButton>
-        </header>
-
-        <div class="taxonomy-list">
-          <div v-for="tag in tags" :key="tag.id" class="taxonomy-item">
-            <div>
-              <strong>
-                <span class="tag-dot" :style="{ background: safeTagColor(tag.color) }" />
-                {{ tag.name }}
-              </strong>
-              <p>{{ tag.slug }}</p>
-            </div>
-            <div class="taxonomy-item__actions">
-              <button class="text-link" type="button" @click="openTagDialog(tag)">编辑</button>
-              <button class="text-link text-link--danger" type="button" @click="removeTag(tag.id)">删除</button>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div class="taxonomy-tabs" role="tablist" aria-label="专题与标签切换">
+      <button
+        type="button"
+        class="taxonomy-tab"
+        role="tab"
+        :aria-selected="activeTab === 'topic'"
+        :tabindex="activeTab === 'topic' ? 0 : -1"
+        @click="activeTab = 'topic'"
+        @keydown.left.prevent="activeTab = 'tag'"
+        @keydown.right.prevent="activeTab = 'tag'"
+      >
+        专题 ({{ topics.length }})
+      </button>
+      <button
+        type="button"
+        class="taxonomy-tab"
+        role="tab"
+        :aria-selected="activeTab === 'tag'"
+        :tabindex="activeTab === 'tag' ? 0 : -1"
+        @click="activeTab = 'tag'"
+        @keydown.left.prevent="activeTab = 'topic'"
+        @keydown.right.prevent="activeTab = 'topic'"
+      >
+        标签 ({{ tags.length }})
+      </button>
     </div>
+
+    <section v-show="activeTab === 'topic'" class="taxonomy-panel" role="tabpanel" aria-label="专题">
+      <header class="taxonomy-panel__header">
+        <div role="heading" aria-level="2">专题</div>
+        <BaseButton ref="topicTriggerRef" size="sm" @click="openTopicDialog()">新增专题</BaseButton>
+      </header>
+
+      <div class="taxonomy-list">
+        <div v-for="topic in topics" :key="topic.id" class="taxonomy-item">
+          <div>
+            <strong>{{ topic.name }}</strong>
+            <p>{{ topic.label }} · {{ topic.slug }}<template v-if="topic.article_count !== undefined"> · 已发布 {{ topic.article_count }} 篇</template></p>
+          </div>
+          <div class="taxonomy-item__actions">
+            <button class="text-link" type="button" @click="openTopicDialog(topic)">编辑</button>
+            <button class="text-link text-link--danger" type="button" @click="removeTopic(topic.id)">
+              删除
+            </button>
+          </div>
+        </div>
+        <p v-if="!topics.length && !loading" class="admin-page__status" role="status">
+          还没有任何专题，点击右上角“新增专题”开始整理。
+        </p>
+      </div>
+    </section>
+
+    <section v-show="activeTab === 'tag'" class="taxonomy-panel" role="tabpanel" aria-label="标签">
+      <header class="taxonomy-panel__header">
+        <div role="heading" aria-level="2">标签</div>
+        <BaseButton ref="tagTriggerRef" size="sm" @click="openTagDialog()">新增标签</BaseButton>
+      </header>
+
+      <div class="taxonomy-list">
+        <div v-for="tag in tags" :key="tag.id" class="taxonomy-item">
+          <div>
+            <strong>
+              <span class="tag-dot" :style="{ background: safeTagColor(tag.color) }" />
+              {{ tag.name }}
+            </strong>
+            <p>{{ tag.slug }}</p>
+          </div>
+          <div class="taxonomy-item__actions">
+            <button class="text-link" type="button" @click="openTagDialog(tag)">编辑</button>
+            <button class="text-link text-link--danger" type="button" @click="removeTag(tag.id)">删除</button>
+          </div>
+        </div>
+        <p v-if="!tags.length && !loading" class="admin-page__status" role="status">
+          还没有任何标签，点击右上角“新增标签”开始整理。
+        </p>
+      </div>
+    </section>
 
     <Teleport to="body">
       <Transition name="taxonomy-dialog">
@@ -171,6 +202,7 @@ const formError = ref('')
 const editingTopicId = ref<number | null>(null)
 const editingTagId = ref<number | null>(null)
 const activeDialog = ref<'topic' | 'tag' | null>(null)
+const activeTab = ref<'topic' | 'tag'>('topic')
 const topicTriggerRef = ref<InstanceType<typeof BaseButton> | null>(null)
 const tagTriggerRef = ref<InstanceType<typeof BaseButton> | null>(null)
 const dialogCloseButtonRef = ref<HTMLButtonElement | null>(null)

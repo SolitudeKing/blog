@@ -5,13 +5,105 @@
         <p class="admin-page__eyebrow">Notices</p>
         <div role="heading" aria-level="1">公告管理</div>
       </div>
-      <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">刷新</BaseButton>
+      <div class="admin-page__actions">
+        <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">刷新</BaseButton>
+        <BaseButton ref="createTriggerRef" @click="openNoticeDialog()">新建公告</BaseButton>
+      </div>
     </header>
 
-    <div class="notice-grid">
-      <form class="notice-panel" :aria-busy="saving" @submit.prevent="saveNotice">
-        <div role="heading" aria-level="2">{{ editingId ? '编辑公告' : '新增公告' }}</div>
-        <BaseInput v-model="form.title" label="标题" />
+    <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
+
+    <div class="notice-toolbar admin-toolbar" role="search" aria-label="筛选公告">
+      <input
+        v-model="keyword"
+        class="mist-input"
+        type="search"
+        aria-label="搜索公告"
+        placeholder="搜索公告"
+        @keyup.enter="loadNotices(1)"
+      />
+      <BaseSelect
+        v-model="enabledFilter"
+        :options="enabledOptions"
+        label="公告状态"
+        @change="loadNotices(1)"
+      />
+      <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">筛选</BaseButton>
+    </div>
+
+    <p v-if="loading && !notices.length" class="admin-page__status" role="status" aria-live="polite">
+      正在加载公告…
+    </p>
+
+    <div
+      v-if="notices.length"
+      class="admin-table"
+      role="table"
+      aria-label="公告列表"
+      :aria-rowcount="notices.length + 1"
+    >
+      <div class="admin-table__row admin-table__row--head notice-table__row" role="row">
+        <span class="admin-table__cell" role="columnheader">标题</span>
+        <span class="admin-table__cell" role="columnheader">状态</span>
+        <span class="admin-table__cell" role="columnheader">有效期</span>
+        <span class="admin-table__cell" role="columnheader">操作</span>
+      </div>
+      <div v-for="notice in notices" :key="notice.id" class="admin-table__row notice-table__row" role="row">
+        <div class="admin-table__cell" role="cell" data-label="标题">
+          <strong>{{ notice.title }}</strong>
+          <p>{{ notice.content }}</p>
+        </div>
+        <div class="admin-table__cell" role="cell" data-label="状态">
+          <span
+            class="status-pill"
+            :class="notice.enabled ? 'status-pill--published' : 'status-pill--archived'"
+          >
+            {{ notice.enabled ? '启用' : '停用' }}
+          </span>
+        </div>
+        <span class="admin-table__cell" role="cell" data-label="有效期">{{ formatRange(notice) }}</span>
+        <div class="admin-table__cell admin-table__actions" role="cell" data-label="操作">
+          <div class="admin-table__action-list">
+            <button class="text-link" type="button" @click="openNoticeDialog(notice)">编辑</button>
+            <button class="text-link text-link--danger" type="button" @click="removeNotice(notice.id)">
+              删除
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <BaseEmpty
+      v-else-if="!loading"
+      title="暂无公告"
+      description="创建一条公告，让访客在首页第一眼看到。"
+    >
+      <template #icon>
+        <SvgIcon class="admin-empty__icon" name="empty-notice" />
+      </template>
+    </BaseEmpty>
+
+    <div v-if="notices.length" class="notice-list__footer">
+      <BasePagination
+        mode="pages"
+        :model-value="page.page"
+        :total="page.total"
+        :page-size="page.page_size"
+        :loading="loadingMore"
+        align="center"
+        @change="goToPage"
+      />
+    </div>
+
+    <BaseModal
+      v-model="showNoticeModal"
+      :title="editingId ? '编辑公告' : '新建公告'"
+      eyebrow="Notice"
+      :loading="saving"
+      :error="formError"
+    >
+      <form class="notice-form" :aria-busy="saving" @submit.prevent="saveNotice">
+        <BaseInput v-model="form.title" label="标题" required />
         <BaseTextarea v-model="form.content" label="内容" :rows="5" />
 
         <div class="notice-form__row">
@@ -32,104 +124,19 @@
             <input v-model="endsAtInput" class="mist-input" type="datetime-local" />
           </label>
         </div>
-
-        <div class="notice-form__actions">
-          <BaseButton type="submit" :loading="saving">{{ editingId ? '保存修改' : '创建公告' }}</BaseButton>
-          <BaseButton v-if="editingId" type="button" variant="secondary" @click="resetForm">取消</BaseButton>
-        </div>
-        <p v-if="error" class="admin-page__error" role="alert" aria-live="assertive">{{ error }}</p>
       </form>
-
-      <section class="notice-list">
-        <div class="admin-toolbar notice-toolbar" role="search" aria-label="筛选公告">
-          <input
-            v-model="keyword"
-            class="mist-input"
-            type="search"
-            aria-label="搜索公告"
-            placeholder="搜索公告"
-            @keyup.enter="loadNotices(1)"
-          />
-          <BaseSelect
-            v-model="enabledFilter"
-            :options="enabledOptions"
-            label="公告状态"
-            @change="loadNotices(1)"
-          />
-          <BaseButton variant="secondary" :loading="loading" @click="loadNotices(1)">筛选</BaseButton>
-        </div>
-
-        <p v-if="loading && !notices.length" class="admin-page__status" role="status" aria-live="polite">
-          正在加载公告…
-        </p>
-
-        <div
-          v-if="notices.length"
-          class="admin-table"
-          role="table"
-          aria-label="公告列表"
-          :aria-rowcount="notices.length + 1"
-        >
-          <div class="admin-table__row admin-table__row--head notice-table__row" role="row">
-            <span class="admin-table__cell" role="columnheader">标题</span>
-            <span class="admin-table__cell" role="columnheader">状态</span>
-            <span class="admin-table__cell" role="columnheader">有效期</span>
-            <span class="admin-table__cell" role="columnheader">操作</span>
-          </div>
-          <div v-for="notice in notices" :key="notice.id" class="admin-table__row notice-table__row" role="row">
-            <div class="admin-table__cell" role="cell" data-label="标题">
-              <strong>{{ notice.title }}</strong>
-              <p>{{ notice.content }}</p>
-            </div>
-            <div class="admin-table__cell" role="cell" data-label="状态">
-              <span
-                class="status-pill"
-                :class="notice.enabled ? 'status-pill--published' : 'status-pill--archived'"
-              >
-                {{ notice.enabled ? '启用' : '停用' }}
-              </span>
-            </div>
-            <span class="admin-table__cell" role="cell" data-label="有效期">{{ formatRange(notice) }}</span>
-            <div class="admin-table__cell admin-table__actions" role="cell" data-label="操作">
-              <div class="admin-table__action-list">
-                <button class="text-link" type="button" @click="editNotice(notice)">编辑</button>
-                <button class="text-link text-link--danger" type="button" @click="removeNotice(notice.id)">
-                  删除
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <BaseEmpty
-          v-else-if="!loading"
-          title="暂无公告"
-          description="创建一条公告，让访客在首页第一眼看到。"
-        >
-          <template #icon>
-            <SvgIcon class="admin-empty__icon" name="empty-notice" />
-          </template>
-        </BaseEmpty>
-
-        <div v-if="notices.length" class="notice-list__footer">
-          <BasePagination
-            mode="pages"
-            :model-value="page.page"
-            :total="page.total"
-            :page-size="page.page_size"
-            :loading="loadingMore"
-            align="center"
-            @change="goToPage"
-          />
-        </div>
-      </section>
-    </div>
+      <template #footer>
+        <BaseButton variant="secondary" :disabled="saving" @click="closeNoticeDialog">取消</BaseButton>
+        <BaseButton :loading="saving" @click="saveNotice">{{ editingId ? '保存修改' : '创建公告' }}</BaseButton>
+      </template>
+    </BaseModal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseModal from '@/components/base/BaseModal.vue'
 import BasePagination from '@/components/base/BasePagination.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
@@ -145,9 +152,12 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const saving = ref(false)
 const error = ref('')
+const formError = ref('')
 const keyword = ref('')
 const enabledFilter = ref<string>('')
 const editingId = ref<number | null>(null)
+const showNoticeModal = ref(false)
+const createTriggerRef = ref<InstanceType<typeof BaseButton> | null>(null)
 const toast = useToast()
 
 const enabledOptions = [
@@ -242,8 +252,10 @@ async function goToPage(targetPage: number) {
 }
 
 async function saveNotice() {
+  if (saving.value) return
   saving.value = true
   error.value = ''
+  formError.value = ''
   try {
     const payload = { ...form }
     if (editingId.value) {
@@ -253,10 +265,11 @@ async function saveNotice() {
       await createNotice(payload)
       toast.success('公告已创建')
     }
-    resetForm()
+    closeNoticeDialog()
     await loadNotices(1)
   } catch (err) {
     const message = err instanceof Error ? err.message : '保存公告失败'
+    formError.value = message
     error.value = message
     toast.error(message)
   } finally {
@@ -264,14 +277,27 @@ async function saveNotice() {
   }
 }
 
-function editNotice(notice: NoticeItem) {
-  editingId.value = notice.id
-  form.title = notice.title
-  form.content = notice.content
-  form.enabled = notice.enabled
-  form.sort_order = notice.sort_order
-  form.starts_at = notice.starts_at
-  form.ends_at = notice.ends_at
+function openNoticeDialog(notice?: NoticeItem) {
+  formError.value = ''
+  if (notice) {
+    editingId.value = notice.id
+    form.title = notice.title
+    form.content = notice.content
+    form.enabled = notice.enabled
+    form.sort_order = notice.sort_order
+    form.starts_at = notice.starts_at
+    form.ends_at = notice.ends_at
+  } else {
+    resetForm()
+  }
+  showNoticeModal.value = true
+}
+
+async function closeNoticeDialog() {
+  if (saving.value) return
+  showNoticeModal.value = false
+  await nextTick()
+  createTriggerRef.value?.$el.focus({ preventScroll: true })
 }
 
 async function removeNotice(id: number) {
