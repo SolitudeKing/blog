@@ -363,6 +363,53 @@ func TestValidateAcceptsSupportedTLS(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsNegativeRedisDB(t *testing.T) {
+	t.Parallel()
+
+	cfg := validTestConfig()
+	cfg.RedisDB = -1
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() error = nil, want REDIS_DB validation error")
+	}
+}
+
+func TestValidateRequiresRedisAddrInProduction(t *testing.T) {
+	t.Parallel()
+
+	cfg := validTestConfig()
+	cfg.RedisAddr = ""
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want Redis addr required in production")
+	}
+	if !strings.Contains(err.Error(), "REDIS_HOST") {
+		t.Fatalf("Validate() error = %v, want mention of REDIS_HOST", err)
+	}
+}
+
+func TestValidateAcceptsMissingRedisAddrInDevelopment(t *testing.T) {
+	t.Parallel()
+
+	cfg := validTestConfig()
+	cfg.AppEnv = "development"
+	cfg.RedisAddr = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil in development with no Redis", err)
+	}
+}
+
+func TestLoadReadsRedisDB(t *testing.T) {
+	t.Parallel()
+
+	// 通过 Validate() 路径验证正整数 REDIS_DB 可被接受，确保配置加载后
+	// 不会被默认的 0 静默覆盖，也不会被误认为负数。
+	cfg := validTestConfig()
+	cfg.RedisDB = 3
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil for RedisDB=3", err)
+	}
+}
+
 func atomicConnectionEnv() map[string]string {
 	return map[string]string{
 		"MYSQL_HOST":     "2001:db8::10",
@@ -386,6 +433,7 @@ func validTestConfig() Config {
 	return Config{
 		AppEnv:           "production",
 		MySQLDSN:         "blog:secret@tcp(mysql:3306)/blog",
+		RedisAddr:        "redis:6379",
 		JWTAccessSecret:  "access-" + strings.Repeat("a", 40),
 		JWTRefreshSecret: "refresh-" + strings.Repeat("b", 40),
 		JWTAccessTTL:     30 * time.Minute,

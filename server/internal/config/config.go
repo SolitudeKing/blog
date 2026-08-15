@@ -25,6 +25,8 @@ type Config struct {
 	// RedisUsername 对应 REDIS_USER，用于 Redis 6+ 的 ACL 鉴权；
 	// 留空时等价于仅密码，兼容旧版本 Redis。
 	RedisUsername string
+	// RedisDB 对应 REDIS_DB：选择 Redis 服务内的逻辑库编号（0-15）。
+	RedisDB int
 
 	// MySQLTLS 对应 MYSQL_TLS：
 	//   - 空 / "false" / "0" / "off" → 不启用 TLS（默认）
@@ -86,6 +88,7 @@ func Load() (Config, error) {
 		RedisAddr:        redisAddr,
 		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
 		RedisUsername:    getEnv("REDIS_USER", ""),
+		RedisDB:          getEnvInt("REDIS_DB", 0),
 		MySQLTLS:         strings.TrimSpace(getEnv("MYSQL_TLS", "")),
 		RedisTLS:         strings.TrimSpace(getEnv("REDIS_TLS", "")),
 		JWTAccessSecret:  getEnv("JWT_ACCESS_SECRET", "dev-access-secret"),
@@ -128,6 +131,9 @@ func (c Config) Validate() error {
 		if err := validateHostPort("Redis address", c.RedisAddr); err != nil {
 			return err
 		}
+	}
+	if c.RedisDB < 0 {
+		return errors.New("REDIS_DB must be a non-negative integer")
 	}
 	if _, _, err := mysqlTLSParam(c.MySQLTLS); err != nil {
 		return fmt.Errorf("MYSQL_TLS is invalid: %w", err)
@@ -184,6 +190,11 @@ func (c Config) Validate() error {
 	}
 	if insecureAdminPassword(c.AdminPassword) {
 		return errors.New("default admin password is not allowed in production")
+	}
+	// 生产环境强制显式配置 Redis：避免 REDIS_HOST/REDIS_ADDR 同时缺失时
+	// 静默回退到 localhost:6379（cache 行为会发生无法预期的切换）。
+	if strings.TrimSpace(c.RedisAddr) == "" {
+		return errors.New("REDIS_HOST (or legacy REDIS_ADDR) is required in production")
 	}
 	return nil
 }
