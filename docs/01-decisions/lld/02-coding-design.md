@@ -164,4 +164,4 @@ STORAGE_LOCAL_ROOT=./storage/uploads
 - Compose 在有 Docker 的环境执行 `config --quiet`、构建、启动和健康检查。
 - 备份必须通过完整性检查，并在隔离环境完成恢复演练。
 
-完整命令见 [维护指南](./12-maintenance-guide.md)。
+完整命令见 [维护指南](../../03-knowledge/wiki/02-maintenance-guide.md)。

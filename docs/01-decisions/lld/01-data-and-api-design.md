@@ -647,7 +647,7 @@ Access Token claims：
 - Access Token 与 Refresh Token 的有效期分别由环境变量配置。
 - 刷新接口校验 Refresh Token 后签发新令牌。
 - 当前没有完整的服务端 Refresh Token 持久化、轮换和撤销记录；登出不能被视为终止全部刷新会话。
-- 服务端撤销、密码变更失效和多设备会话审计列为 P1，见 [项目审查](./13-project-review.md)。
+- 服务端撤销、密码变更失效和多设备会话审计列为 P1，见 [项目审查](../../04-operations/reviews/01-project-review.md)。
 
 ## 缓存与失效
 

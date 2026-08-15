@@ -37,6 +37,26 @@
 - 删除 `backup-mysql.sh` / `restore-mysql.sh`，把备份责任显式划归数据库托管方；`healthcheck.sh` 调整为仅校验本仓库持有的容器，外部依赖的健康通过 API `/healthz` 端点间接观察。
 - 后端新增 `MYSQL_TLS` / `REDIS_TLS` 字段（取值 `false` / `true` / `skip-verify`），分别注入 MySQL DSN 与 Redis client 的 TLS Config；并补齐配套单元测试。
 
+## 2026-08-15 后端 API 修复
+
+本轮针对 2026-08-15 后端 API 审查识别的 7 项必修（P0）实施修复；强烈建议（P1）与可改进（P2）见 `../../backend-optimization/` 子目录。
+
+### 本轮已修复
+
+- **公开文章列表排序**：当 `onlyPublished=true` 时 `ORDER BY articles.published_at IS NULL, articles.published_at DESC, articles.id DESC`，后台管理列表继续按 `created_at DESC, id DESC`（编辑视角）。修复了首页 / 归档在草稿被发布后顺序错乱的问题。`sortArticles` / `articleListOrderClause` 集中维护两套排序键。
+- **文章详情补 prev/next**：`ArticleDetail` 新增 `prev` / `next` 字段，按同专题 + `published_at` 在已发布集合中选取 `LIMIT 1`。邻居使用 `ArticleNeighbor` 轻量引用，避免冗余 `topic` / `tags` 数据。修复了前端拿不到上一篇/下一篇、与设计文档 §"文章详情" 契约不一致的问题。
+- **PublishedAt 改指针类型**：`ArticleItem.PublishedAt` 由 `time.Time` 改为 `*time.Time`，未发布文章（草稿/归档）序列化为 `null`，避免前端 `Invalid Date`。
+- **auth/login 内存模式 bcrypt 缓存**：把无 DB 模式下的 bcrypt hash 计算移到 `AuthService.memoryAdminUser`，启动时一次生成，登录时直接比对，不再每次请求消耗 50–150ms。
+- **Refresh Token 撤销机制**：新增 `RevokedRefreshToken` 模型 + AutoMigrate；TokenClaims 增加 `JTI`；`Refresh` 校验撤销表并在签发新对时把旧 jti 写入；`Logout` 把当前 access / refresh jti 一并写入。文档 [01-data-and-api-design.md §JWT 设计](../../01-decisions/lld/01-data-and-api-design.md#jwt-设计) 的 P1 要求已落地主体能力，剩余完善见 [`p1-strongly-recommended.md §3.4`](../../backend-optimization/p1-strongly-recommended.md)。
+- **Dashboard 文章计数合并为单查询**：`fillArticleCounts` 由 6 次独立的 COUNT / SUM 合并为一次 `SUM(CASE WHEN status = ...)` 聚合，文章表 ≥10K 行时仪表盘加载时延显著下降。
+- **Topic List Join 抽取共享常量**：`TopicService.List` 把 SELECT 列表 / GROUP BY / JOIN 条件抽到 `topicListSelectColumns` / `topicListGroupColumns` / `joinPublishedArticlesOnTopic`，避免日后 `article_count` 在两侧漂移。`Dashboard.fillTopicStats` 显式声明独立的 join（计数范围含草稿），通过注释解释为何不复用同一常量。
+
+### 验证状态
+
+- 已通过：`go build ./...`、`go test ./...`（含新增的 `TestAuthService*` / `TestArticleService*` 用例）。
+- 新增 `server/internal/model/revoked_refresh_token.go` 与 `server/internal/service/auth_jti_test.go`、`article_detail_test.go`，覆盖 jti 唯一性、prev/next 内存行为、排序键、logout 无 DB 行为。
+- 待真实数据：在独立 MySQL/Redis 上验证 `RevokedRefreshToken` 表 AutoMigrate、Refresh 撤销查询、Topic/Dashboard join 行为；浏览器验证 `published_at = null` 在前台 article 列表的展示。
+
 ## P1：上线前应继续完成
 
 ### 认证与会话

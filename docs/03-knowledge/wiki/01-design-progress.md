@@ -32,4 +32,4 @@
 3. 加固媒体上传与删除引用安全。
 4. 建立前端自动化、浏览器截图与读屏验收基线。
 
-详细风险和优先级见 [项目审查](./13-project-review.md) 与 [实施路线图](./04-implementation-roadmap.md)。
+详细风险和优先级见 [项目审查](../../04-operations/reviews/01-project-review.md) 与 [实施路线图](../../02-requirements/roadmap/01-implementation-roadmap.md)。

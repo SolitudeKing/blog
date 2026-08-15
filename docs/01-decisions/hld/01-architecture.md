@@ -73,7 +73,7 @@ flowchart LR
 - 当前 Refresh Token 尚未形成完整的服务端持久化、轮换与撤销链路，登出不应被文档描述为可终止所有刷新会话。
 - 生产环境必须使用不同的高熵 Access/Refresh 密钥和强管理员密码。
 
-服务端会校验启动所需配置，并在生产环境拒绝常见占位密钥。认证会话加固见 [实施路线图](./04-implementation-roadmap.md)。
+服务端会校验启动所需配置，并在生产环境拒绝常见占位密钥。认证会话加固见 [实施路线图](../../02-requirements/roadmap/01-implementation-roadmap.md)。
 
 ## 缓存原则
 
@@ -106,7 +106,7 @@ Compose 仅打包 `api` 与 `nginx` 两个服务；**MySQL 与 Redis 由外部�
 - 外部数据库 / 缓存的备份责任由托管方承担；本仓库仅保留 `api-storage` 上传卷，仍需独立备份。
 - 常驻服务使用 `restart: unless-stopped`，但仍需外部监控。
 
-部署和恢复步骤见 [部署与备份运行手册](./08-deployment-runbook.md)。
+部署和恢复步骤见 [部署与备份运行手册](../../04-operations/runbook/01-deployment-and-backup.md)。
 
 ## 主要欠账
 
