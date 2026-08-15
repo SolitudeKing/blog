@@ -73,14 +73,10 @@ func (s *TopicService) List() ([]TopicItem, error) {
 	if s.db != nil {
 		var items []TopicItem
 		if err := s.db.Table("topics").
-			Select(`topics.id, topics.name, topics.label, topics.slug, topics.description,
-				topics.cover_url, topics.sort_order, topics.created_at, topics.updated_at,
-				COUNT(articles.id) AS article_count`).
-			Joins(`LEFT JOIN articles ON articles.topic_id = topics.id
-				AND articles.status = 'published' AND articles.deleted_at IS NULL`).
+			Select(topicListSelectColumns).
+			Joins(joinPublishedArticlesOnTopic).
 			Where("topics.deleted_at IS NULL").
-			Group(`topics.id, topics.name, topics.label, topics.slug, topics.description,
-				topics.cover_url, topics.sort_order, topics.created_at, topics.updated_at`).
+			Group(topicListGroupColumns).
 			Order("topics.sort_order ASC, topics.created_at DESC, topics.id DESC").
 			Scan(&items).Error; err != nil {
 			return nil, apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -94,6 +90,22 @@ func (s *TopicService) List() ([]TopicItem, error) {
 	copy(items, s.items)
 	return items, nil
 }
+
+// topicListSelectColumns / topicListGroupColumns / joinPublishedArticlesOnTopic
+// 是 topic/list 与 dashboard/topic-stats 共用的 SELECT / JOIN 条件。
+// 任何字段重命名或 join 条件调整都必须同时修改 dashboard.fillTopicStats，
+// 避免 article_count 在两侧出现差异。
+const topicListSelectColumns = `topics.id, topics.name, topics.label, topics.slug, topics.description,
+	topics.cover_url, topics.sort_order, topics.created_at, topics.updated_at,
+	COUNT(articles.id) AS article_count`
+
+const topicListGroupColumns = `topics.id, topics.name, topics.label, topics.slug, topics.description,
+	topics.cover_url, topics.sort_order, topics.created_at, topics.updated_at`
+
+// joinPublishedArticlesOnTopic 只统计已发布且未删除的文章计数。
+// Article 表上 deleted_at 由 gorm.DeletedAt 维护（gorm 默认名），保持原行为。
+const joinPublishedArticlesOnTopic = `LEFT JOIN articles ON articles.topic_id = topics.id
+	AND articles.status = 'published' AND articles.deleted_at IS NULL`
 
 func (s *TopicService) Create(req TopicSaveRequest) (TopicItem, error) {
 	req, err := normalizeTopicSaveRequest(req)
