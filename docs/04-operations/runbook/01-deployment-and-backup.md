@@ -56,7 +56,8 @@ REDIS_TLS=false
 1. 在 `cp .env.example .env` 之后立刻设置 `ADMIN_PASSWORD=<强口令>`，至少 12 位、含大小写字母与数字。
 2. 启动后用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录 `/admin/login`。
 3. **首次登录后立即在管理后台修改密码**——这一步在生产中无任何强制约束，依赖人工执行；轮换步骤见 [runbook/02-secret-rotation.md](./02-secret-rotation.md)。
-4. 若遗忘了 owner 密码且无法登录，唯一恢复路径是直接修改 `users` 表的 `password_hash`（应用启动时不会重建 owner）。
+4. 媒体走 S3（详见 §10）；owner 在后台改密不影响已上传对象的公开 URL（公开 URL 走 `STORAGE_S3_PUBLIC_URL`，与签名密钥无关）。
+5. 若遗忘了 owner 密码且无法登录，唯一恢复路径是直接修改 `users` 表的 `password_hash`（应用启动时不会重建 owner）。
 
 > 单一 owner 账号是当前设计约束：没有"忘记密码"邮件通道，没有自助注册，所有管理操作都走这一个账号。后续若引入多管理员或邀请流程，会作为 P1 在 `reviews/` 跟踪。
 
@@ -122,7 +123,7 @@ MySQL / Redis 均由外部托管服务提供，**备份责任由托管方承担*
 - 与托管方约定自动备份频率与保留窗口（建议每日全量 + 短期 binlog/PITR）。
 - 备份恢复演练每季度至少一次，结果记入运维记录。
 - 手动导出辅助：本机安装 `mysqldump` / `redis-cli` 后，从 `.env` 读取连接信息即可对外部实例做一次性导出。
-- 上传文件：`api-storage` 命名卷仍由本仓库持有，请额外配置卷或对象存储备份（参考 §7）。
+- 上传文件：生产走 S3 / MinIO（§10），不再依赖 `api-storage` 命名卷；该卷仅在开发或临时回退到 local 驱动时使用。
 
 ### 恢复流程
 
@@ -143,22 +144,86 @@ sh deploy/scripts/healthcheck.sh
 | --- | --- | --- |
 | MySQL | **外部托管实例** | 托管方（PITR / 快照 / 异地副本） |
 | Redis | **外部托管实例** | 托管方；本仓库仅作为可重建缓存，不作为业务事实来源 |
-| 上传文件 | `api-storage` volume（容器内 `/app/storage/uploads`；Docker 主机位于 `/var/lib/docker/volumes/<project>_api-storage/_data/`） | **本仓库负责**：需补充独立备份（与外部数据库的恢复点无强对应关系；丢失后通过内容运营恢复） |
+| 上传文件 | **外部 S3 / MinIO**：`STORAGE_S3_ENDPOINT` / `STORAGE_S3_BUCKET` / `STORAGE_S3_PUBLIC_URL` 在 `deploy/.env.production` 配齐；S3 凭据轮换见 [runbook/02-secret-rotation.md §5](./02-secret-rotation.md#5-storage_s3_access_key--storage_s3_secret_key) | **托管方**（与 MySQL 同口径） |
 | 容器日志 | Docker `json-file` | 单文件 10 MB，最多 5 个文件 |
 
-Compose 使用 `restart: unless-stopped`。部署机仍需监控磁盘、上传卷备份结果、证书、容器健康和恢复演练时间。
+> 生产环境**不要**依赖 `api-storage` 命名卷。该卷在 `STORAGE_DRIVER=local` 或 `STORAGE_S3_*` 缺失时才会被实际写入；保留它是为了本地开发与紧急回退方便，**生产部署中应当是空的**。如果发现该卷在生产中占用磁盘，先确认 `STORAGE_DRIVER=s3` 与全部 `STORAGE_S3_*` 已生效，再 `docker volume rm <project>_api-storage`。
+
+Compose 使用 `restart: unless-stopped`。部署机仍需监控磁盘、S3 桶配额 / 访问日志、证书、容器健康和恢复演练时间。
 
 ## 8. 回滚原则
 
 - 应用回滚前确认新版本是否已执行不可逆数据变更。
-- 不直接删除命名卷解决启动问题。
-- 数据恢复前保存当前数据库与上传卷快照。
-- 回滚完成后核对三专题、文章数量、媒体引用、站点设置、RSS 和 sitemap。
+- 不直接删除命名卷解决启动问题；S3 模式下命名卷本来就是空的。
+- 数据恢复前保存当前数据库与 S3 桶的访问凭据快照（`STORAGE_S3_*` 在 `.env` 中的版本）。
+- 回滚完成后核对三专题、文章数量、媒体引用（按公开 URL 抽查几张图）、站点设置、RSS 和 sitemap。
 
 ## 9. 后续 P1（不在本仓库持有）
 
 - `ensureDatabase` 创建数据库权限：当前应用启动会执行 `CREATE DATABASE IF NOT EXISTS`。若托管账号无 `CREATE` 权限，请先在托管方建库；后续将引入 `MYSQL_SKIP_CREATE_DB` 开关作为代码层补项。
 - TLS 自定义名字：当前仅支持内置 `true` / `skip-verify`；自定义 `tls.Config`（客户端证书 / 自定义 CA 池）作为后续 P1。
 - 显式迁移版本：当前 `database.go` 使用 GORM AutoMigrate，建议逐步迁移到版本化迁移工具（golang-migrate 等）。
-- 上传卷 `api-storage` 备份脚本：当前由运维侧自行备份卷内容，仓库内未提供脚本；后续可加 `deploy/scripts/backup-uploads.sh`。
+- S3 健康检查纳入 `/healthz`：当前 `health_handler.go` 只检查 MySQL / Redis，S3 桶不可达时 healthcheck 仍会通过；后续加 `HeadBucket` 探针。
 - 资源限制与编排：当前 `docker-compose.yml` 未声明 `deploy.resources` / `security_opt`，仅给 `api` 显式了 `user: 10001:10001`；进一步在部署环境规格明确后再评估。
+
+## 10. S3 / 对象存储运维
+
+生产上传路径走 S3 / MinIO；`api-storage` 命名卷在 S3 模式下不被写入。
+
+### 10.1 桶存在性与权限
+
+应用启动时会调用 `BucketExists`（`server/internal/storage/factory.go`），失败立即终止启动。常见原因：
+
+- 桶未在 MinIO / S3 托管方先建好；`STORAGE_S3_BUCKET` 与托管方桶名不一致。
+- access key 缺少 `s3:ListBucket` / `s3:GetObject` / `s3:PutObject` / `s3:DeleteObject` 中至少前 3 项。
+- `STORAGE_S3_ENDPOINT` 协议写错（`http` vs `https`），或者 endpoint 写成了管理控制台地址而非 API 地址。
+- 桶 region 与 `STORAGE_S3_REGION` 不一致（MinIO 通常忽略 region，但 AWS S3 会强制校验）。
+
+### 10.2 公开 URL 与签名 URL 的差异
+
+- `STORAGE_S3_ENDPOINT`：后端写入 / 删除 / 列出对象用的 API 地址。**不要**把它配到 `STORAGE_S3_PUBLIC_URL`。
+- `STORAGE_S3_PUBLIC_URL`：浏览器直拉的只读 URL，**必须**含 `/bucket` 路径（如 `https://cdn.example.com/blog`）。后端在生成图片 `<img src>` 时填的就是这个值。
+
+公开 URL 通常通过 CDN（Cloudflare / 七牛 / 阿里云 CDN）走，可以加缓存与图片处理；本仓库不强制 CDN，但 `STORAGE_S3_PUBLIC_URL` 直接指向 MinIO 公开桶也能用。
+
+桶策略需要允许匿名 `s3:GetObject`；否则浏览器会拿到 403 / `AccessDenied`。
+
+### 10.3 MinIO 自签名证书
+
+`STORAGE_S3_USE_SSL=true` 但 endpoint 证书是自签的：
+
+- 临时方案：把 `STORAGE_S3_USE_SSL` 改为 `false`，或换受信证书（Let's Encrypt 等）。
+- 根治：自定义 CA 池支持——当前实现**不支持**在 `.env` 里配置额外 CA 路径（详见 §9 TLS 自定义名字 P1）。
+
+基础镜像已经预装 `ca-certificates`（见 `server/Dockerfile`），所以使用受信 CA 签发的证书不会出 `x509: certificate signed by unknown authority`；如果仍报，先 `docker compose build --no-cache api` 拉取新基础镜像。
+
+### 10.4 凭据轮换
+
+明确指向 [runbook/02-secret-rotation.md §5](./02-secret-rotation.md#5-storage_s3_access_key--storage_s3_secret_key)。注意：
+
+- 旧 AccessKey 在 S3 模式下**不要**立即删除：保留 24 小时供仍在跑旧实例的容器完成最后一次上传。
+- 轮换期间已分发的公开 URL 仍可访问（对象 URL 与 AccessKey 无关），所以**轮换 S3 凭据不需要批量改 HTML**。
+
+### 10.5 监控与排错
+
+```bash
+# 拉取应用最近 5 分钟日志，过滤 S3 相关报错
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml logs --since=5m api \
+  | grep -iE 's3|presign|putobject|getobject|no such bucket|access denied|signaturedoesnotmatch'
+```
+
+更深一步可在 MinIO 控制台 / CloudWatch 看桶的请求日志（按 `s3:GetObject` / `s3:PutObject` 状态码筛 4xx / 5xx）。
+
+### 10.6 紧急回退到 local 驱动
+
+如果 S3 在短期内无法恢复（证书过期 / 桶被误删 / 凭据被吊销），可以临时把 `STORAGE_DRIVER` 切回 `local`：
+
+```bash
+# 1. 编辑 deploy/.env.production：STORAGE_DRIVER=local
+# 2. api-storage 卷会立即接管；旧上传对象因为留在 S3 上而无法访问，
+#    本地驱动只接管"切换之后的"上传。
+# 3. 滚动重启 api。
+# 4. 恢复 S3 后切回 s3 即可，期间上传的新文件可由脚本迁回（仓库暂不提供迁回脚本）。
+```
+
+切回 `local` 是临时手段，**不是**备份策略；切回后请同步通知所有依赖"媒体走 S3 URL"的运营与第三方集成。

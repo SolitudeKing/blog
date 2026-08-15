@@ -74,6 +74,10 @@ sudo timedatectl set-timezone Asia/Shanghai
 - bucket：在托管方手工建好（如 `blog`）
 - 一对 access key / secret key
 - 记录：`STORAGE_S3_ENDPOINT`（`https://host:port`）/ `STORAGE_S3_BUCKET` / `STORAGE_S3_REGION` / `STORAGE_S3_USE_SSL` / `STORAGE_S3_PUBLIC_URL`（浏览器拉取对象的 URL，**必须含 `/bucket` 路径**，如 `https://cdn.example.com/blog`）
+- **桶策略最小集**：access key 至少需要 `s3:GetObject` / `s3:PutObject` / `s3:DeleteObject` / `s3:ListBucket`；桶本身需允许匿名 `s3:GetObject`，否则 `STORAGE_S3_PUBLIC_URL` 会被浏览器 403 拒绝。
+- **PUBLIC_URL 与 ENDPOINT 的区别**：`STORAGE_S3_ENDPOINT` 是后端写入 / 删除 / 签名用的 API 地址；`STORAGE_S3_PUBLIC_URL` 是浏览器只读用的公开 URL。**不要**把两者填成同一个值。
+
+S3 桶的运维细节（自签证书、凭据轮换、紧急回退到 local 驱动）见 [`01-deployment-and-backup.md` §10](./01-deployment-and-backup.md)。
 
 ### 4.4 边缘代理
 
@@ -189,6 +193,7 @@ docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml lo
 - 浏览器打开 `https://<域名>/`（或经过边缘代理后的 URL）应看到首页。
 - `/admin/login` 用 `admin` + §6 生成的 `ADMIN_PASSWORD` 登录成功。
 - 后台做一次"新建公告 + 上传一张图"冒烟，确认 S3 凭据有效。
+- 在媒体管理里点开刚上传图片的"复制 URL"或直接访问 `STORAGE_S3_PUBLIC_URL/<key>`，浏览器能直接看到图片（**不要**出现 403 / 404 / `AccessDenied`）。如果返回 403，说明桶策略没有允许匿名 `s3:GetObject`（回到 §4.3）。
 
 ## 11. 首次登录后立即改管理员密码
 
@@ -214,7 +219,7 @@ docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up
 git checkout <previous-tag>
 docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
 
-# 看卷使用情况（上传文件）
+# 看卷使用情况（生产 S3 模式下应为空；如非空说明 STORAGE_DRIVER 没切到 s3）
 docker system df -v | grep api-storage
 
 # 备份当前 .env
@@ -229,16 +234,20 @@ cp deploy/.env.production deploy/.env.production.bak.$(date +%Y%m%d-%H%M%S)
 | 容器 healthy 但 `curl /healthz` 返回 503 | DB 抖动；按 [`01-deployment-and-backup.md` §4](./01-deployment-and-backup.md) "健康检查"段诊断 |
 | Nginx 502 + `docker compose restart api` 后仍 502 | 不应再发生：nginx 现在每次新建连接都重新解析 `api` 域名；若仍出现，看 `docker compose logs nginx | grep "no live upstreams"` |
 | 上传图片失败 + 日志 `x509: certificate signed by unknown authority` | MinIO 启用了 TLS 但 api 容器缺 CA；先 `docker compose build --no-cache api` 重打镜像（基础镜像已带 `ca-certificates`） |
+| 上传图片失败 + 日志 `SignatureDoesNotMatch` / `403 Forbidden` | `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY` 与 MinIO 控制台不一致（轮换后未重启，或粘贴时多了换行 / 空格）；回到 §7 重新填值并 `--force-recreate api` |
+| 上传图片失败 + 日志 `NoSuchBucket` | 桶没在托管方先建好，或 `STORAGE_S3_BUCKET` 拼写错；回到 §4.3 |
+| 上传图能写入 S3 但浏览器访问公开 URL 返回 403 | 桶策略没有允许匿名 `s3:GetObject`；在 MinIO 控制台把桶的匿名访问策略改为 `download` |
 | 容器启动后立即退出，日志 `permission denied` on `/app/storage/uploads` | 旧版 `api-storage` 卷是 root 拥有的，UID 10001 写不进去；执行 `docker compose run --rm -u 0 api chown -R 10001:10001 /app/storage/uploads` |
-| AutoMigrate 没有日志 | 启动在更早阶段失败；`docker compose logs api | head -50` 排查，多数是 MySQL/Redis 不可达 |
+| AutoMigrate 没有日志 | 启动在更早阶段失败；`docker compose logs api | head -50` 排查，多数是 MySQL/Redis 不可达；如日志出现 `NoSuchBucket` / `InvalidAccessKeyId` 等，则根因在 §7 的 S3 凭据 |
 | 健康检查全绿但页面 502 | 检查边缘代理是否正确转发到本机 80；`docker compose exec nginx wget -qO- http://api:8080/healthz` 看 nginx 容器能否解析 api |
 
 ## 14. 安全与合规须知
 
 - **不要把含真实凭据的 `deploy/.env.production` 提交到 git**。本仓库的 `deploy/.env.production` 是占位符模板（已纳入版本库），运维应在仓库根 `.gitignore` 排除已填值的本地副本（`*.local` 已忽略）；或者直接编辑 `deploy/.env.production` 然后不提交该文件变更。
 - **定期轮换密钥**：见 [`02-secret-rotation.md`](./02-secret-rotation.md)。建议每 90 天一次。
-- **上传卷 `api-storage` 备份由本仓库负责**，需运维侧另外配置（详见 [`01-deployment-and-backup.md` §7](./01-deployment-and-backup.md)）。
+- **生产无 `api-storage` 卷依赖**：S3 bucket 由托管方按 SLA 备份；轮换见 [`01-deployment-and-backup.md` §10.4](./01-deployment-and-backup.md)。**不要**为 `api-storage` 卷配置任何异地备份脚本——生产模式下它是空的，备份它只会浪费磁盘。
 - **数据库与对象存储的备份责任在托管方**——快照、PITR、保留周期等由托管方按 SLA 提供。
+- **公开读桶的安全边界**：若 S3 桶要同时承担公开读与私有写，不要把所有文件都放在一个 prefix 下；使用独立 prefix / bucket 隔离，避免误把私有文件暴露在 `STORAGE_S3_PUBLIC_URL` 下。
 - **单 owner 账号**是当前设计约束，没有"忘记密码"邮件通道，所有管理操作都走这一个 owner；后续若引入多管理员或邀请流程，会在 `reviews/` 跟踪。
 
 ## 15. 延伸阅读
