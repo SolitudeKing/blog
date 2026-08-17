@@ -152,8 +152,8 @@
     <section v-if="topicLinks.length" class="home-section home-section--tight" aria-labelledby="topics-title">
       <div class="home-topics">
         <div class="home-topics__intro">
-          <span class="home-kicker">Topics</span>
-          <div id="topics-title" role="heading" aria-level="2">从这些专题进入</div>
+          <span class="home-kicker">{{ homeContent.home_topics_kicker }}</span>
+          <div id="topics-title" role="heading" aria-level="2">{{ homeContent.home_topics_heading }}</div>
         </div>
         <nav class="home-topics__links" aria-label="文章专题">
           <RouterLink
@@ -172,12 +172,12 @@
     <section v-if="activeNotice" class="home-section" aria-labelledby="notice-title">
       <div class="home-notice mist-glass--subtle">
         <div>
-          <span class="home-kicker">Site notice</span>
+          <span class="home-kicker">{{ homeContent.home_notice_kicker }}</span>
           <div id="notice-title" role="heading" aria-level="2">{{ activeNotice.title }}</div>
           <p>{{ activeNotice.content }}</p>
         </div>
         <RouterLink class="mist-button mist-button--secondary" to="/archives">
-          继续阅读
+          {{ homeContent.home_notice_action_label }}
         </RouterLink>
       </div>
     </section>

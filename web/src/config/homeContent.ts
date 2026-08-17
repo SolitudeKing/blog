@@ -87,6 +87,30 @@ export const homeContentFields: ReadonlyArray<HomeContentField> = [
     hint: '没有任何已发布文章时显示的标题；最多 64 字。',
     max: 64,
   },
+  {
+    key: 'home_topics_kicker',
+    label: '专题目录小标',
+    hint: '"Topics" 段上方小标；最多 32 字。',
+    max: 32,
+  },
+  {
+    key: 'home_topics_heading',
+    label: '专题目录标题',
+    hint: '"Topics" 段标题；最多 64 字。',
+    max: 64,
+  },
+  {
+    key: 'home_notice_kicker',
+    label: '站点公告小标',
+    hint: '启用中的 Site Notice 卡片上方小标；最多 32 字。',
+    max: 32,
+  },
+  {
+    key: 'home_notice_action_label',
+    label: '"继续阅读"按钮',
+    hint: 'Site Notice 卡片上的跳转按钮；最多 16 字。',
+    max: 16,
+  },
 ]
 
 export const defaultHomeContent: Readonly<HomeContent> = {
@@ -102,6 +126,10 @@ export const defaultHomeContent: Readonly<HomeContent> = {
   home_latest_heading: '最近发布的博客',
   home_latest_view_all_label: '查看全部归档',
   home_latest_empty_title: '暂时还没有发布文章',
+  home_topics_kicker: 'Topics',
+  home_topics_heading: '从这些专题进入',
+  home_notice_kicker: 'Site notice',
+  home_notice_action_label: '继续阅读',
 }
 
 export function createDefaultHomeContent(): HomeContent {
@@ -141,6 +169,13 @@ export function normalizeHomeContent(value?: HomeContentInput): HomeContent {
     home_latest_empty_title: resolveText(
       value?.home_latest_empty_title,
       defaultHomeContent.home_latest_empty_title,
+    ),
+    home_topics_kicker: resolveText(value?.home_topics_kicker, defaultHomeContent.home_topics_kicker),
+    home_topics_heading: resolveText(value?.home_topics_heading, defaultHomeContent.home_topics_heading),
+    home_notice_kicker: resolveText(value?.home_notice_kicker, defaultHomeContent.home_notice_kicker),
+    home_notice_action_label: resolveText(
+      value?.home_notice_action_label,
+      defaultHomeContent.home_notice_action_label,
     ),
   }
 }
