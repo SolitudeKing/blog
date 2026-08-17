@@ -2,9 +2,20 @@
   <section class="search-page" aria-labelledby="search-title">
     <header class="search-hero">
       <div class="search-hero__copy">
-        <p class="search-kicker">Search the current</p>
-        <div id="search-title" role="heading" aria-level="1">打捞一段想法</div>
-        <p>输入一个词，沿着标题、摘要、正文、专题与标签寻找。也可以从常用航标开始，看看它会把你带去哪里。</p>
+        <p class="search-kicker">{{ searchContent.search_kicker }}</p>
+        <div
+          id="search-title"
+          role="heading"
+          aria-level="1"
+          :title="searchContent.search_heading"
+        >
+          <template v-if="searchTitleLines">
+            <span>{{ searchTitleLines.first }}</span>
+            <span class="search-title__line">{{ searchTitleLines.second }}</span>
+          </template>
+          <template v-else>{{ searchContent.search_heading }}</template>
+        </div>
+        <p>{{ searchContent.search_intro }}</p>
       </div>
 
       <aside class="search-hero__aside" :aria-label="searchOverview">
@@ -33,7 +44,7 @@
             type="search"
             name="q"
             autocomplete="off"
-            placeholder="例如：设计系统、写作、Vue……"
+            :placeholder="searchContent.search_placeholder"
             aria-describedby="search-hint search-status"
             aria-controls="search-results"
           />
@@ -53,7 +64,7 @@
       </form>
 
       <div class="search-suggestions" role="group" aria-label="常用搜索词">
-        <span class="search-suggestions__label">试试这些航标</span>
+        <span class="search-suggestions__label">{{ searchContent.search_suggestion_label }}</span>
         <button
           v-for="suggestion in suggestions"
           :key="suggestion"
@@ -115,8 +126,8 @@
 
         <BaseEmpty
           v-else-if="searched"
-          title="这片水域还没有记录"
-          description="可以尝试缩短关键词，或从“设计”“代码”“写作”这些航标重新出发。"
+          :title="searchContent.search_empty_title"
+          :description="searchContent.search_empty_description"
         >
           <template #icon>
             <SvgIcon name="search-minus" />
@@ -164,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BasePagination from '@/components/base/BasePagination.vue'
@@ -172,7 +183,15 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { searchArticles } from '@/api/modules/article'
+import { getSearchSuggestions } from '@/api/modules/taxonomy'
+import {
+  parseSearchSuggestionFallbacks,
+  resolveLobbySearchContent,
+} from '@/config/searchContent'
+import { useSettingStore } from '@/stores/setting'
 import type { ArticleSearchItem } from '@/types/article'
+import type { SuggestionItem } from '@/types/taxonomy'
+import { splitHeroTitle } from '@/utils/heroTitle'
 
 interface HighlightPart {
   text: string
@@ -185,7 +204,6 @@ interface SearchMapItem {
   width: number
 }
 
-const suggestions = ['设计', '代码', '写作', 'Vue', '前端']
 const fieldLabels: Record<string, string> = {
   title: '标题',
   summary: '摘要',
@@ -202,6 +220,20 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
 })
 const route = useRoute()
 const router = useRouter()
+const setting = useSettingStore()
+const searchContent = computed(() => resolveLobbySearchContent(setting.lobby))
+const searchTitleLines = computed(() => splitHeroTitle(searchContent.value.search_heading))
+// 航标由服务端按 UTC 日期从专题与标签中抽样；接口失败或为空时回退到
+// search_content.search_suggestion_fallbacks 配置的兜底词。
+const suggestionItems = ref<SuggestionItem[]>([])
+const fallbackSuggestions = computed(() =>
+  parseSearchSuggestionFallbacks(searchContent.value),
+)
+const suggestions = computed(() =>
+  suggestionItems.value.length
+    ? suggestionItems.value.map((item) => item.text)
+    : fallbackSuggestions.value,
+)
 const inputRef = ref<HTMLInputElement | null>(null)
 const keyword = ref('')
 const results = ref<ArticleSearchItem[]>([])
@@ -405,6 +437,16 @@ function highlight(value: string): HighlightPart[] {
   }
   return parts.length ? parts : [{ text: value, hit: false }]
 }
+
+onMounted(() => {
+  getSearchSuggestions()
+    .then((items) => {
+      suggestionItems.value = items
+    })
+    .catch(() => {
+      // 静默失败：suggestions 会回退到 search_content 的兜底词。
+    })
+})
 
 watch(
   () => route.query.q,

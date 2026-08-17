@@ -34,7 +34,8 @@
 }
 
 .about-hero__copy [role='heading'][aria-level='1'] {
-  max-width: 11ch;
+  width: 100%;
+  padding-inline: var(--space-4);
   margin: var(--space-4) 0 var(--space-5);
   color: var(--text-primary);
   font-family: var(--font-serif);
@@ -43,6 +44,18 @@
   letter-spacing: -0.055em;
   line-height: 1.02;
   overflow-wrap: anywhere;
+}
+
+// 两行错落：含分隔符的标题从首个分隔符切为两行，第二行缩进 1ch 形成错落；
+// 第二行受 max-width 约束，超出部分隐藏并以省略号收尾；原生 title 属性提供
+// 鼠标 hover 时浏览器气泡展示完整文案。
+.about-hero__copy .about-title__line {
+  display: block;
+  margin-left: 1ch;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .about-hero__lead {
@@ -156,7 +169,8 @@
 }
 
 .about-principles__intro [role='heading'][aria-level='2'] {
-  max-width: 13ch;
+  width: 100%;
+  padding-inline: var(--space-3);
   margin: var(--space-3) 0 var(--space-4);
   color: var(--text-primary);
   font-family: var(--font-serif);
@@ -164,6 +178,18 @@
   font-weight: 400;
   letter-spacing: -0.035em;
   line-height: var(--leading-tight);
+}
+
+// 两行错落：含分隔符的标题从首个分隔符切为两行，第二行缩进 1ch 形成错落；
+// 第二行受 max-width 约束，超出部分隐藏并以省略号收尾；原生 title 属性提供
+// 鼠标 hover 时浏览器气泡展示完整文案。
+.about-principles__intro .about-principles-title__line {
+  display: block;
+  margin-left: 1ch;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .about-principles__intro > p:last-child {
@@ -238,7 +264,8 @@
 }
 
 .about-contact [role='heading'][aria-level='2'] {
-  max-width: 16ch;
+  width: 100%;
+  padding-inline: var(--space-3);
   margin: var(--space-3) 0 var(--space-4);
   color: var(--text-primary);
   font-family: var(--font-serif);
@@ -246,6 +273,18 @@
   font-weight: 400;
   letter-spacing: -0.035em;
   line-height: var(--leading-tight);
+}
+
+// 两行错落：含分隔符的标题从首个分隔符切为两行，第二行缩进 1ch 形成错落；
+// 第二行受 max-width 约束，超出部分隐藏并以省略号收尾；原生 title 属性提供
+// 鼠标 hover 时浏览器气泡展示完整文案。
+.about-contact .about-contact-title__line {
+  display: block;
+  margin-left: 1ch;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .about-contact > div > p:last-child {

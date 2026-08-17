@@ -2,10 +2,21 @@
   <section class="archives-page" aria-labelledby="archive-title" :aria-busy="loading || loadingMore">
     <header class="archive-hero">
       <div class="archive-hero__copy">
-        <p class="archive-kicker">Archive · {{ archiveRange }}</p>
-        <div id="archive-title" role="heading" aria-level="1">所有足迹，都有刻度</div>
+        <p class="archive-kicker">{{ archiveContent.archive_kicker }} · {{ archiveRange }}</p>
+        <div
+          id="archive-title"
+          role="heading"
+          aria-level="1"
+          :title="archiveContent.archive_heading"
+        >
+          <template v-if="archiveTitleLines">
+            <span>{{ archiveTitleLines.first }}</span>
+            <span class="archive-title__line">{{ archiveTitleLines.second }}</span>
+          </template>
+          <template v-else>{{ archiveContent.archive_heading }}</template>
+        </div>
         <p>
-          从最近一次发布向过去回望。这里按年份与月份整理已经公开的文章，让每一段记录都能被重新抵达。
+          {{ archiveContent.archive_intro }}
         </p>
       </div>
 
@@ -50,8 +61,8 @@
 
       <BaseEmpty
         v-else-if="!articles.length && !loading && !error"
-        title="还没有归档内容"
-        description="发布文章后会按年/月自动汇总到这里。"
+        :title="archiveContent.archive_empty_title"
+        :description="archiveContent.archive_empty_description"
       >
         <template #icon>
           <SvgIcon name="book-open" />
@@ -121,7 +132,10 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import SvgIcon from '@/components/base/SvgIcon.vue'
 import { getArticleList } from '@/api/modules/article'
+import { resolveLobbyArchiveContent } from '@/config/archiveContent'
+import { useSettingStore } from '@/stores/setting'
 import type { ArticleListItem } from '@/types/article'
+import { splitHeroTitle } from '@/utils/heroTitle'
 
 interface ArchiveEntry {
   id: number
@@ -149,6 +163,9 @@ interface ArchiveYear {
 
 const chineseMonths = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
 const englishMonthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' })
+const setting = useSettingStore()
+const archiveContent = computed(() => resolveLobbyArchiveContent(setting.lobby))
+const archiveTitleLines = computed(() => splitHeroTitle(archiveContent.value.archive_heading))
 const articles = ref<ArchiveEntry[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)

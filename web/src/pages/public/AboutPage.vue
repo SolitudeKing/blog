@@ -2,14 +2,27 @@
   <section class="about-page" aria-labelledby="about-title">
     <header class="about-hero">
       <div class="about-hero__copy">
-        <p class="about-kicker">About the keeper</p>
-        <div id="about-title" role="heading" aria-level="1">你好，我是 {{ author }}</div>
-        <p class="about-hero__lead">{{ essay }}</p>
-        <p class="about-hero__signature">{{ siteName }} 的维护者</p>
+        <p class="about-kicker">{{ aboutContent.about_kicker }}</p>
+        <div
+          id="about-title"
+          role="heading"
+          aria-level="1"
+          :title="aboutContent.about_heading"
+        >
+          <template v-if="aboutTitleLines">
+            <span>{{ aboutTitleLines.first }}</span>
+            <span class="about-title__line">{{ aboutTitleLines.second }}</span>
+          </template>
+          <template v-else>{{ aboutContent.about_heading }}</template>
+        </div>
+        <p class="about-hero__lead">{{ aboutContent.about_lead }}</p>
+        <p class="about-hero__signature">{{ aboutContent.about_signature }}</p>
         <div class="about-hero__actions">
-          <a class="mist-button mist-button--lg" href="#contact" @click="focusContact">和我联系</a>
+          <a class="mist-button mist-button--lg" href="#contact" @click="focusContact">
+            {{ aboutContent.about_contact_label }}
+          </a>
           <RouterLink class="mist-button mist-button--secondary mist-button--lg" to="/archives">
-            阅读文章
+            {{ aboutContent.about_reading_label }}
           </RouterLink>
         </div>
       </div>
@@ -19,8 +32,8 @@
           <SvgIcon class="about-portrait__field" name="about-field" />
           <span class="about-portrait__monogram" aria-hidden="true">{{ authorInitial }}</span>
           <figcaption :id="portraitCaptionId" class="about-portrait__caption">
-            <span>{{ author }}</span>
-            <span>{{ siteName }}</span>
+            <span>{{ aboutContent.about_portrait_line1 }}</span>
+            <span>{{ aboutContent.about_portrait_line2 }}</span>
           </figcaption>
         </figure>
       </div>
@@ -29,9 +42,20 @@
     <section class="about-section" aria-labelledby="principles-title">
       <div class="about-principles">
         <header class="about-principles__intro">
-          <p class="about-kicker">Publishing principles</p>
-          <div id="principles-title" role="heading" aria-level="2">让内容按自己的节奏生长</div>
-          <p>这些原则约束这个博客的设计与维护方式，也帮助阅读始终停留在内容本身。</p>
+          <p class="about-kicker">{{ aboutContent.about_principles_kicker }}</p>
+          <div
+            id="principles-title"
+            role="heading"
+            aria-level="2"
+            :title="aboutContent.about_principles_heading"
+          >
+            <template v-if="aboutPrinciplesTitleLines">
+              <span>{{ aboutPrinciplesTitleLines.first }}</span>
+              <span class="about-principles-title__line">{{ aboutPrinciplesTitleLines.second }}</span>
+            </template>
+            <template v-else>{{ aboutContent.about_principles_heading }}</template>
+          </div>
+          <p>{{ aboutContent.about_principles_intro }}</p>
         </header>
 
         <ol class="about-principle-list">
@@ -54,15 +78,24 @@
     >
       <div class="about-contact mist-glass--strong">
         <div>
-          <p class="about-kicker">Say hello</p>
-          <div id="contact-title" role="heading" aria-level="2">
-            {{ socialEntries.length ? '在这些地方找到我' : '联系方式暂时停泊' }}
+          <p class="about-kicker">{{ aboutContent.about_contact_kicker }}</p>
+          <div
+            id="contact-title"
+            role="heading"
+            aria-level="2"
+            :title="aboutContactHeading"
+          >
+            <template v-if="aboutContactTitleLines">
+              <span>{{ aboutContactTitleLines.first }}</span>
+              <span class="about-contact-title__line">{{ aboutContactTitleLines.second }}</span>
+            </template>
+            <template v-else>{{ aboutContactHeading }}</template>
           </div>
           <p>
             {{
               socialEntries.length
-                ? '选择你习惯的平台，继续聊写作、技术或长期维护。'
-                : '站点尚未公开社交链接，你仍可以从归档继续阅读。'
+                ? aboutContent.about_contact_intro_with
+                : aboutContent.about_contact_intro_empty
             }}
           </p>
         </div>
@@ -81,7 +114,7 @@
         </nav>
 
         <RouterLink v-else class="mist-button mist-button--secondary mist-button--lg" to="/archives">
-          先读一篇文章
+          {{ aboutContent.about_contact_empty_cta }}
         </RouterLink>
       </div>
     </section>
@@ -92,37 +125,30 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import SvgIcon from '@/components/base/SvgIcon.vue'
+import { resolveAboutPrinciples, resolveLobbyAboutContent } from '@/config/aboutContent'
 import { useSettingStore } from '@/stores/setting'
+import { splitHeroTitle } from '@/utils/heroTitle'
 import { createSocialLinkEntries } from '@/utils/socialLinks'
 
-interface Principle {
-  title: string
-  description: string
-}
-
 const portraitCaptionId = 'about-portrait-caption'
-const principles: Principle[] = [
-  {
-    title: '内容先于装饰',
-    description: '排版、留白与动效都服务于理解；移除背景效果之后，文章仍然应该清楚而完整。',
-  },
-  {
-    title: '让系统承担复杂',
-    description: '主题、组件和状态保持稳定契约，把维护成本留在系统内部，而不是交给每一篇内容。',
-  },
-  {
-    title: '为长期阅读留白',
-    description: '不追逐每一次短暂变化，让归档、链接与文字在更长时间里仍然可以被重新找到。',
-  },
-]
 
 const setting = useSettingStore()
-const siteName = computed(() => setting.lobby?.site_name?.trim() || 'Solitude Blog')
-const author = computed(() => setting.lobby?.author?.trim() || 'Solitude King')
-const essay = computed(
-  () => setting.lobby?.essay?.trim() || '关于写作、技术与长期维护的个人记录。',
+const aboutContent = computed(() => resolveLobbyAboutContent(setting.lobby))
+const principles = computed(() => resolveAboutPrinciples(aboutContent.value))
+const aboutTitleLines = computed(() => splitHeroTitle(aboutContent.value.about_heading))
+const aboutPrinciplesTitleLines = computed(() =>
+  splitHeroTitle(aboutContent.value.about_principles_heading),
 )
-const authorInitial = computed(() => Array.from(author.value)[0]?.toUpperCase() || 'S')
+const aboutContactHeading = computed(() =>
+  socialEntries.value.length
+    ? aboutContent.value.about_contact_heading_with
+    : aboutContent.value.about_contact_heading_empty,
+)
+const aboutContactTitleLines = computed(() => splitHeroTitle(aboutContactHeading.value))
+const authorInitial = computed(() => {
+  const author = setting.lobby?.author?.trim() ?? ''
+  return author.charAt(0).toUpperCase() || 'S'
+})
 const socialEntries = computed(() => createSocialLinkEntries(setting.lobby?.social_links))
 
 function formatIndex(index: number) {

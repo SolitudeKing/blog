@@ -32,7 +32,8 @@
 }
 
 .archive-hero__copy [role='heading'][aria-level='1'] {
-  max-width: 10ch;
+  width: 100%;
+  padding-inline: var(--space-4);
   margin: var(--space-4) 0 var(--space-5);
   color: var(--text-primary);
   font-family: var(--font-serif);
@@ -40,6 +41,18 @@
   font-weight: 400;
   letter-spacing: -0.055em;
   line-height: 1;
+}
+
+// 两行错落：含分隔符的标题从首个分隔符切为两行，第二行缩进 1ch 形成错落；
+// 第二行受 max-width 约束，超出部分隐藏并以省略号收尾；原生 title 属性提供
+// 鼠标 hover 时浏览器气泡展示完整文案。
+.archive-hero__copy .archive-title__line {
+  display: block;
+  margin-left: 1ch;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .archive-hero__copy > p:last-child {
