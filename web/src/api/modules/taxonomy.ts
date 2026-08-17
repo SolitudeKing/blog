@@ -1,5 +1,5 @@
 import { request } from '@/api/http'
-import type { TagItem, TagPayload, TopicItem, TopicPayload } from '@/types/taxonomy'
+import type { SuggestionItem, TagItem, TagPayload, TopicItem, TopicPayload } from '@/types/taxonomy'
 
 export function getTopicList() {
   return request<TopicItem[]>({
@@ -58,5 +58,13 @@ export function deleteTag(id: number | string) {
   return request<{ id: string; deleted: boolean }>({
     method: 'DELETE',
     url: `tag/delete/${id}`,
+  })
+}
+
+// 每日搜索航标：服务端按 UTC 日期从专题与标签中确定性抽样。
+export function getSearchSuggestions() {
+  return request<SuggestionItem[]>({
+    method: 'GET',
+    url: 'search/suggestions',
   })
 }

@@ -36,3 +36,11 @@ export interface TagPayload {
   description: string
   color: string
 }
+
+// 每日搜索航标：由服务端按 UTC 日期从专题与标签中确定性抽样。
+export type SuggestionKind = 'topic' | 'tag'
+
+export interface SuggestionItem {
+  text: string
+  kind: SuggestionKind
+}
