@@ -63,7 +63,14 @@ REDIS_TLS=false
 
 ## 3. 展开并启动
 
-先检查最终配置：
+仓库提供两条等价路径，按运维场景二选一：
+
+| 路径 | 适用场景 | 启动命令 |
+| --- | --- | --- |
+| **制品挂载（默认）** | 日常升级，运行时镜像已构建 | 开发机执行 `.\deploy\scripts\deploy.ps1 -Host <user>@<host>`；服务器端 `docker compose --env-file .env -f deploy/docker-compose.runtime.yml up -d` |
+| **源码构建（回退）** | 紧急修复 / 运行时镜像缺失 | 服务器端 `docker compose --env-file .env -f deploy/docker-compose.yml up -d --build` |
+
+预检配置（任意一条路径都建议先做）：
 
 ```bash
 docker compose --env-file .env -f deploy/docker-compose.yml config --quiet
@@ -72,13 +79,9 @@ docker compose --env-file .env -f deploy/docker-compose.yml config --services
 
 第二条命令应仅输出 `api` 与 `nginx` 两个服务。如出现 `mysql` 或 `redis`，说明 Compose 仍包含旧服务定义，请检查 `deploy/docker-compose.yml` 是否已切到当前外部化版本。
 
-再启动服务：
-
-```bash
-docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
-```
-
 启动顺序：API 容器等待自身健康检查通过后启动 Nginx；API 直接通过 env 注入的外部地址连接 MySQL / Redis，**假设外部服务已就绪且网络可达**。宿主机的 API 调试端口（`APP_PORT`，默认 8080）仅绑定 `127.0.0.1`；外部流量只进入 Nginx。
+
+制品路径的细节（制品目录、scp / rsync、`-Fallback` 标志、何时重建运行时镜像、故障排查）见 [`03-artifact-based-deploy.md`](./03-artifact-based-deploy.md)。
 
 ## 4. 健康检查
 

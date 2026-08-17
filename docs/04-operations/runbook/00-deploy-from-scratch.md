@@ -156,6 +156,33 @@ docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml co
 - `config --quiet` 静默退出表示配置无语法错误。
 - `config --services` 应**仅**输出 `api` 与 `nginx`。如出现 `mysql` / `redis` 等其他服务，说明仓库还在旧版本或 `deploy/.env.production` 引用了不存在的变量——回到 §7 重新检查。
 
+## 8.5 构建运行时基础镜像（仅首次 / 升级时）
+
+仓库提供两条部署路径，**§9 第一次启动**用的是「源码构建」路径（`deploy/docker-compose.yml`），无需预构建镜像。
+
+后续**日常升级**应切到「制品挂载」路径（`deploy/docker-compose.runtime.yml`），后者依赖两套预构建的运行时镜像：
+
+```bash
+# API 运行时：alpine + ca-certificates + tzdata + util-linux + 非 root app 用户 + entrypoint
+docker build -t solitude-blog-api-runtime:1.0.0 -f server/Dockerfile.runtime server/
+
+# SPA 运行时：nginx:alpine + deploy/nginx/default.conf（默认 html 已被清空）
+docker build -t solitude-blog-nginx-runtime:1.0.0 -f web/Dockerfile.runtime .
+```
+
+什么时候需要重建运行时镜像：
+
+| 变更 | 是否重建？ |
+| --- | --- |
+| 升级 `alpine` / `nginx` 基础镜像 | 是 |
+| 给 api 镜像新增系统包（如 `curl`） | 是 |
+| 修改 `deploy/nginx/default.conf` | 是（nginx 运行时） |
+| 修改 `deploy/runtime/api-entrypoint.sh` | 是（api 运行时） |
+| 改 Go / Vue 源代码 | **否**，仅重建制品 |
+| 改 `.env` | **否**，仅 scp `.env` |
+
+升级镜像版本号后记得同步修改 `deploy/docker-compose.runtime.yml` 中对应的 `image:` tag。
+
 ## 9. 首次启动
 
 ```bash
@@ -209,14 +236,24 @@ docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml lo
 # 滚动重启 api（不影响数据）
 docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --no-deps --force-recreate api
 
-# 拉取新版本
+# 拉取新版本（默认路径：制品挂载，不重建镜像）
+# 开发机执行（前置条件：已 §8.5 构建好运行时镜像）：
+#   .\deploy\scripts\deploy.ps1 -Host <user>@<host>
+# 或 Linux / macOS：
+#   deploy/scripts/deploy.sh <user>@<host>
+# 脚本细节见 deploy/scripts/deploy.{ps1,sh} 与 docs/04-operations/runbook/03-artifact-based-deploy.md。
+
+# 拉取新版本（源码构建路径，仅用于紧急修复或运行时镜像缺失）
 cd /opt/solitude-blog
 git fetch
 git checkout <new-tag>
 docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
 
-# 紧急回滚到上一个 tag
+# 紧急回滚到上一个 tag（制品路径：重跑 deploy 脚本；源码路径：git checkout + up -d --build）
 git checkout <previous-tag>
+# 制品路径
+#   .\deploy\scripts\deploy.ps1 -Host <user>@<host>   # 上一 tag 的制品已在主机上
+# 源码路径
 docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
 
 # 看卷使用情况（生产 S3 模式下应为空；如非空说明 STORAGE_DRIVER 没切到 s3）
