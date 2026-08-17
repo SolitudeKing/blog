@@ -92,7 +92,7 @@ erDiagram
 | --- | --- | --- |
 | id | bigint unsigned | 主键 |
 | title | varchar(200) | 标题 |
-| slug | varchar(220) | 公开 URL，唯一 |
+| slug | varchar(220) | 公开 URL，唯一；对外契约限小写字母、数字与 `-` 分段，最长 120 字符（列宽 220 仅为存量兼容） |
 | summary | text | 摘要 |
 | content_md | longtext | Markdown 正文 |
 | content_html | longtext | 可选，异步渲染后的 HTML |
@@ -142,8 +142,8 @@ erDiagram
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | id | bigint unsigned | 主键 |
-| name | varchar(64) | 标签名 |
-| slug | varchar(80) | 唯一 slug |
+| name | varchar(80) | 标签名 |
+| slug | varchar(120) | 唯一 slug |
 | description | varchar(255) | 描述 |
 | color | varchar(32) | 展示颜色 |
 | created_at | datetime | 创建时间 |
@@ -541,7 +541,7 @@ DELETE article/delete/{id}
 GET    article/version-list/{id}
 ```
 
-文章列表过滤参数 `topic`、`tag` 均使用 slug；创建与更新请求使用 `topic_id` 关联专题，不再接受 `category_id`。发布、撤回与归档通过 `article/update/{id}` 修改 `status`，创建和更新会在同一事务中自动记录版本；当前只提供最近 20 条版本的只读列表，不提供独立发布、手动创建版本或恢复版本接口。公开与后台文章响应统一返回 `topic_id`，以及字段为 `topic` 的轻量引用 `{id,name,label,slug}`。
+文章列表过滤参数 `topic`、`tag` 均使用 slug；创建与更新请求使用 `topic_id` 关联专题，不再接受 `category_id`。发布、撤回与归档通过 `article/update/{id}` 修改 `status`，创建和更新会在同一事务中自动记录版本；当前只提供最近 20 条版本的只读列表，不提供独立发布、手动创建版本或恢复版本接口。公开与后台文章响应统一返回 `topic_id`，以及字段为 `topic` 的轻量引用 `{id,name,label,slug}`。文章 `slug` 必填、全局唯一，格式限小写字母、数字与 `-` 分段（`^[a-z0-9]+(-[a-z0-9]+)*$`），最长 120 字符，格式非法返回 `20002 invalid parameter`，重复返回 `30002 duplicate slug`；存量非法 slug 文章编辑其他字段时可不改 slug 直接保存，仅当 slug 发生变化时才执行格式校验。
 
 ### 专题与标签
 
@@ -570,7 +570,9 @@ DELETE tag/delete/{id}
 }
 ```
 
-`name`、`label`、`slug` 必填；`label` 最多 32 个 Unicode 字符，`slug` 全局唯一，`cover_url` 可为空，`sort_order` 默认为 `0`。`article_count` 是列表响应的聚合字段，不写入 `topics`。固定三个专题允许维护展示名称、说明、封面与排序，但修改其稳定 `label/slug` 或删除专题会返回 `30001 resource conflict`；其他专题删除前必须检查文章引用，存在引用时返回 `30004 referenced resource used`。
+`name`、`label`、`slug` 必填；`label` 最多 32 个 Unicode 字符，`slug` 全局唯一，格式限小写字母、数字与 `-` 分段（`^[a-z0-9]+(-[a-z0-9]+)*$`），最长 120 字符，格式非法返回 `20002 invalid parameter`，重复返回 `30002 duplicate slug`；`cover_url` 可为空，`sort_order` 默认为 `0`。`article_count` 是列表响应的聚合字段，不写入 `topics`。固定三个专题允许维护展示名称、说明、封面与排序，但修改其稳定 `label/slug` 或删除专题会返回 `30001 resource conflict`；其他专题删除前必须检查文章引用，存在引用时返回 `30004 referenced resource used`。
+
+标签的 `name`、`slug` 必填，`slug` 遵循与专题相同的格式、长度与唯一性规则，重复返回 `30002 duplicate slug`；`color` 使用 `#RGB` 或 `#RRGGBB` 格式。
 
 ### 媒体库
 

@@ -126,7 +126,7 @@
             <form v-if="activeDialog === 'topic'" class="taxonomy-form" :aria-busy="savingTopic" @submit.prevent="saveTopic">
               <BaseInput v-model="topicForm.name" label="专题名称" required />
               <BaseInput v-model="topicForm.label" label="Label" hint="用于文章卡片等紧凑位置的短标签" required />
-              <BaseInput v-model="topicForm.slug" label="Slug" required />
+              <BaseInput v-model="topicForm.slug" label="Slug" :error="topicSlugError" required />
               <div class="taxonomy-form__cover">
                 <div class="taxonomy-form__cover-field">
                   <BaseInput
@@ -156,7 +156,7 @@
 
             <form v-else class="taxonomy-form" :aria-busy="savingTag" @submit.prevent="saveTag">
               <BaseInput v-model="tagForm.name" label="名称" required />
-              <BaseInput v-model="tagForm.slug" label="Slug" required />
+              <BaseInput v-model="tagForm.slug" label="Slug" :error="tagSlugError" required />
               <BaseInput v-model="tagForm.color" label="颜色" hint="使用 #RGB 或 #RRGGBB 格式，例如 #5f8d62" :error="tagColorError" required />
               <BaseTextarea v-model="tagForm.description" label="描述" :rows="3" />
               <div class="taxonomy-form__actions">
@@ -244,6 +244,26 @@ const tagColorError = computed(() => {
   return ''
 })
 
+const slugFormatPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/
+const slugMaxLength = 120
+
+function slugError(value: string) {
+  const slug = value.trim()
+  if (!slug) {
+    return '' // 空值交给 required 与后端必填校验
+  }
+  if (!slugFormatPattern.test(slug)) {
+    return 'Slug 仅支持小写字母、数字与连字符（-）'
+  }
+  if (slug.length > slugMaxLength) {
+    return 'Slug 长度不能超过 120 字符'
+  }
+  return ''
+}
+
+const topicSlugError = computed(() => slugError(topicForm.slug))
+const tagSlugError = computed(() => slugError(tagForm.slug))
+
 onMounted(() => {
   loadAll()
 })
@@ -289,6 +309,10 @@ function onTopicCoverUpload(asset: AssetItem) {
 }
 
 async function saveTopic() {
+  if (topicSlugError.value) {
+    formError.value = topicSlugError.value
+    return
+  }
   savingTopic.value = true
   formError.value = ''
   try {
@@ -342,11 +366,16 @@ async function saveTag() {
     formError.value = tagColorError.value
     return
   }
+  if (tagSlugError.value) {
+    formError.value = tagSlugError.value
+    return
+  }
 
   savingTag.value = true
   try {
     const payload: TagPayload = {
       ...tagForm,
+      slug: tagForm.slug.trim(),
       color: tagForm.color.trim(),
     }
     if (editingTagId.value) {
@@ -511,7 +540,7 @@ function toSlug(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 }
 

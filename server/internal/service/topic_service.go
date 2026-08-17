@@ -112,13 +112,16 @@ func (s *TopicService) Create(req TopicSaveRequest) (TopicItem, error) {
 	if err != nil {
 		return TopicItem{}, err
 	}
+	if err := validateSlugFormat(req.Slug); err != nil {
+		return TopicItem{}, err
+	}
 	if s.db != nil {
 		var count int64
 		if err := s.db.Unscoped().Model(&model.Topic{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
 			return TopicItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		if count > 0 {
-			return TopicItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TopicItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 		row := model.Topic{
 			Name:        req.Name,
@@ -138,7 +141,7 @@ func (s *TopicService) Create(req TopicSaveRequest) (TopicItem, error) {
 	defer s.mu.Unlock()
 	for _, item := range s.items {
 		if item.Slug == req.Slug {
-			return TopicItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TopicItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 	}
 	now := time.Now().UTC()
@@ -178,6 +181,12 @@ func (s *TopicService) Update(id string, req TopicSaveRequest) (TopicItem, error
 		if err := protectFormalTopicIdentity(row.Slug, req); err != nil {
 			return TopicItem{}, err
 		}
+		// slug 未变化时跳过格式校验，避免存量非法 slug 行编辑其他字段时被拦截。
+		if req.Slug != row.Slug {
+			if err := validateSlugFormat(req.Slug); err != nil {
+				return TopicItem{}, err
+			}
+		}
 		var count int64
 		if err := s.db.Unscoped().Model(&model.Topic{}).
 			Where("slug = ? AND id <> ?", req.Slug, parsed).
@@ -185,7 +194,7 @@ func (s *TopicService) Update(id string, req TopicSaveRequest) (TopicItem, error
 			return TopicItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		if count > 0 {
-			return TopicItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TopicItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 		row.Name = req.Name
 		row.Label = req.Label
@@ -204,13 +213,18 @@ func (s *TopicService) Update(id string, req TopicSaveRequest) (TopicItem, error
 	defer s.mu.Unlock()
 	for _, item := range s.items {
 		if item.Slug == req.Slug && item.ID != parsed {
-			return TopicItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TopicItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 	}
 	for index, item := range s.items {
 		if item.ID == parsed {
 			if err := protectFormalTopicIdentity(item.Slug, req); err != nil {
 				return TopicItem{}, err
+			}
+			if req.Slug != item.Slug {
+				if err := validateSlugFormat(req.Slug); err != nil {
+					return TopicItem{}, err
+				}
 			}
 			item.Name = req.Name
 			item.Label = req.Label

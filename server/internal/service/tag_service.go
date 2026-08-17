@@ -71,13 +71,16 @@ func (s *TagService) Create(req TagSaveRequest) (TagItem, error) {
 	if req.Name == "" || req.Slug == "" {
 		return TagItem{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
+	if err := validateSlugFormat(req.Slug); err != nil {
+		return TagItem{}, err
+	}
 	if s.db != nil {
 		var count int64
 		if err := s.db.Unscoped().Model(&model.Tag{}).Where("slug = ?", req.Slug).Count(&count).Error; err != nil {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		if count > 0 {
-			return TagItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TagItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 		row := model.Tag{
 			Name:        req.Name,
@@ -95,7 +98,7 @@ func (s *TagService) Create(req TagSaveRequest) (TagItem, error) {
 	defer s.mu.Unlock()
 	for _, item := range s.items {
 		if item.Slug == req.Slug {
-			return TagItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TagItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 	}
 	now := time.Now().UTC()
@@ -129,6 +132,12 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 		if err != nil {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
+		// slug 未变化时跳过格式校验，避免存量非法 slug 行编辑其他字段时被拦截。
+		if req.Slug != row.Slug {
+			if err := validateSlugFormat(req.Slug); err != nil {
+				return TagItem{}, err
+			}
+		}
 		var count int64
 		if err := s.db.Unscoped().Model(&model.Tag{}).
 			Where("slug = ? AND id <> ?", req.Slug, parsed).
@@ -136,7 +145,7 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 			return TagItem{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
 		if count > 0 {
-			return TagItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TagItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 		row.Name = req.Name
 		row.Slug = req.Slug
@@ -153,11 +162,16 @@ func (s *TagService) Update(id string, req TagSaveRequest) (TagItem, error) {
 	defer s.mu.Unlock()
 	for _, item := range s.items {
 		if item.Slug == req.Slug && item.ID != parsed {
-			return TagItem{}, apperrors.New(apperrors.CodeResourceConflict)
+			return TagItem{}, apperrors.New(apperrors.CodeDuplicateSlug)
 		}
 	}
 	for index, item := range s.items {
 		if item.ID == parsed {
+			if req.Slug != item.Slug {
+				if err := validateSlugFormat(req.Slug); err != nil {
+					return TagItem{}, err
+				}
+			}
 			item.Name = req.Name
 			item.Slug = req.Slug
 			item.Description = req.Description
