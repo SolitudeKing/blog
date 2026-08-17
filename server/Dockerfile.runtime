@@ -1,0 +1,29 @@
+# Runtime-only image for the Go API.
+# - 不包含应用代码：二进制由宿主机 `deploy/runtime/api/api` 挂载进容器。
+# - 镜像只在 alpine / util-linux / ca-certificates 升级时重建。
+# - 对应回退路径使用 server/Dockerfile（源码构建）。
+FROM alpine:3.21
+
+# ca-certificates + tzdata：与 server/Dockerfile 一致，MySQL/Redis TLS、S3 HTTPS、
+# time.LoadLocation 都依赖这些包。
+#
+# util-linux 提供 setpriv，entrypoint 用它把进程降权到 UID 10001；
+# 比引入 gosu / su-exec 更轻量。
+RUN apk add --no-cache ca-certificates tzdata util-linux \
+    && addgroup -S app && adduser -S -G app -u 10001 app \
+    && mkdir -p /app/storage/uploads /app/runtime/bin \
+    && chown -R app:app /app
+
+WORKDIR /app
+
+# entrypoint 放在 /usr/local/bin，不会被 bind mount 覆盖。
+COPY deploy/scripts/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/api-entrypoint.sh
+
+EXPOSE 8080
+
+# entrypoint 需要 root 身份来 chown 挂载进来的二进制，
+# 再通过 setpriv 把进程降权到 UID 10001。
+USER root
+ENTRYPOINT ["/usr/local/bin/api-entrypoint.sh"]
+CMD ["/app/runtime/bin/api"]

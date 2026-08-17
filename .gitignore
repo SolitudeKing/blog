@@ -14,6 +14,10 @@ dist/
 build/
 coverage/
 
+# 制品部署（bind mount 到容器）：由 deploy/scripts/build-artifacts.{ps1,sh} 生成，
+# 部署时 scp 到服务器；不进版本库。
+deploy/runtime/
+
 # Local env
 .env
 .env.local

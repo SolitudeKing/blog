@@ -1,0 +1,96 @@
+x-service-logging: &service-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  api:
+    # 预构建的运行时镜像：alpine + ca-certificates + tzdata + util-linux + 非 root app 用户 + entrypoint。
+    # 不包含应用代码；二进制由 ./runtime/api:/app/api:rw 挂载进容器。
+    # 镜像仅在 alpine / util-linux 升级时重建，日常代码部署不需要 rebuild。
+    image: solitude-blog-api-runtime:1.0.0
+    container_name: solitude-blog-api
+    restart: unless-stopped
+    # 与 server/Dockerfile.runtime 中新增的 `app` 用户对齐；命名卷 api-storage 首次写入时会
+    # 自动 chown 给此 UID，容器重启后上传文件仍可读写。
+    user: "10001:10001"
+    environment:
+      # 容器内 API 固定监听 8080；APP_PORT 只作为宿主机调试端口。
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: 8080
+      APP_API_VERSION: ${APP_API_VERSION:-v1}
+      SITE_BASE_URL: ${SITE_BASE_URL:-http://localhost}
+      # MySQL / Redis 均假设由外部服务提供，Compose 仅透传连接信息。
+      MYSQL_HOST: ${MYSQL_HOST:?MYSQL_HOST must be set}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST must be set}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_USER: ${REDIS_USER:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      MYSQL_TLS: ${MYSQL_TLS:-false}
+      REDIS_TLS: ${REDIS_TLS:-false}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-30}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-14}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      ADMIN_NICKNAME: ${ADMIN_NICKNAME:-Solitude King}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      # 容器内 API 写入路径固定在 /app/storage/uploads（与 api-storage 卷对齐）；
+      # 宿主机侧的 .env 仅在回退到本地非容器运行时才有意义。
+      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app/storage/uploads}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-us-east-1}
+      STORAGE_S3_USE_SSL: ${STORAGE_S3_USE_SSL:-false}
+      STORAGE_S3_PUBLIC_URL: ${STORAGE_S3_PUBLIC_URL:-}
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      # 制品：宿主机 Go 二进制。:rw 让 entrypoint 能 cp + chown；
+      # 之后再 exec 到镜像内 /app/runtime/bin/api 执行。
+      - ./runtime/api:/app/api:rw
+      # 持久化上传（与 docker-compose.yml 行为一致）。
+      - api-storage:/app/storage/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: *service-logging
+
+  nginx:
+    # 预构建的运行时镜像：nginx:alpine + deploy/nginx/default.conf；
+    # /usr/share/nginx/html 故意清空，由 ./runtime/web:/usr/share/nginx/html:ro 提供 SPA。
+    image: solitude-blog-nginx-runtime:1.0.0
+    container_name: solitude-blog-nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-80}:80"
+    volumes:
+      # 制品：Vite 构建产物。:ro 是关键，避免容器内写入污染宿主机目录。
+      # deploy/nginx/default.conf 中的 root /usr/share/nginx/html 仍指向同一路径。
+      - ./runtime/web:/usr/share/nginx/html:ro
+    healthcheck:
+      # 用容器内自检端点，不穿透到 api / DB；DB 抖动不应把 nginx 标记为 unhealthy。
+      test: ["CMD-SHELL", "wget -qO- http://localhost/nginx-health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *service-logging
+
+volumes:
+  api-storage:
