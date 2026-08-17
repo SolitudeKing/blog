@@ -113,6 +113,90 @@
           />
         </section>
 
+        <section class="settings-panel">
+          <div role="heading" aria-level="2">归档文案</div>
+          <p class="settings-panel__description">
+            归档页的标题与空状态文案。留空时会回退到默认值。
+          </p>
+          <div class="settings-form__row">
+            <BaseInput
+              v-for="field in splitContentFields(archiveContentFields).single"
+              :key="field.key"
+              v-model="form.archive_content[field.key]"
+              :name="`archive-content-${field.key}`"
+              :label="field.label"
+              :hint="field.hint"
+              :maxlength="field.max"
+            />
+          </div>
+          <BaseTextarea
+            v-for="field in splitContentFields(archiveContentFields).multi"
+            :key="field.key"
+            v-model="form.archive_content[field.key]"
+            :name="`archive-content-${field.key}`"
+            :label="field.label"
+            :hint="field.hint"
+            :rows="4"
+            :maxlength="field.max"
+          />
+        </section>
+
+        <section class="settings-panel">
+          <div role="heading" aria-level="2">搜索文案</div>
+          <p class="settings-panel__description">
+            搜索页的标题、占位符与空状态文案。航标兜底词每行一个，仅在每日航标接口不可用时展示。
+          </p>
+          <div class="settings-form__row">
+            <BaseInput
+              v-for="field in splitContentFields(searchContentFields).single"
+              :key="field.key"
+              v-model="form.search_content[field.key]"
+              :name="`search-content-${field.key}`"
+              :label="field.label"
+              :hint="field.hint"
+              :maxlength="field.max"
+            />
+          </div>
+          <BaseTextarea
+            v-for="field in splitContentFields(searchContentFields).multi"
+            :key="field.key"
+            v-model="form.search_content[field.key]"
+            :name="`search-content-${field.key}`"
+            :label="field.label"
+            :hint="field.hint"
+            :rows="4"
+            :maxlength="field.max"
+          />
+        </section>
+
+        <section class="settings-panel">
+          <div role="heading" aria-level="2">关于文案</div>
+          <p class="settings-panel__description">
+            关于页 hero、发布原则与联系方式的文案。留空时会回退到默认值。
+          </p>
+          <div class="settings-form__row">
+            <BaseInput
+              v-for="field in splitContentFields(aboutContentFields).single"
+              :key="field.key"
+              v-model="form.about_content[field.key]"
+              :name="`about-content-${field.key}`"
+              :label="field.label"
+              :hint="field.hint"
+              :maxlength="field.max"
+            />
+          </div>
+          <BaseTextarea
+            v-for="field in splitContentFields(aboutContentFields).multi"
+            :key="field.key"
+            v-model="form.about_content[field.key]"
+            :name="`about-content-${field.key}`"
+            :label="field.label"
+            :hint="field.hint"
+            :rows="4"
+            :maxlength="field.max"
+          />
+        </section>
+
         <section class="settings-panel settings-panel--appearance">
           <div role="heading" aria-level="2">主题外观</div>
           <p id="site-theme-hint" class="settings-panel__description">
@@ -230,6 +314,21 @@ import {
   homeContentFields,
   normalizeHomeContent,
 } from '@/config/homeContent'
+import {
+  archiveContentFields,
+  createDefaultArchiveContent,
+  normalizeArchiveContent,
+} from '@/config/archiveContent'
+import {
+  createDefaultSearchContent,
+  normalizeSearchContent,
+  searchContentFields,
+} from '@/config/searchContent'
+import {
+  aboutContentFields,
+  createDefaultAboutContent,
+  normalizeAboutContent,
+} from '@/config/aboutContent'
 import { useToast } from '@/composables/useToast'
 import { getSettingDetail, updateSetting } from '@/api/modules/setting'
 import { useSettingStore } from '@/stores/setting'
@@ -267,11 +366,21 @@ const form = reactive<SettingPayload>({
     douyin: '',
   },
   home_content: createDefaultHomeContent(),
+  archive_content: createDefaultArchiveContent(),
+  search_content: createDefaultSearchContent(),
+  about_content: createDefaultAboutContent(),
 })
 
-// 多行字段用 textarea 单独渲染，单行字段集中到一行内。
-const singleLineHomeFields = homeContentFields.filter((field) => !field.multiline)
-const multilineHomeFields = homeContentFields.filter((field) => field.multiline)
+// 多行字段用 textarea 单独渲染，单行字段集中到一行内；各文案面板共用同一拆分。
+function splitContentFields<T extends { multiline?: boolean }>(fields: readonly T[]) {
+  return {
+    single: fields.filter((field) => !field.multiline),
+    multi: fields.filter((field) => field.multiline),
+  }
+}
+
+const singleLineHomeFields = splitContentFields(homeContentFields).single
+const multilineHomeFields = splitContentFields(homeContentFields).multi
 
 const selectedTheme = computed(
   () =>
@@ -307,6 +416,9 @@ function assignSetting(setting: LobbySetting) {
     douyin: setting.social_links.douyin ?? '',
   }
   form.home_content = normalizeHomeContent(setting.home_content)
+  form.archive_content = normalizeArchiveContent(setting.archive_content)
+  form.search_content = normalizeSearchContent(setting.search_content)
+  form.about_content = normalizeAboutContent(setting.about_content)
 }
 
 async function loadSetting() {
