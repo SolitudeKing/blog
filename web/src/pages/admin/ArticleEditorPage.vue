@@ -11,7 +11,7 @@
     <form class="editor-form" :aria-busy="saving" @submit.prevent="save">
       <div class="editor-form__main">
         <BaseInput v-model="form.title" label="标题" />
-        <BaseInput v-model="form.slug" label="Slug" />
+        <BaseInput v-model="form.slug" label="Slug" :error="slugErrorMessage" />
         <BaseTextarea v-model="form.summary" label="摘要" :rows="4" />
         <div class="article-cover">
           <div class="article-cover__field">
@@ -240,6 +240,12 @@ async function submit(status: ArticleSavePayload['status']) {
     toast.error(error.value)
     return
   }
+  const slugProblem = slugError(form.slug)
+  if (slugProblem) {
+    error.value = slugProblem
+    toast.error(error.value)
+    return
+  }
   saving.value = true
   error.value = ''
   try {
@@ -365,9 +371,28 @@ function toSlug(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 }
+
+const slugFormatPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/
+const slugMaxLength = 120
+
+function slugError(value: string) {
+  const slug = value.trim()
+  if (!slug) {
+    return '' // \u7a7a\u503c\u4ea4\u7ed9\u540e\u7aef\u5fc5\u586b\u6821\u9a8c
+  }
+  if (!slugFormatPattern.test(slug)) {
+    return 'Slug \u4ec5\u652f\u6301\u5c0f\u5199\u5b57\u6bcd\u3001\u6570\u5b57\u4e0e\u8fde\u5b57\u7b26\uff08-\uff09'
+  }
+  if (slug.length > slugMaxLength) {
+    return 'Slug \u957f\u5ea6\u4e0d\u80fd\u8d85\u8fc7 120 \u5b57\u7b26'
+  }
+  return ''
+}
+
+const slugErrorMessage = computed(() => slugError(form.slug))
 
 function safeTagColor(value: string | null | undefined) {
   const color = value?.trim() ?? ''

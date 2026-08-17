@@ -240,6 +240,9 @@ func (s *ArticleService) Create(req ArticleCreateRequest, actorID uint64) (Artic
 	if req.Title == "" || req.Slug == "" || req.TopicID == 0 {
 		return ArticleItem{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
+	if err := validateSlugFormat(req.Slug); err != nil {
+		return ArticleItem{}, err
+	}
 	if actorID == 0 {
 		return ArticleItem{}, apperrors.New(apperrors.CodeUnauthorized)
 	}
@@ -352,6 +355,13 @@ func (s *ArticleService) Update(id string, req ArticleUpdateRequest, actorID uin
 				return apperrors.New(apperrors.CodeDatabaseUnavailable)
 			}
 			oldSlug = article.Slug
+
+			// slug 未变化时跳过格式校验，避免存量非法 slug 行编辑其他字段时被拦截。
+			if req.Slug != oldSlug {
+				if err := validateSlugFormat(req.Slug); err != nil {
+					return err
+				}
+			}
 
 			var slugCount int64
 			if err := tx.Unscoped().Model(&model.Article{}).
@@ -719,6 +729,12 @@ func (s *ArticleService) updateInMemory(id uint64, req ArticleUpdateRequest, sta
 	}
 	for index, item := range s.items {
 		if item.ID == id {
+			// slug 未变化时跳过格式校验，避免存量非法 slug 行编辑其他字段时被拦截。
+			if req.Slug != item.Slug {
+				if err := validateSlugFormat(req.Slug); err != nil {
+					return ArticleDetail{}, err
+				}
+			}
 			now := time.Now().UTC()
 			item.Title = req.Title
 			item.Slug = req.Slug

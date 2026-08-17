@@ -2,7 +2,10 @@ package service
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/model"
@@ -92,5 +95,75 @@ func assertAppErrorCode(t *testing.T, err error, code int) {
 	}
 	if appErr.Code != code {
 		t.Fatalf("error code = %d, want %d", appErr.Code, code)
+	}
+}
+
+func TestArticleServiceRejectsInvalidSlugFormat(t *testing.T) {
+	service := NewArticleService(nil, nil)
+
+	cases := []string{"中文", "My-Slug", "my slug", "my_slug", "my.slug", "-abc", "abc-"}
+	for _, slug := range cases {
+		_, err := service.Create(ArticleCreateRequest{Title: "文章", Slug: slug, TopicID: 1}, 7)
+		assertAppErrorCode(t, err, apperrors.CodeInvalidParameter)
+	}
+}
+
+func TestArticleServiceRejectsOversizedSlug(t *testing.T) {
+	service := NewArticleService(nil, nil)
+
+	_, err := service.Create(ArticleCreateRequest{Title: "文章", Slug: strings.Repeat("a", 120), TopicID: 1}, 7)
+	if err != nil {
+		t.Fatalf("Create() error = %v, want success at 120 chars", err)
+	}
+	_, err = service.Create(ArticleCreateRequest{Title: "文章", Slug: strings.Repeat("a", 121), TopicID: 1}, 7)
+	assertAppErrorCode(t, err, apperrors.CodeInvalidParameter)
+}
+
+func TestArticleServiceRejectsDuplicateSlugOnCreate(t *testing.T) {
+	service := NewArticleService(nil, nil)
+
+	_, err := service.Create(ArticleCreateRequest{Title: "笔记", Slug: "notes", TopicID: 1}, 7)
+	if err != nil {
+		t.Fatalf("first Create() error = %v", err)
+	}
+	_, err = service.Create(ArticleCreateRequest{Title: "笔记", Slug: "notes", TopicID: 1}, 7)
+	assertAppErrorCode(t, err, apperrors.CodeDuplicateSlug)
+}
+
+func TestArticleServiceUpdateRejectsInvalidSlugChange(t *testing.T) {
+	service := NewArticleService(nil, nil)
+
+	item, err := service.Create(ArticleCreateRequest{Title: "文章", Slug: "valid-slug", TopicID: 1}, 7)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	_, err = service.Update(strconv.FormatUint(item.ID, 10), ArticleUpdateRequest{
+		Title: "文章", Slug: "中文", TopicID: 1,
+	}, 7)
+	assertAppErrorCode(t, err, apperrors.CodeInvalidParameter)
+}
+
+func TestArticleServiceUpdateSkipsSlugValidationWhenUnchanged(t *testing.T) {
+	service := NewArticleService(nil, nil)
+	now := time.Now().UTC()
+	// 注入存量非法 slug 行，模拟历史数据：slug 未变化时编辑其他字段不应被拦截。
+	service.items = append(service.items, ArticleDetail{
+		ArticleItem: ArticleItem{
+			ID:        99,
+			Title:     "旧文章",
+			Slug:      "旧-slug",
+			Status:    "draft",
+			TopicID:   1,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	})
+
+	updated, err := service.Update("99", ArticleUpdateRequest{Title: "新标题", Slug: "旧-slug", TopicID: 1}, 7)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.Title != "新标题" || updated.Slug != "旧-slug" {
+		t.Fatalf("Update() item = %#v, want title updated and slug kept", updated)
 	}
 }
