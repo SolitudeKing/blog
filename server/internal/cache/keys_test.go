@@ -19,4 +19,7 @@ func TestArticleKeysUseTopicAwareSchemaVersion(t *testing.T) {
 	if key := SiteSettingsKey(); !strings.HasPrefix(key, "blog:v1:") {
 		t.Fatalf("site settings key %q unexpectedly changed schema", key)
 	}
+	if key := SearchSuggestionsKey("2026-08-17"); key != "blog:v1:search:suggestions:2026-08-17" {
+		t.Fatalf("search suggestions key = %q, want date-scoped v1 key", key)
+	}
 }

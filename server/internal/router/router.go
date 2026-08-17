@@ -35,6 +35,7 @@ func Register(r *gin.Engine, h Handlers, cfg config.Config) {
 	r.GET("rss.xml", h.Feed.RSS)
 	r.GET("sitemap.xml", h.Feed.Sitemap)
 	r.GET("search/article", h.Search.Article)
+	r.GET("search/suggestions", h.Search.Suggestions)
 
 	r.POST("auth/login", h.Auth.Login)
 	r.POST("auth/refresh", h.Auth.Refresh)

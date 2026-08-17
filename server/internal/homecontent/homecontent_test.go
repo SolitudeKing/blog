@@ -25,6 +25,10 @@ func TestDefaultHomeContentIsCompleteAndIndependent(t *testing.T) {
 		{"latest heading", first.HomeLatestHeading},
 		{"latest view all", first.HomeLatestViewAllLabel},
 		{"latest empty title", first.HomeLatestEmptyTitle},
+		{"topics kicker", first.HomeTopicsKicker},
+		{"topics heading", first.HomeTopicsHeading},
+		{"notice kicker", first.HomeNoticeKicker},
+		{"notice action label", first.HomeNoticeActionLabel},
 	} {
 		if check.value == "" {
 			t.Fatalf("default home content has empty %s", check.name)
@@ -56,6 +60,11 @@ func TestIsValidHomeContent(t *testing.T) {
 	if IsValidHomeContent(overlongAction) {
 		t.Fatal("overlong action label must be rejected")
 	}
+	overlongNotice := DefaultHomeContent()
+	overlongNotice.HomeNoticeActionLabel = strings.Repeat("读", HomeNoticeActionLabelMaxRunes+1)
+	if IsValidHomeContent(overlongNotice) {
+		t.Fatal("overlong notice action label must be rejected")
+	}
 }
 
 func TestNormalizeHomeContentTrimsAndFillsDefaults(t *testing.T) {
@@ -63,10 +72,10 @@ func TestNormalizeHomeContentTrimsAndFillsDefaults(t *testing.T) {
 
 	defaults := DefaultHomeContent()
 	got := NormalizeHomeContent(HomeContent{
-		HomeProfileKicker:          "   ",
-		HomeIntroHeading:           "  自定义介绍标题  ",
-		HomeActionViewRecentLabel:  "",
-		HomeLatestEmptyTitle:       "    ",
+		HomeProfileKicker:         "   ",
+		HomeIntroHeading:          "  自定义介绍标题  ",
+		HomeActionViewRecentLabel: "",
+		HomeLatestEmptyTitle:      "    ",
 	})
 
 	if got.HomeProfileKicker != defaults.HomeProfileKicker {
@@ -88,10 +97,10 @@ func TestNormalizeHomeContentFallsBackFromOverlongValues(t *testing.T) {
 
 	defaults := DefaultHomeContent()
 	got := NormalizeHomeContent(HomeContent{
-		HomeProfileKicker:  strings.Repeat("B", HomeProfileKickerMaxRunes+1),
-		HomeIntroHeading:   strings.Repeat("H", HomeIntroHeadingMaxRunes+1),
-		HomeLatestKicker:   strings.Repeat("K", HomeLatestKickerMaxRunes+1),
-		HomeLatestHeading:  strings.Repeat("T", HomeLatestHeadingMaxRunes+1),
+		HomeProfileKicker: strings.Repeat("B", HomeProfileKickerMaxRunes+1),
+		HomeIntroHeading:  strings.Repeat("H", HomeIntroHeadingMaxRunes+1),
+		HomeLatestKicker:  strings.Repeat("K", HomeLatestKickerMaxRunes+1),
+		HomeLatestHeading: strings.Repeat("T", HomeLatestHeadingMaxRunes+1),
 	})
 
 	if got.HomeProfileKicker != defaults.HomeProfileKicker {

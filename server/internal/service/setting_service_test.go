@@ -9,6 +9,7 @@ import (
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/homecontent"
 	"solitude-blog/server/internal/model"
+	"solitude-blog/server/internal/sectioncontent"
 )
 
 func TestNormalizeSettingAcceptsSupportedAppearance(t *testing.T) {
@@ -22,7 +23,7 @@ func TestNormalizeSettingAcceptsSupportedAppearance(t *testing.T) {
 				Theme:    theme,
 				Mode:     mode,
 			}
-			got, err := normalizeSetting(req, nil, homecontent.DefaultHomeContent())
+			got, err := normalizeSetting(req, defaultLobbySetting())
 			if err != nil {
 				t.Fatalf("normalizeSetting(%q, %q) returned error: %v", theme, mode, err)
 			}
@@ -46,7 +47,7 @@ func TestNormalizeSettingNormalizesAndValidatesICPNumber(t *testing.T) {
 		Theme:     appearance.ThemeMistSeaSalt,
 		Mode:      appearance.ModeLight,
 	}
-	setting, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent())
+	setting, err := normalizeSetting(request, defaultLobbySetting())
 	if err != nil {
 		t.Fatalf("normalizeSetting returned error: %v", err)
 	}
@@ -55,7 +56,7 @@ func TestNormalizeSettingNormalizesAndValidatesICPNumber(t *testing.T) {
 	}
 
 	request.ICPNumber = strings.Repeat("备", maxICPNumberRunes+1)
-	if _, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent()); err == nil {
+	if _, err := normalizeSetting(request, defaultLobbySetting()); err == nil {
 		t.Fatal("normalizeSetting accepted an overly long icp number")
 	}
 }
@@ -70,7 +71,7 @@ func TestNormalizeSettingNormalizesAndValidatesAuthorAvatarURL(t *testing.T) {
 		Theme:           appearance.ThemeMistSeaSalt,
 		Mode:            appearance.ModeLight,
 	}
-	setting, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent())
+	setting, err := normalizeSetting(request, defaultLobbySetting())
 	if err != nil {
 		t.Fatalf("normalizeSetting returned error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestNormalizeSettingNormalizesAndValidatesAuthorAvatarURL(t *testing.T) {
 	}
 
 	request.AuthorAvatarURL = strings.Repeat("a", maxAuthorAvatarURLRunes+1)
-	if _, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent()); err == nil {
+	if _, err := normalizeSetting(request, defaultLobbySetting()); err == nil {
 		t.Fatal("normalizeSetting accepted an overly long author avatar URL")
 	}
 }
@@ -96,7 +97,7 @@ func TestNormalizeSettingRejectsInvalidAppearance(t *testing.T) {
 	}
 
 	for _, req := range tests {
-		_, err := normalizeSetting(req, nil, homecontent.DefaultHomeContent())
+		_, err := normalizeSetting(req, defaultLobbySetting())
 		if err == nil {
 			t.Fatalf("normalizeSetting(%q, %q) returned nil error", req.Theme, req.Mode)
 		}
@@ -142,13 +143,15 @@ func TestNormalizeSettingMergesProvidedThemesAndResetsEmptyFields(t *testing.T) 
 			HomeLatestEndText:          "新的海盐结束文案",
 		},
 	}
+	currentSetting := defaultLobbySetting()
+	currentSetting.ThemeElements = current
 	got, err := normalizeSetting(SettingSaveRequest{
 		SiteName:      "Blog",
 		Author:        "Author",
 		Theme:         appearance.ThemeMistSeaSalt,
 		Mode:          appearance.ModeLight,
 		ThemeElements: &provided,
-	}, current, homecontent.DefaultHomeContent())
+	}, currentSetting)
 	if err != nil {
 		t.Fatalf("normalizeSetting returned error: %v", err)
 	}
@@ -185,7 +188,7 @@ func TestNormalizeSettingRejectsInvalidThemeElements(t *testing.T) {
 			Theme:         appearance.ThemeMistSeaSalt,
 			Mode:          appearance.ModeLight,
 			ThemeElements: &elements,
-		}, appearance.DefaultThemeElements(), homecontent.DefaultHomeContent())
+		}, defaultLobbySetting())
 		appErr, ok := err.(apperrors.AppError)
 		if !ok || appErr.Code != apperrors.CodeInvalidParameter {
 			t.Fatalf("normalizeSetting(%#v) error = %#v, want invalid parameter", elements, err)
@@ -268,7 +271,7 @@ func TestNormalizeSettingRejectsInvalidHomeContent(t *testing.T) {
 			Theme:       appearance.ThemeMistSeaSalt,
 			Mode:        appearance.ModeLight,
 			HomeContent: &content,
-		}, appearance.DefaultThemeElements(), homecontent.DefaultHomeContent())
+		}, defaultLobbySetting())
 		appErr, ok := err.(apperrors.AppError)
 		if !ok || appErr.Code != apperrors.CodeInvalidParameter {
 			t.Fatalf("normalizeSetting(%#v) error = %#v, want invalid parameter", content, err)
@@ -332,7 +335,7 @@ func TestNormalizeSettingTrimsAndValidatesAuthorHandle(t *testing.T) {
 		Theme:        appearance.ThemeMistSeaSalt,
 		Mode:         appearance.ModeLight,
 	}
-	setting, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent())
+	setting, err := normalizeSetting(request, defaultLobbySetting())
 	if err != nil {
 		t.Fatalf("normalizeSetting returned error: %v", err)
 	}
@@ -341,7 +344,7 @@ func TestNormalizeSettingTrimsAndValidatesAuthorHandle(t *testing.T) {
 	}
 
 	request.AuthorHandle = strings.Repeat("h", maxAuthorHandleRunes+1)
-	if _, err := normalizeSetting(request, nil, homecontent.DefaultHomeContent()); err == nil {
+	if _, err := normalizeSetting(request, defaultLobbySetting()); err == nil {
 		t.Fatal("normalizeSetting accepted an overly long author handle")
 	}
 }
@@ -354,5 +357,117 @@ func TestCloneSettingDeepCopiesHomeContent(t *testing.T) {
 	cloned.HomeContent.HomeIntroHeading = "changed"
 	if original.HomeContent.HomeIntroHeading == "changed" {
 		t.Fatal("cloneSetting shared its home content struct")
+	}
+}
+
+func TestNormalizeSettingRejectsInvalidSectionContent(t *testing.T) {
+	t.Parallel()
+
+	overlongArchive := sectioncontent.DefaultArchiveContent()
+	overlongArchive.ArchiveIntro = strings.Repeat("文", sectioncontent.ArchiveIntroMaxRunes+1)
+	overlongSearch := sectioncontent.DefaultSearchContent()
+	overlongSearch.SearchSuggestionFallbacks = strings.Repeat("词", sectioncontent.SearchSuggestionFallbacksMaxRunes+1)
+	overlongAbout := sectioncontent.DefaultAboutContent()
+	overlongAbout.Principle1Description = strings.Repeat("描", sectioncontent.AboutPrincipleDescriptionMaxRunes+1)
+
+	tests := []SettingSaveRequest{
+		{ArchiveContent: &overlongArchive},
+		{SearchContent: &overlongSearch},
+		{AboutContent: &overlongAbout},
+	}
+	for _, req := range tests {
+		req.SiteName = "Blog"
+		req.Author = "Author"
+		req.Theme = appearance.ThemeMistSeaSalt
+		req.Mode = appearance.ModeLight
+		_, err := normalizeSetting(req, defaultLobbySetting())
+		appErr, ok := err.(apperrors.AppError)
+		if !ok || appErr.Code != apperrors.CodeInvalidParameter {
+			t.Fatalf("normalizeSetting(%#v) error = %#v, want invalid parameter", req, err)
+		}
+	}
+}
+
+func TestSettingFromModelFallsBackFromMalformedSectionContentJSON(t *testing.T) {
+	t.Parallel()
+
+	item := settingFromModel(model.SiteSetting{
+		SiteName:           "Blog",
+		Author:             "Author",
+		Theme:              appearance.ThemeMistSeaSalt,
+		Mode:               appearance.ModeLight,
+		ArchiveContentJSON: "{not-json",
+		SearchContentJSON:  "{not-json",
+		AboutContentJSON:   "{not-json",
+	})
+	if !reflect.DeepEqual(item.ArchiveContent, sectioncontent.DefaultArchiveContent()) {
+		t.Fatalf("archive content = %#v, want defaults", item.ArchiveContent)
+	}
+	if !reflect.DeepEqual(item.SearchContent, sectioncontent.DefaultSearchContent()) {
+		t.Fatalf("search content = %#v, want defaults", item.SearchContent)
+	}
+	if !reflect.DeepEqual(item.AboutContent, sectioncontent.DefaultAboutContent()) {
+		t.Fatalf("about content = %#v, want defaults", item.AboutContent)
+	}
+}
+
+func TestNormalizeSettingPreservesSectionContentWhenRequestOmitsIt(t *testing.T) {
+	t.Parallel()
+
+	settings := NewSettingService(nil, nil)
+	customArchive := sectioncontent.DefaultArchiveContent()
+	customArchive.ArchiveHeading = "自定义归档标题"
+	customSearch := sectioncontent.DefaultSearchContent()
+	customSearch.SearchHeading = "自定义搜索标题"
+	customAbout := sectioncontent.DefaultAboutContent()
+	customAbout.AboutHeading = "自定义关于标题"
+	if _, err := settings.Update(SettingSaveRequest{
+		SiteName:       "Blog",
+		Author:         "Author",
+		Theme:          appearance.ThemeMistForest,
+		Mode:           appearance.ModeDark,
+		ArchiveContent: &customArchive,
+		SearchContent:  &customSearch,
+		AboutContent:   &customAbout,
+	}); err != nil {
+		t.Fatalf("initial Update returned error: %v", err)
+	}
+
+	got, err := settings.Update(SettingSaveRequest{
+		SiteName: "Renamed Blog",
+		Author:   "Author",
+		Theme:    appearance.ThemeMistForest,
+		Mode:     appearance.ModeLight,
+	})
+	if err != nil {
+		t.Fatalf("legacy Update returned error: %v", err)
+	}
+	if !reflect.DeepEqual(got.ArchiveContent, customArchive) {
+		t.Fatalf("legacy Update archive content = %#v, want preserved %#v", got.ArchiveContent, customArchive)
+	}
+	if !reflect.DeepEqual(got.SearchContent, customSearch) {
+		t.Fatalf("legacy Update search content = %#v, want preserved %#v", got.SearchContent, customSearch)
+	}
+	if !reflect.DeepEqual(got.AboutContent, customAbout) {
+		t.Fatalf("legacy Update about content = %#v, want preserved %#v", got.AboutContent, customAbout)
+	}
+}
+
+func TestCloneSettingDeepCopiesSectionContent(t *testing.T) {
+	t.Parallel()
+
+	original := defaultLobbySetting()
+	cloned := cloneSetting(original)
+	cloned.ArchiveContent.ArchiveHeading = "changed"
+	cloned.SearchContent.SearchHeading = "changed"
+	cloned.AboutContent.AboutHeading = "changed"
+	if original.ArchiveContent.ArchiveHeading == "changed" {
+		t.Fatal("cloneSetting shared its archive content struct")
+	}
+	if original.SearchContent.SearchHeading == "changed" {
+		t.Fatal("cloneSetting shared its search content struct")
+	}
+	if original.AboutContent.AboutHeading == "changed" {
+		t.Fatal("cloneSetting shared its about content struct")
 	}
 }

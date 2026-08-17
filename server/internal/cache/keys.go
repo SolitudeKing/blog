@@ -35,3 +35,9 @@ func ArticleListFilterHash(topic string, tag string, keyword string, status stri
 func SiteSettingsKey() string {
 	return prefix + ":site:settings"
 }
+
+// SearchSuggestionsKey scopes the daily search suggestions cache to one UTC
+// date, so the key itself expires the content and no invalidation is needed.
+func SearchSuggestionsKey(date string) string {
+	return fmt.Sprintf("%s:search:suggestions:%s", prefix, date)
+}

@@ -38,6 +38,18 @@ const (
 	// HomeLatestEmptyTitleMaxRunes caps the title shown when there are no
 	// published articles.
 	HomeLatestEmptyTitleMaxRunes = 64
+	// HomeTopicsKickerMaxRunes caps the small label rendered above the
+	// topics directory heading.
+	HomeTopicsKickerMaxRunes = 32
+	// HomeTopicsHeadingMaxRunes caps the heading rendered above the topics
+	// directory links.
+	HomeTopicsHeadingMaxRunes = 64
+	// HomeNoticeKickerMaxRunes caps the small label rendered above the site
+	// notice heading.
+	HomeNoticeKickerMaxRunes = 32
+	// HomeNoticeActionLabelMaxRunes caps the short action link label on the
+	// site notice card.
+	HomeNoticeActionLabelMaxRunes = 16
 )
 
 // HomeContent is the full set of theme-independent home page copy fields.
@@ -55,6 +67,10 @@ type HomeContent struct {
 	HomeLatestHeading          string `json:"home_latest_heading"`
 	HomeLatestViewAllLabel     string `json:"home_latest_view_all_label"`
 	HomeLatestEmptyTitle       string `json:"home_latest_empty_title"`
+	HomeTopicsKicker           string `json:"home_topics_kicker"`
+	HomeTopicsHeading          string `json:"home_topics_heading"`
+	HomeNoticeKicker           string `json:"home_notice_kicker"`
+	HomeNoticeActionLabel      string `json:"home_notice_action_label"`
 }
 
 // DefaultHomeContent returns a complete, independently allocated copy of the
@@ -74,6 +90,10 @@ func DefaultHomeContent() HomeContent {
 		HomeLatestHeading:          "最近发布的博客",
 		HomeLatestViewAllLabel:     "查看全部归档",
 		HomeLatestEmptyTitle:       "暂时还没有发布文章",
+		HomeTopicsKicker:           "Topics",
+		HomeTopicsHeading:          "从这些专题进入",
+		HomeNoticeKicker:           "Site notice",
+		HomeNoticeActionLabel:      "继续阅读",
 	}
 }
 
@@ -91,7 +111,11 @@ func IsValidHomeContent(value HomeContent) bool {
 		!exceedsRuneLimit(value.HomeLatestKicker, HomeLatestKickerMaxRunes) &&
 		!exceedsRuneLimit(value.HomeLatestHeading, HomeLatestHeadingMaxRunes) &&
 		!exceedsRuneLimit(value.HomeLatestViewAllLabel, HomeLatestViewAllLabelMaxRunes) &&
-		!exceedsRuneLimit(value.HomeLatestEmptyTitle, HomeLatestEmptyTitleMaxRunes)
+		!exceedsRuneLimit(value.HomeLatestEmptyTitle, HomeLatestEmptyTitleMaxRunes) &&
+		!exceedsRuneLimit(value.HomeTopicsKicker, HomeTopicsKickerMaxRunes) &&
+		!exceedsRuneLimit(value.HomeTopicsHeading, HomeTopicsHeadingMaxRunes) &&
+		!exceedsRuneLimit(value.HomeNoticeKicker, HomeNoticeKickerMaxRunes) &&
+		!exceedsRuneLimit(value.HomeNoticeActionLabel, HomeNoticeActionLabelMaxRunes)
 }
 
 // NormalizeHomeContent returns a complete HomeContent by trimming every
@@ -111,6 +135,10 @@ func NormalizeHomeContent(value HomeContent) HomeContent {
 		HomeLatestHeading:          normalizeHomeText(value.HomeLatestHeading, defaults.HomeLatestHeading, HomeLatestHeadingMaxRunes),
 		HomeLatestViewAllLabel:     normalizeHomeText(value.HomeLatestViewAllLabel, defaults.HomeLatestViewAllLabel, HomeLatestViewAllLabelMaxRunes),
 		HomeLatestEmptyTitle:       normalizeHomeText(value.HomeLatestEmptyTitle, defaults.HomeLatestEmptyTitle, HomeLatestEmptyTitleMaxRunes),
+		HomeTopicsKicker:           normalizeHomeText(value.HomeTopicsKicker, defaults.HomeTopicsKicker, HomeTopicsKickerMaxRunes),
+		HomeTopicsHeading:          normalizeHomeText(value.HomeTopicsHeading, defaults.HomeTopicsHeading, HomeTopicsHeadingMaxRunes),
+		HomeNoticeKicker:           normalizeHomeText(value.HomeNoticeKicker, defaults.HomeNoticeKicker, HomeNoticeKickerMaxRunes),
+		HomeNoticeActionLabel:      normalizeHomeText(value.HomeNoticeActionLabel, defaults.HomeNoticeActionLabel, HomeNoticeActionLabelMaxRunes),
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	apperrors "solitude-blog/server/internal/errors"
 	"solitude-blog/server/internal/homecontent"
 	"solitude-blog/server/internal/model"
+	"solitude-blog/server/internal/sectioncontent"
 )
 
 const (
@@ -35,31 +36,37 @@ type SettingService struct {
 }
 
 type LobbySetting struct {
-	SiteName        string                     `json:"site_name"`
-	Author          string                     `json:"author"`
-	AuthorHandle    string                     `json:"author_handle"`
-	AuthorAvatarURL string                     `json:"author_avatar_url"`
-	Essay           string                     `json:"essay"`
-	ICPNumber       string                     `json:"icp_number"`
-	Theme           string                     `json:"theme"`
-	Mode            string                     `json:"mode"`
-	SocialLinks     map[string]string          `json:"social_links"`
-	ThemeElements   appearance.ThemeElementMap `json:"theme_elements"`
-	HomeContent     homecontent.HomeContent    `json:"home_content"`
+	SiteName        string                        `json:"site_name"`
+	Author          string                        `json:"author"`
+	AuthorHandle    string                        `json:"author_handle"`
+	AuthorAvatarURL string                        `json:"author_avatar_url"`
+	Essay           string                        `json:"essay"`
+	ICPNumber       string                        `json:"icp_number"`
+	Theme           string                        `json:"theme"`
+	Mode            string                        `json:"mode"`
+	SocialLinks     map[string]string             `json:"social_links"`
+	ThemeElements   appearance.ThemeElementMap    `json:"theme_elements"`
+	HomeContent     homecontent.HomeContent       `json:"home_content"`
+	ArchiveContent  sectioncontent.ArchiveContent `json:"archive_content"`
+	SearchContent   sectioncontent.SearchContent  `json:"search_content"`
+	AboutContent    sectioncontent.AboutContent   `json:"about_content"`
 }
 
 type SettingSaveRequest struct {
-	SiteName        string                      `json:"site_name"`
-	Author          string                      `json:"author"`
-	AuthorHandle    string                      `json:"author_handle"`
-	AuthorAvatarURL string                      `json:"author_avatar_url"`
-	Essay           string                      `json:"essay"`
-	ICPNumber       string                      `json:"icp_number"`
-	Theme           string                      `json:"theme"`
-	Mode            string                      `json:"mode"`
-	SocialLinks     map[string]string           `json:"social_links"`
-	ThemeElements   *appearance.ThemeElementMap `json:"theme_elements"`
-	HomeContent     *homecontent.HomeContent    `json:"home_content"`
+	SiteName        string                         `json:"site_name"`
+	Author          string                         `json:"author"`
+	AuthorHandle    string                         `json:"author_handle"`
+	AuthorAvatarURL string                         `json:"author_avatar_url"`
+	Essay           string                         `json:"essay"`
+	ICPNumber       string                         `json:"icp_number"`
+	Theme           string                         `json:"theme"`
+	Mode            string                         `json:"mode"`
+	SocialLinks     map[string]string              `json:"social_links"`
+	ThemeElements   *appearance.ThemeElementMap    `json:"theme_elements"`
+	HomeContent     *homecontent.HomeContent       `json:"home_content"`
+	ArchiveContent  *sectioncontent.ArchiveContent `json:"archive_content"`
+	SearchContent   *sectioncontent.SearchContent  `json:"search_content"`
+	AboutContent    *sectioncontent.AboutContent   `json:"about_content"`
 }
 
 func NewSettingService(db *gorm.DB, redisClient *redis.Client) *SettingService {
@@ -100,7 +107,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 			return LobbySetting{}, err
 		}
 		current := settingFromModel(row)
-		normalized, err := normalizeSetting(req, current.ThemeElements, current.HomeContent)
+		normalized, err := normalizeSetting(req, current)
 		if err != nil {
 			return LobbySetting{}, err
 		}
@@ -115,6 +122,9 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 		row.SocialLinksJSON = mustMarshalSocialLinks(normalized.SocialLinks)
 		row.ThemeElementsJSON = mustMarshalThemeElements(normalized.ThemeElements)
 		row.HomeContentJSON = mustMarshalHomeContent(normalized.HomeContent)
+		row.ArchiveContentJSON = mustMarshalArchiveContent(normalized.ArchiveContent)
+		row.SearchContentJSON = mustMarshalSearchContent(normalized.SearchContent)
+		row.AboutContentJSON = mustMarshalAboutContent(normalized.AboutContent)
 		if err := s.db.Save(&row).Error; err != nil {
 			return LobbySetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
 		}
@@ -124,7 +134,7 @@ func (s *SettingService) Update(req SettingSaveRequest) (LobbySetting, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	normalized, err := normalizeSetting(req, s.setting.ThemeElements, s.setting.HomeContent)
+	normalized, err := normalizeSetting(req, s.setting)
 	if err != nil {
 		return LobbySetting{}, err
 	}
@@ -147,6 +157,12 @@ func (s *SettingService) getCachedSetting() (LobbySetting, bool) {
 	item.Theme = appearance.NormalizeTheme(item.Theme)
 	item.Mode = appearance.NormalizeMode(item.Mode)
 	item.ThemeElements = appearance.NormalizeThemeElements(item.ThemeElements)
+	// 滚动部署期间，旧二进制写入的缓存可能缺少新增文案组；这里统一自愈，
+	// 与 theme/mode/theme_elements 的处理保持一致。
+	item.HomeContent = homecontent.NormalizeHomeContent(item.HomeContent)
+	item.ArchiveContent = sectioncontent.NormalizeArchiveContent(item.ArchiveContent)
+	item.SearchContent = sectioncontent.NormalizeSearchContent(item.SearchContent)
+	item.AboutContent = sectioncontent.NormalizeAboutContent(item.AboutContent)
 	return item, true
 }
 
@@ -180,18 +196,21 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 
 	defaults := defaultLobbySetting()
 	row = model.SiteSetting{
-		ID:                defaultSiteSettingID,
-		SiteName:          defaults.SiteName,
-		Author:            defaults.Author,
-		AuthorHandle:      defaults.AuthorHandle,
-		AuthorAvatarURL:   defaults.AuthorAvatarURL,
-		Essay:             defaults.Essay,
-		ICPNumber:         defaults.ICPNumber,
-		Theme:             defaults.Theme,
-		Mode:              defaults.Mode,
-		SocialLinksJSON:   mustMarshalSocialLinks(defaults.SocialLinks),
-		ThemeElementsJSON: mustMarshalThemeElements(defaults.ThemeElements),
-		HomeContentJSON:   mustMarshalHomeContent(defaults.HomeContent),
+		ID:                 defaultSiteSettingID,
+		SiteName:           defaults.SiteName,
+		Author:             defaults.Author,
+		AuthorHandle:       defaults.AuthorHandle,
+		AuthorAvatarURL:    defaults.AuthorAvatarURL,
+		Essay:              defaults.Essay,
+		ICPNumber:          defaults.ICPNumber,
+		Theme:              defaults.Theme,
+		Mode:               defaults.Mode,
+		SocialLinksJSON:    mustMarshalSocialLinks(defaults.SocialLinks),
+		ThemeElementsJSON:  mustMarshalThemeElements(defaults.ThemeElements),
+		HomeContentJSON:    mustMarshalHomeContent(defaults.HomeContent),
+		ArchiveContentJSON: mustMarshalArchiveContent(defaults.ArchiveContent),
+		SearchContentJSON:  mustMarshalSearchContent(defaults.SearchContent),
+		AboutContentJSON:   mustMarshalAboutContent(defaults.AboutContent),
 	}
 	if err := s.db.Create(&row).Error; err != nil {
 		return model.SiteSetting{}, apperrors.New(apperrors.CodeDatabaseUnavailable)
@@ -199,7 +218,7 @@ func (s *SettingService) loadOrCreate() (model.SiteSetting, error) {
 	return row, nil
 }
 
-func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.ThemeElementMap, currentHomeContent homecontent.HomeContent) (LobbySetting, error) {
+func normalizeSetting(req SettingSaveRequest, current LobbySetting) (LobbySetting, error) {
 	if req.SiteName == "" || req.Author == "" {
 		return LobbySetting{}, apperrors.New(apperrors.CodeMissingRequiredField)
 	}
@@ -224,10 +243,19 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 	if req.HomeContent != nil && !homecontent.IsValidHomeContent(*req.HomeContent) {
 		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
 	}
+	if req.ArchiveContent != nil && !sectioncontent.IsValidArchiveContent(*req.ArchiveContent) {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	if req.SearchContent != nil && !sectioncontent.IsValidSearchContent(*req.SearchContent) {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
+	if req.AboutContent != nil && !sectioncontent.IsValidAboutContent(*req.AboutContent) {
+		return LobbySetting{}, apperrors.New(apperrors.CodeInvalidParameter)
+	}
 	if req.SocialLinks == nil {
 		req.SocialLinks = map[string]string{}
 	}
-	themeElements := appearance.NormalizeThemeElements(currentThemeElements)
+	themeElements := appearance.NormalizeThemeElements(current.ThemeElements)
 	if req.ThemeElements != nil {
 		provided := appearance.NormalizeThemeElements(*req.ThemeElements)
 		for theme := range *req.ThemeElements {
@@ -236,9 +264,22 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 	}
 	// home_content 是平铺结构，没有"按主题合并"的概念；当请求携带 home_content 时整体替换，
 	// 字段级的 trim/默认值兜底在 NormalizeHomeContent 内完成。请求未携带则保留 DB 已有值。
-	homeContent := homecontent.NormalizeHomeContent(currentHomeContent)
+	homeContent := homecontent.NormalizeHomeContent(current.HomeContent)
 	if req.HomeContent != nil {
 		homeContent = homecontent.NormalizeHomeContent(*req.HomeContent)
+	}
+	// 三个板块文案组同样整体替换：请求携带时替换，未携带则保留 DB 已有值。
+	archiveContent := sectioncontent.NormalizeArchiveContent(current.ArchiveContent)
+	if req.ArchiveContent != nil {
+		archiveContent = sectioncontent.NormalizeArchiveContent(*req.ArchiveContent)
+	}
+	searchContent := sectioncontent.NormalizeSearchContent(current.SearchContent)
+	if req.SearchContent != nil {
+		searchContent = sectioncontent.NormalizeSearchContent(*req.SearchContent)
+	}
+	aboutContent := sectioncontent.NormalizeAboutContent(current.AboutContent)
+	if req.AboutContent != nil {
+		aboutContent = sectioncontent.NormalizeAboutContent(*req.AboutContent)
 	}
 	return cloneSetting(LobbySetting{
 		SiteName:        req.SiteName,
@@ -252,6 +293,9 @@ func normalizeSetting(req SettingSaveRequest, currentThemeElements appearance.Th
 		SocialLinks:     req.SocialLinks,
 		ThemeElements:   themeElements,
 		HomeContent:     homeContent,
+		ArchiveContent:  archiveContent,
+		SearchContent:   searchContent,
+		AboutContent:    aboutContent,
 	}), nil
 }
 
@@ -276,6 +320,9 @@ func settingFromModel(row model.SiteSetting) LobbySetting {
 		SocialLinks:     links,
 		ThemeElements:   appearance.NormalizeThemeElements(themeElements),
 		HomeContent:     mustUnmarshalHomeContent(row.HomeContentJSON),
+		ArchiveContent:  mustUnmarshalArchiveContent(row.ArchiveContentJSON),
+		SearchContent:   mustUnmarshalSearchContent(row.SearchContentJSON),
+		AboutContent:    mustUnmarshalAboutContent(row.AboutContentJSON),
 	}
 }
 
@@ -291,6 +338,9 @@ func defaultLobbySetting() LobbySetting {
 		Mode:            appearance.DefaultMode,
 		ThemeElements:   appearance.DefaultThemeElements(),
 		HomeContent:     homecontent.DefaultHomeContent(),
+		ArchiveContent:  sectioncontent.DefaultArchiveContent(),
+		SearchContent:   sectioncontent.DefaultSearchContent(),
+		AboutContent:    sectioncontent.DefaultAboutContent(),
 		SocialLinks: map[string]string{
 			"gitee":    "",
 			"bilibili": "",
@@ -308,6 +358,9 @@ func cloneSetting(setting LobbySetting) LobbySetting {
 	setting.SocialLinks = links
 	setting.ThemeElements = appearance.CloneThemeElements(setting.ThemeElements)
 	setting.HomeContent = homecontent.CloneHomeContent(setting.HomeContent)
+	setting.ArchiveContent = sectioncontent.CloneArchiveContent(setting.ArchiveContent)
+	setting.SearchContent = sectioncontent.CloneSearchContent(setting.SearchContent)
+	setting.AboutContent = sectioncontent.CloneAboutContent(setting.AboutContent)
 	return setting
 }
 
@@ -344,4 +397,61 @@ func mustUnmarshalHomeContent(raw string) homecontent.HomeContent {
 		return homecontent.DefaultHomeContent()
 	}
 	return homecontent.NormalizeHomeContent(content)
+}
+
+func mustMarshalArchiveContent(content sectioncontent.ArchiveContent) string {
+	payload, err := json.Marshal(sectioncontent.NormalizeArchiveContent(content))
+	if err != nil {
+		return "{}"
+	}
+	return string(payload)
+}
+
+func mustUnmarshalArchiveContent(raw string) sectioncontent.ArchiveContent {
+	if raw == "" {
+		return sectioncontent.DefaultArchiveContent()
+	}
+	content := sectioncontent.ArchiveContent{}
+	if err := json.Unmarshal([]byte(raw), &content); err != nil {
+		return sectioncontent.DefaultArchiveContent()
+	}
+	return sectioncontent.NormalizeArchiveContent(content)
+}
+
+func mustMarshalSearchContent(content sectioncontent.SearchContent) string {
+	payload, err := json.Marshal(sectioncontent.NormalizeSearchContent(content))
+	if err != nil {
+		return "{}"
+	}
+	return string(payload)
+}
+
+func mustUnmarshalSearchContent(raw string) sectioncontent.SearchContent {
+	if raw == "" {
+		return sectioncontent.DefaultSearchContent()
+	}
+	content := sectioncontent.SearchContent{}
+	if err := json.Unmarshal([]byte(raw), &content); err != nil {
+		return sectioncontent.DefaultSearchContent()
+	}
+	return sectioncontent.NormalizeSearchContent(content)
+}
+
+func mustMarshalAboutContent(content sectioncontent.AboutContent) string {
+	payload, err := json.Marshal(sectioncontent.NormalizeAboutContent(content))
+	if err != nil {
+		return "{}"
+	}
+	return string(payload)
+}
+
+func mustUnmarshalAboutContent(raw string) sectioncontent.AboutContent {
+	if raw == "" {
+		return sectioncontent.DefaultAboutContent()
+	}
+	content := sectioncontent.AboutContent{}
+	if err := json.Unmarshal([]byte(raw), &content); err != nil {
+		return sectioncontent.DefaultAboutContent()
+	}
+	return sectioncontent.NormalizeAboutContent(content)
 }

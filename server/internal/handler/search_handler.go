@@ -9,11 +9,12 @@ import (
 )
 
 type SearchHandler struct {
-	search *service.SearchService
+	search      *service.SearchService
+	suggestions *service.SuggestionService
 }
 
-func NewSearchHandler(search *service.SearchService) *SearchHandler {
-	return &SearchHandler{search: search}
+func NewSearchHandler(search *service.SearchService, suggestions *service.SuggestionService) *SearchHandler {
+	return &SearchHandler{search: search, suggestions: suggestions}
 }
 
 func (h *SearchHandler) Article(c *gin.Context) {
@@ -28,4 +29,13 @@ func (h *SearchHandler) Article(c *gin.Context) {
 		return
 	}
 	response.List(c, items, pageInfo)
+}
+
+func (h *SearchHandler) Suggestions(c *gin.Context) {
+	items, err := h.suggestions.Suggestions()
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, items)
 }

@@ -22,6 +22,7 @@ import (
 	"solitude-blog/server/internal/config"
 	"solitude-blog/server/internal/homecontent"
 	"solitude-blog/server/internal/model"
+	"solitude-blog/server/internal/sectioncontent"
 )
 
 type Resources struct {
@@ -435,6 +436,27 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 		if homeChanged {
 			updates["home_content_json"] = homeContentJSON
 		}
+		archiveContentJSON, archiveChanged, err := normalizeStoredArchiveContent(row.ArchiveContentJSON)
+		if err != nil {
+			return err
+		}
+		if archiveChanged {
+			updates["archive_content_json"] = archiveContentJSON
+		}
+		searchContentJSON, searchChanged, err := normalizeStoredSearchContent(row.SearchContentJSON)
+		if err != nil {
+			return err
+		}
+		if searchChanged {
+			updates["search_content_json"] = searchContentJSON
+		}
+		aboutContentJSON, aboutChanged, err := normalizeStoredAboutContent(row.AboutContentJSON)
+		if err != nil {
+			return err
+		}
+		if aboutChanged {
+			updates["about_content_json"] = aboutContentJSON
+		}
 		if len(updates) == 0 {
 			return nil
 		}
@@ -451,16 +473,31 @@ func seedDefaultSiteSetting(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+	archiveContentJSON, err := marshalArchiveContent(sectioncontent.DefaultArchiveContent())
+	if err != nil {
+		return err
+	}
+	searchContentJSON, err := marshalSearchContent(sectioncontent.DefaultSearchContent())
+	if err != nil {
+		return err
+	}
+	aboutContentJSON, err := marshalAboutContent(sectioncontent.DefaultAboutContent())
+	if err != nil {
+		return err
+	}
 	return db.Create(&model.SiteSetting{
-		ID:                1,
-		SiteName:          "Solitude Blog",
-		Author:            "Solitude King",
-		AuthorHandle:      "",
-		Essay:             "Keep writing, keep shipping.",
-		Theme:             appearance.DefaultTheme,
-		Mode:              appearance.DefaultMode,
-		ThemeElementsJSON: themeElementsJSON,
-		HomeContentJSON:   homeContentJSON,
+		ID:                 1,
+		SiteName:           "Solitude Blog",
+		Author:             "Solitude King",
+		AuthorHandle:       "",
+		Essay:              "Keep writing, keep shipping.",
+		Theme:              appearance.DefaultTheme,
+		Mode:               appearance.DefaultMode,
+		ThemeElementsJSON:  themeElementsJSON,
+		HomeContentJSON:    homeContentJSON,
+		ArchiveContentJSON: archiveContentJSON,
+		SearchContentJSON:  searchContentJSON,
+		AboutContentJSON:   aboutContentJSON,
 		SocialLinksJSON: `{
 			"gitee": "",
 			"bilibili": "",
@@ -507,6 +544,72 @@ func normalizeStoredHomeContent(raw string) (string, bool, error) {
 }
 
 func marshalHomeContent(content homecontent.HomeContent) (string, error) {
+	payload, err := json.Marshal(content)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func normalizeStoredArchiveContent(raw string) (string, bool, error) {
+	stored := sectioncontent.ArchiveContent{}
+	if raw == "" || json.Unmarshal([]byte(raw), &stored) != nil {
+		payload, err := marshalArchiveContent(sectioncontent.DefaultArchiveContent())
+		return payload, true, err
+	}
+	normalized := sectioncontent.NormalizeArchiveContent(stored)
+	if reflect.DeepEqual(stored, normalized) {
+		return raw, false, nil
+	}
+	payload, err := marshalArchiveContent(normalized)
+	return payload, true, err
+}
+
+func marshalArchiveContent(content sectioncontent.ArchiveContent) (string, error) {
+	payload, err := json.Marshal(content)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func normalizeStoredSearchContent(raw string) (string, bool, error) {
+	stored := sectioncontent.SearchContent{}
+	if raw == "" || json.Unmarshal([]byte(raw), &stored) != nil {
+		payload, err := marshalSearchContent(sectioncontent.DefaultSearchContent())
+		return payload, true, err
+	}
+	normalized := sectioncontent.NormalizeSearchContent(stored)
+	if reflect.DeepEqual(stored, normalized) {
+		return raw, false, nil
+	}
+	payload, err := marshalSearchContent(normalized)
+	return payload, true, err
+}
+
+func marshalSearchContent(content sectioncontent.SearchContent) (string, error) {
+	payload, err := json.Marshal(content)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func normalizeStoredAboutContent(raw string) (string, bool, error) {
+	stored := sectioncontent.AboutContent{}
+	if raw == "" || json.Unmarshal([]byte(raw), &stored) != nil {
+		payload, err := marshalAboutContent(sectioncontent.DefaultAboutContent())
+		return payload, true, err
+	}
+	normalized := sectioncontent.NormalizeAboutContent(stored)
+	if reflect.DeepEqual(stored, normalized) {
+		return raw, false, nil
+	}
+	payload, err := marshalAboutContent(normalized)
+	return payload, true, err
+}
+
+func marshalAboutContent(content sectioncontent.AboutContent) (string, error) {
 	payload, err := json.Marshal(content)
 	if err != nil {
 		return "", err
